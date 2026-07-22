@@ -35,7 +35,7 @@ export class CognitionTraceStore {
       workflow_id: input.workflow_id,
       requested_by: input.requested_by,
       system_active: true,
-      status: "ACTIVE",
+      status: "QUEUED",
       created_at: input.created_at,
       completed_at: null,
       intent: {
