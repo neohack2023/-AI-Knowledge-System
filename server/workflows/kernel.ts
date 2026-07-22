@@ -233,15 +233,12 @@ export class WorkflowExecutionKernel {
     });
     this.events.set(execution.execution_id, events);
 
+    cognitionTraceStore.setStatus(execution.execution_id, execution.status, execution.completed_at);
     cognitionTraceStore.recordEvent(execution.execution_id, "WORKFLOW", eventType, {
       workflow_status: execution.status,
       stage: execution.current_stage,
       ...(data ?? {}),
     });
-
-    if (execution.status === "COMPLETED") cognitionTraceStore.setStatus(execution.execution_id, "COMPLETED", execution.completed_at);
-    if (execution.status === "FAILED") cognitionTraceStore.setStatus(execution.execution_id, "FAILED", execution.completed_at);
-    if (execution.status === "CANCELLED") cognitionTraceStore.setStatus(execution.execution_id, "CANCELLED", execution.completed_at);
   }
 
   private snapshot(executionId: string): ExecutionSnapshot {
