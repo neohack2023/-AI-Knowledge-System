@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { CognitionTrace } from "../../server/observability/types";
 
 type TraceResponse = {
@@ -13,21 +13,21 @@ type TraceResponse = {
   };
 };
 
-const panel: React.CSSProperties = {
+const panel: CSSProperties = {
   border: "1px solid rgba(91, 214, 191, .24)",
   background: "rgba(5, 18, 20, .86)",
   borderRadius: 14,
   padding: 18,
 };
 
-const label: React.CSSProperties = {
+const label: CSSProperties = {
   color: "#6f9791",
   fontSize: 11,
   letterSpacing: ".12em",
   textTransform: "uppercase",
 };
 
-const value: React.CSSProperties = {
+const value: CSSProperties = {
   color: "#d7efeb",
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
   fontSize: 13,
