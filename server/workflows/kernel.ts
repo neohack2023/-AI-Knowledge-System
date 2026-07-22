@@ -147,7 +147,9 @@ export class WorkflowExecutionKernel {
 
   fail(executionId: string, error: WorkflowExecutionError): ExecutionSnapshot {
     const execution = this.requireExecution(executionId);
-    if (terminalStatuses.has(execution.status)) throw new WorkflowKernelError("INVALID_TRANSITION", `Cannot fail an execution in ${execution.status}.", 409);
+    if (terminalStatuses.has(execution.status)) {
+      throw new WorkflowKernelError("INVALID_TRANSITION", `Cannot fail an execution in ${execution.status}.`, 409);
+    }
     this.transitionToFailure(execution, error);
     return this.snapshot(executionId);
   }
@@ -211,7 +213,7 @@ export class WorkflowExecutionKernel {
 
   private assertStatus(execution: WorkflowExecution, allowed: WorkflowExecution["status"][], operation: string) {
     if (!allowed.includes(execution.status)) {
-      throw new WorkflowKernelError("INVALID_TRANSITION", `Cannot ${operation} an execution in ${execution.status}.", 409);
+      throw new WorkflowKernelError("INVALID_TRANSITION", `Cannot ${operation} an execution in ${execution.status}.`, 409);
     }
   }
 
