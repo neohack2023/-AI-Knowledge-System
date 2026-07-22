@@ -22,7 +22,15 @@ export const authorityRoles = [
 
 export type AuthorityRole = (typeof authorityRoles)[number];
 export type ConfidenceBand = "LOW" | "MEDIUM" | "HIGH";
-export type CognitionTraceStatus = "ACTIVE" | "COMPLETED" | "FAILED" | "CANCELLED";
+export type CognitionTraceStatus =
+  | "QUEUED"
+  | "RUNNING"
+  | "WAITING"
+  | "APPROVAL_REQUIRED"
+  | "PAUSED"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
 export type ObservabilityCategory =
   | "SYSTEM"
   | "INTENT"
