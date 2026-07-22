@@ -1,4 +1,5 @@
 import type { RuntimeMode } from "../../shared/runtime-mode.ts";
+import type { CognitionTrace, WorkflowObservationEmitter } from "../observability/types.ts";
 
 export const executionStatuses = [
   "QUEUED",
@@ -60,6 +61,7 @@ export type HandlerResult = {
 export type WorkflowHandlerContext = {
   execution: Readonly<WorkflowExecution>;
   now: () => string;
+  observe: WorkflowObservationEmitter;
 };
 
 export interface WorkflowHandler {
@@ -82,4 +84,5 @@ export type CreateExecutionRequest = {
 export type ExecutionSnapshot = {
   execution: WorkflowExecution;
   events: ExecutionEvent[];
+  trace: CognitionTrace;
 };

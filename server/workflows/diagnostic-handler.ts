@@ -21,8 +21,16 @@ export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
   readonly supports_pause = true;
   readonly supports_cancel = true;
 
-  async start({ execution }: WorkflowHandlerContext): Promise<HandlerResult> {
+  async start({ execution, observe }: WorkflowHandlerContext): Promise<HandlerResult> {
     const keys = Object.keys(execution.input).sort();
+    observe.sourceRead({
+      system: "TRANSIENT_CONTEXT",
+      resource: "workflow_execution.input",
+      purpose: "Validate diagnostic workflow input before server-side computation.",
+      authority_role: "TRANSIENT",
+      result: "SUCCESS",
+      metadata: { input_property_count: keys.length },
+    });
     return {
       status: "RUNNING",
       current_stage: "compute",

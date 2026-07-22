@@ -1,3 +1,4 @@
+import { cognitionTraceStore } from "../observability/trace-store.ts";
 import { InternalDiagnosticWorkflowHandler } from "./diagnostic-handler.ts";
 import type {
   CreateExecutionRequest,
@@ -65,6 +66,13 @@ export class WorkflowExecutionKernel {
 
     this.executions.set(execution.execution_id, execution);
     this.events.set(execution.execution_id, []);
+    cognitionTraceStore.createTrace({
+      execution_id: execution.execution_id,
+      workflow_id: execution.workflow_id,
+      requested_by: execution.requested_by,
+      requested_scope_key: execution.scope_key,
+      created_at: now,
+    });
 
     if (!this.handlers.has(request.workflow_id)) {
       this.transitionToFailure(execution, {
@@ -139,7 +147,9 @@ export class WorkflowExecutionKernel {
 
   fail(executionId: string, error: WorkflowExecutionError): ExecutionSnapshot {
     const execution = this.requireExecution(executionId);
-    if (terminalStatuses.has(execution.status)) throw new WorkflowKernelError("INVALID_TRANSITION", `Cannot fail an execution in ${execution.status}.`, 409);
+    if (terminalStatuses.has(execution.status)) {
+      throw new WorkflowKernelError("INVALID_TRANSITION", `Cannot fail an execution in ${execution.status}.`, 409);
+    }
     this.transitionToFailure(execution, error);
     return this.snapshot(executionId);
   }
@@ -156,7 +166,11 @@ export class WorkflowExecutionKernel {
   }
 
   private context(execution: WorkflowExecution) {
-    return { execution: structuredClone(execution), now: () => new Date().toISOString() };
+    return {
+      execution: structuredClone(execution),
+      now: () => new Date().toISOString(),
+      observe: cognitionTraceStore.emitter(execution.execution_id),
+    };
   }
 
   private async invoke(execution: WorkflowExecution, operation: () => Promise<HandlerResult>) {
@@ -218,13 +232,23 @@ export class WorkflowExecutionKernel {
       ...(data ? { data } : {}),
     });
     this.events.set(execution.execution_id, events);
+
+    cognitionTraceStore.setStatus(execution.execution_id, execution.status, execution.completed_at);
+    cognitionTraceStore.recordEvent(execution.execution_id, "WORKFLOW", eventType, {
+      workflow_status: execution.status,
+      stage: execution.current_stage,
+      ...(data ?? {}),
+    });
   }
 
   private snapshot(executionId: string): ExecutionSnapshot {
     const execution = this.requireExecution(executionId);
+    const trace = cognitionTraceStore.getTraceByExecution(executionId);
+    if (!trace) throw new WorkflowKernelError("TRACE_NOT_FOUND", "Cognition trace was not found for workflow execution.", 500);
     return {
       execution: structuredClone(execution),
       events: structuredClone(this.events.get(executionId) ?? []),
+      trace,
     };
   }
 }
