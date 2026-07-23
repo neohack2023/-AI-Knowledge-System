@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  Activity, Archive, BadgeCheck, Box, BrainCircuit, Braces, Check, ChevronDown, CirclePause,
+  Activity, Box, BrainCircuit, Braces, Check, ChevronDown, CirclePause,
   CirclePlay, Clock3, Code2, Database, FileClock, FileSearch, GitBranch, Grid3X3, History,
-  Layers3, Library, MemoryStick, Network, OctagonAlert, Pause, Play, Radio, RotateCcw,
+  Layers3, Library, MemoryStick, Network, OctagonAlert, Play, Radio, RotateCcw,
   Search, ShieldCheck, Sparkles, Square, TerminalSquare, X, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +13,8 @@ import {
 } from "./system-registry";
 import { SimulationEventTransport, type WorkflowEvent } from "./runtime";
 import { runtimeModePresentation, type RuntimeMode } from "../shared/runtime-mode";
+import type { NextActionDefinition, NextActionEnvelope } from "../shared/next-actions";
+import { NextActionApprovalPanel, NextActionsPanel } from "./next-actions-panel";
 
 type RunRecord = { id: string; workflow: string; scope: string; startedAt: string; mode: RuntimeMode; status: RuntimeStatus; events: WorkflowEvent[] };
 type NodeRuntime = Record<string, { status: RuntimeStatus; duration?: number }>;
@@ -170,8 +172,8 @@ function ApprovalPanel({ workflow, scope, event, expanded, onInspect, onApprove,
 
 function Observatory() {
   const [workflowId, setWorkflowId] = useState(workflowRegistry[0].id);
-  const workflow = useMemo(() => workflowRegistry.find((w) => w.id === workflowId)!, [workflowId]);
-  const allowedScopes = useMemo(() => scopeRegistry.filter((s) => workflow.allowedScopes.includes("*") || workflow.allowedScopes.includes(s.key)), [workflow]);
+  const workflow = useMemo(() => workflowRegistry.find((candidate) => candidate.id === workflowId)!, [workflowId]);
+  const allowedScopes = useMemo(() => scopeRegistry.filter((scope) => workflow.allowedScopes.includes("*") || workflow.allowedScopes.includes(scope.key)), [workflow]);
   const [scopeKey, setScopeKey] = useState(allowedScopes[0].key);
   const [events, setEvents] = useState<WorkflowEvent[]>([]);
   const [runtime, setRuntime] = useState<NodeRuntime>({});
@@ -183,10 +185,13 @@ function Observatory() {
   const [transport, setTransport] = useState<SimulationEventTransport>();
   const [paused, setPaused] = useState(false);
   const [focusNode, setFocusNode] = useState<string>();
-  const [selectedNode, setSelectedNode] = useState<GraphNode>(graphNodes.find((n) => n.id === "retrieval")!);
+  const [selectedNode, setSelectedNode] = useState<GraphNode>(graphNodes.find((node) => node.id === "retrieval")!);
   const [showPlan, setShowPlan] = useState(false);
   const [history, setHistory] = useState<RunRecord[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [nextActions, setNextActions] = useState<NextActionEnvelope>();
+  const [pendingAction, setPendingAction] = useState<NextActionDefinition>();
+  const [selectedCommand, setSelectedCommand] = useState<string>();
   const eventsRef = useRef<WorkflowEvent[]>([]);
   const currentEvent = events.at(-1);
   const modeCopy = runtimeModePresentation[mode];
@@ -203,47 +208,105 @@ function Observatory() {
   const accept = useCallback((event: WorkflowEvent) => {
     eventsRef.current = [...eventsRef.current, event]; setEvents(eventsRef.current); setStatus(event.status); setFocusNode(event.node_id);
     setRuntime((old) => ({ ...old, [event.node_id]: { status: event.status, duration: event.duration } }));
+    if (event.next_action_envelope) setNextActions(event.next_action_envelope);
     if (event.event_type === "workflow.completed") {
       setHistory((old) => [{ id: event.execution_id, workflow: event.workflow_id, scope: event.scope_key, startedAt: eventsRef.current[0]?.timestamp ?? event.timestamp, mode: "SIMULATION", status: "COMPLETED", events: [...eventsRef.current] }, ...old]);
     }
   }, []);
 
-  const execute = () => {
+  const executeDefinition = (definition: WorkflowDefinition, targetScope: string) => {
     const id = `trc-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${Math.random().toString(16).slice(2, 8)}`;
-    const sim = new SimulationEventTransport(); sim.subscribe(accept); eventsRef.current = []; setEvents([]); setRuntime({}); setMode(sim.mode); setStatus("QUEUED"); setExecutionId(id); setStartAt(performance.now()); setElapsed(0); setPaused(false); setTransport(sim); setHistoryOpen(false); void sim.start(workflow, scopeKey, id);
+    const sim = new SimulationEventTransport(workflowRegistry.map((candidate) => candidate.id));
+    sim.subscribe(accept);
+    eventsRef.current = [];
+    setEvents([]); setRuntime({}); setMode(sim.mode); setStatus("QUEUED"); setExecutionId(id); setStartAt(performance.now()); setElapsed(0); setPaused(false); setTransport(sim); setHistoryOpen(false);
+    setWorkflowId(definition.id); setScopeKey(targetScope); setNextActions(undefined); setPendingAction(undefined); setSelectedCommand(undefined);
+    void sim.start(definition, targetScope, id);
   };
+
+  const execute = () => executeDefinition(workflow, scopeKey);
   const cancel = () => { transport?.cancel(); setStatus("CANCELLED"); };
   const togglePause = () => { if (!transport) return; if (paused) { transport.resume(); setPaused(false); setStatus("ACTIVE"); } else { transport.pause(); setPaused(true); setStatus("WAITING"); } };
   const replay = async (run: RunRecord) => {
-    setHistoryOpen(false); setMode("REPLAY"); setExecutionId(run.id); setEvents([]); setRuntime({}); setStatus("ACTIVE"); eventsRef.current = [];
-    for (const event of run.events) { const replayed = { ...event, id: `replay-${event.id}` }; accept(replayed); await new Promise((r) => setTimeout(r, 180)); }
+    setHistoryOpen(false); setMode("REPLAY"); setExecutionId(run.id); setEvents([]); setRuntime({}); setStatus("ACTIVE"); eventsRef.current = []; setNextActions(undefined);
+    for (const event of run.events) { const replayed = { ...event, id: `replay-${event.id}` }; accept(replayed); await new Promise((resolve) => setTimeout(resolve, 180)); }
     setStatus(run.status);
   };
-  const approvalEvent = events.findLast((e) => e.status === "APPROVAL REQUIRED");
-  const approvalActive = status === "APPROVAL REQUIRED" && approvalEvent;
+
+  const recordNextActionEvent = (action: NextActionDefinition, eventType: string, eventStatus: RuntimeStatus = "COMPLETED") => {
+    const event: WorkflowEvent = {
+      id: `${executionId}-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
+      timestamp: new Date().toISOString(), event_type: eventType, workflow_id: workflow.id, execution_id: executionId,
+      scope_key: scopeKey, stage: "Next action", node_id: "capability", source: "NextActionEnvelope",
+      authority: action.requires_approval ? "User authorization" : "Workflow transition registry",
+      capability: workflow.capability, operation: action.command, status: eventStatus,
+      input_summary: nextActions?.result_class, output_summary: action.target_workflow_id ? `Target ${action.target_workflow_id}` : action.terminal ? "Terminal transition" : "Advisory transition selected",
+      provenance: "Registry-backed transition selection · simulation only", next_stage: action.target_workflow_id,
+    };
+    accept(event);
+    setHistory((old) => old.map((run) => run.id === executionId ? { ...run, events: [...run.events, event] } : run));
+  };
+
+  const launchSelectedTarget = (action: NextActionDefinition) => {
+    if (!action.target_workflow_id) return;
+    const target = workflowRegistry.find((candidate) => candidate.id === action.target_workflow_id);
+    if (!target) return;
+    const targetAllowsScope = target.allowedScopes.includes("*") || target.allowedScopes.includes(scopeKey);
+    if (!targetAllowsScope) return;
+    executeDefinition(target, scopeKey);
+  };
+
+  const handleNextAction = (action: NextActionDefinition) => {
+    setSelectedCommand(action.command);
+    if (action.requires_approval) {
+      recordNextActionEvent(action, "next_action.approval_required", "APPROVAL REQUIRED");
+      setPendingAction(action);
+      return;
+    }
+    recordNextActionEvent(action, "next_action.selected");
+    if (action.terminal) { setNextActions(undefined); return; }
+    if (action.target_workflow_id) launchSelectedTarget(action);
+  };
+
+  const approvePendingAction = () => {
+    if (!pendingAction) return;
+    const approved = pendingAction;
+    recordNextActionEvent(approved, "next_action.approved");
+    setPendingAction(undefined);
+    launchSelectedTarget(approved);
+  };
+
+  const rejectPendingAction = () => {
+    if (!pendingAction) return;
+    recordNextActionEvent(pendingAction, "next_action.rejected");
+    setPendingAction(undefined); setStatus("COMPLETED");
+  };
+
+  const approvalEvent = events.findLast((event) => event.event_type === "approval.required");
+  const approvalActive = status === "APPROVAL REQUIRED" && approvalEvent && !pendingAction;
 
   return <section className="observatory">
-    <div className="section-heading"><div><MiniLabel>04 / OBSERVATORY</MiniLabel><h1>Workflow execution topology</h1><p>The semantic map becomes a runtime instrument only when structured events arrive.</p></div><div className="heading-actions"><button className={historyOpen ? "icon-btn selected" : "icon-btn"} onClick={() => setHistoryOpen(!historyOpen)}><History size={16} /><span>History</span><b>{history.length}</b></button><ModeBadge mode={mode} /></div></div>
+    <div className="section-heading"><div><MiniLabel>04 / OBSERVATORY</MiniLabel><h1>Workflow execution topology</h1><p>Structured results now expose only registry-valid follow-up transitions.</p></div><div className="heading-actions"><button className={historyOpen ? "icon-btn selected" : "icon-btn"} onClick={() => setHistoryOpen(!historyOpen)}><History size={16} /><span>History</span><b>{history.length}</b></button><ModeBadge mode={mode} /></div></div>
 
     <div className="launcher panel-cut">
       <div className="launcher-title"><div className="pulse-mark"><Zap size={15} /></div><div><MiniLabel>WORKFLOW LAUNCHER</MiniLabel><strong>Explicit simulation harness</strong></div></div>
-      <label><span>Workflow</span><div className="select-wrap"><select value={workflowId} onChange={(e) => selectWorkflow(e.target.value)} disabled={!(["IDLE", "COMPLETED", "CANCELLED", "FAILED"].includes(status))}>{workflowRegistry.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select><ChevronDown size={14} /></div></label>
-      <label><span>Scope / Project</span><div className="select-wrap"><select value={scopeKey} onChange={(e) => setScopeKey(e.target.value)} disabled={!(["IDLE", "COMPLETED", "CANCELLED", "FAILED"].includes(status))}>{allowedScopes.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select><ChevronDown size={14} /></div></label>
+      <label><span>Workflow</span><div className="select-wrap"><select value={workflowId} onChange={(event) => selectWorkflow(event.target.value)} disabled={!(["IDLE", "COMPLETED", "CANCELLED", "FAILED"].includes(status))}>{workflowRegistry.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select><ChevronDown size={14} /></div></label>
+      <label><span>Scope / Project</span><div className="select-wrap"><select value={scopeKey} onChange={(event) => setScopeKey(event.target.value)} disabled={!(["IDLE", "COMPLETED", "CANCELLED", "FAILED"].includes(status))}>{allowedScopes.map((scope) => <option key={scope.key} value={scope.key}>{scope.label}</option>)}</select><ChevronDown size={14} /></div></label>
       <button className="execute-btn" onClick={execute} disabled={["ACTIVE", "WAITING", "APPROVAL REQUIRED", "QUEUED"].includes(status)}><Play size={15} fill="currentColor" />Execute</button>
       <div className="run-state"><div><span className={`status-light ${statusClass(status)}`} /><span>{status}</span></div><strong><Clock3 size={13} />{formatTimer(elapsed)}</strong><code>{executionId}</code></div>
       <div className="run-controls"><button onClick={togglePause} disabled={!transport || !workflow.supportsPause || ["COMPLETED", "CANCELLED", "FAILED"].includes(status)}>{paused ? <CirclePlay size={16} /> : <CirclePause size={16} />}</button><button onClick={cancel} disabled={!transport || !workflow.supportsCancel || ["COMPLETED", "CANCELLED", "FAILED"].includes(status)}><Square size={15} /></button></div>
     </div>
 
-    <div className="registry-line"><span><Database size={12} />MOCK Capability Registry</span><code>{workflow.capability}</code><span>{workflow.autonomy}</span><span>{workflow.status}</span><span>v{workflow.version}</span><span className="source-note">SNAPSHOT · Drive registry · 2026-07-19</span></div>
+    <div className="registry-line"><span><Database size={12} />REGISTRY-BACKED Capability Registry</span><code>{workflow.capability}</code><span>{workflow.autonomy}</span><span>{workflow.status}</span><span>v{workflow.version}</span><span className="source-note">NEXT_ACTION_ENVELOPE · 2026-07-23</span></div>
 
     {historyOpen ? <div className="history-view panel-cut">
       <div className="history-head"><div><MiniLabel>EXECUTION HISTORY</MiniLabel><h2>Local trace archive</h2></div><span>Historical runs are session-local and never presented as live telemetry.</span></div>
-      {history.length === 0 ? <div className="empty-history"><FileClock size={28} /><strong>No executions recorded in this session</strong><span>Run a simulation to create a replayable trace.</span></div> : history.map((run) => <button className="history-row" key={run.id} onClick={() => void replay(run)}><RotateCcw size={15} /><div><strong>{workflowRegistry.find((w) => w.id === run.workflow)?.name}</strong><span>{scopeRegistry.find((s) => s.key === run.scope)?.label}</span></div><code>{run.id}</code><span>{run.mode} · {run.events.length} events</span><i className={`status-pill ${statusClass(run.status)}`}>{run.status}</i></button>)}
+      {history.length === 0 ? <div className="empty-history"><FileClock size={28} /><strong>No executions recorded in this session</strong><span>Run a simulation to create a replayable trace.</span></div> : history.map((run) => <button className="history-row" key={run.id} onClick={() => void replay(run)}><RotateCcw size={15} /><div><strong>{workflowRegistry.find((candidate) => candidate.id === run.workflow)?.name}</strong><span>{scopeRegistry.find((scope) => scope.key === run.scope)?.label}</span></div><code>{run.id}</code><span>{run.mode} · {run.events.length} events</span><i className={`status-pill ${statusClass(run.status)}`}>{run.status}</i></button>)}
     </div> : <>
       <div className="observatory-grid">
         <div className="map-panel panel-cut">
           <div className="panel-bar"><div><MiniLabel>{modeCopy.pathLabel}</MiniLabel><strong>Semantic topology / workflow path</strong></div><div className="view-chips"><button className="active">Governance Core</button><button>Provenance</button><button>Memory Health</button></div></div>
-          <SpatialGraph workflow={workflow} runtime={runtime} activeNode={currentEvent?.status === "ACTIVE" ? currentEvent.node_id : undefined} focusNode={focusNode} onSelect={(n) => { setSelectedNode(n); setFocusNode(n.id); }} />
+          <SpatialGraph workflow={workflow} runtime={runtime} activeNode={currentEvent?.status === "ACTIVE" ? currentEvent.node_id : undefined} focusNode={focusNode} onSelect={(node) => { setSelectedNode(node); setFocusNode(node.id); }} />
         </div>
         <aside className="trace-panel panel-cut">
           <div className="panel-bar"><div><MiniLabel>{modeCopy.traceLabel}</MiniLabel><strong>{currentEvent?.stage ?? "Awaiting execution"}</strong></div><span className={`trace-status ${statusClass(status)}`}>{status}</span></div>
@@ -255,10 +318,12 @@ function Observatory() {
             <div className="wide"><span>Provenance</span><strong>{modeCopy.factLabel} · {currentEvent?.provenance ?? "No runtime provenance yet"}</strong></div><div><span>Next stage</span><code>{currentEvent ? `${modeCopy.factLabel} · ${currentEvent.next_stage ?? "—"}` : "SNAPSHOT · —"}</code></div>
           </div>
           <div className="event-head"><span>EVENT STREAM</span><b>{events.length}</b></div>
-          <div className="event-stream">{events.length === 0 ? <div className="empty-stream"><Activity size={18} />Structured events will appear here</div> : [...events].reverse().map((event) => <button key={event.id} className={`event-row ${event.node_id === focusNode ? "selected" : ""}`} onClick={() => { setFocusNode(event.node_id); setSelectedNode(graphNodes.find((n) => n.id === event.node_id)!); }}><time>{formatTime(event.timestamp)}</time><i className={statusClass(event.status)} /><div><strong>{event.event_type}</strong><span>{event.operation}</span></div><em>{event.duration ? `${event.duration}ms` : ""}</em></button>)}</div>
+          <div className="event-stream">{events.length === 0 ? <div className="empty-stream"><Activity size={18} />Structured events will appear here</div> : [...events].reverse().map((event) => <button key={event.id} className={`event-row ${event.node_id === focusNode ? "selected" : ""}`} onClick={() => { setFocusNode(event.node_id); setSelectedNode(graphNodes.find((node) => node.id === event.node_id) ?? selectedNode); }}><time>{formatTime(event.timestamp)}</time><i className={statusClass(event.status)} /><div><strong>{event.event_type}</strong><span>{event.operation}</span></div><em>{event.duration ? `${event.duration}ms` : ""}</em></button>)}</div>
         </aside>
       </div>
       {approvalActive && <ApprovalPanel workflow={workflow} scope={scopeKey} event={approvalEvent} expanded={showPlan} onInspect={() => setShowPlan(!showPlan)} onReject={() => { transport?.reject(); setStatus("CANCELLED"); }} onApprove={() => transport?.approve()} />}
+      {pendingAction && <NextActionApprovalPanel action={pendingAction} scopeKey={scopeKey} onApprove={approvePendingAction} onReject={rejectPendingAction} />}
+      {nextActions && <NextActionsPanel envelope={nextActions} selectedCommand={selectedCommand} onSelect={handleNextAction} />}
       <div className="inspector-row">
         <div className="node-inspector panel-cut"><div className="node-symbol"><Network size={18} /></div><div><MiniLabel>CONTEXT INSPECTOR</MiniLabel><h3>{selectedNode.label}</h3><p>{selectedNode.detail}</p></div><div className="node-meta"><span>Object type <b>{selectedNode.type}</b></span><span>Scope <b>{scopeKey}</b></span><span>Lifecycle <b>{runtime[selectedNode.id]?.status ?? "IDLE"}</b></span></div></div>
         <div className="packet-card panel-cut"><MiniLabel>SAMPLE · SMALLEST TRUSTWORTHY PACKET</MiniLabel><div><span>01</span><strong>Exact scope record</strong><em>SNAPSHOT · Drive shadow</em></div><div><span>02</span><strong>Workflow contract</strong><em>SNAPSHOT · Notion authority</em></div><div><span>03</span><strong>{scopeKey.includes("github:") ? "Repository identity + head" : "Project handoff pointer"}</strong><em>SNAPSHOT · {scopeKey.includes("github:") ? "GitHub" : "Notion"}</em></div></div>
@@ -275,11 +340,11 @@ function Overview({ onOpenScope }: { onOpenScope: (key: string) => void }) {
       <div><Database size={17} /><span>NOTION<small>Memory authority</small></span><b>SNAPSHOT · AUTHORITATIVE</b></div>
       <div><Layers3 size={17} /><span>GOOGLE DRIVE<small>Runtime / control plane</small></span><b>SNAPSHOT · DRIVE SHADOW</b></div>
       <div><GitBranch size={17} /><span>GITHUB<small>Repository execution facts</small></span><b>SNAPSHOT · AUTHORITATIVE</b></div>
-      <div><ShieldCheck size={17} /><span>GOVERNANCE<small>Durable writes</small></span><b>SAMPLE · STONE → MASON</b></div>
+      <div><ShieldCheck size={17} /><span>GOVERNANCE<small>Durable writes</small></span><b>ACTIVE · STONE → MASON</b></div>
     </div>
-    <div className="overview-title"><div><MiniLabel>PROJECT UNIVERSES</MiniLabel><h2>Registered scopes and pending identities</h2></div><span>SNAPSHOT · authority registry · 2026-07-20</span></div>
-    <div className="universe-grid">{projectUniverses.map(([name, key, kind], i) => <button key={name} onClick={() => key !== "unregistered" && onOpenScope(key)} className={key === "unregistered" ? "pending" : ""}><span className="universe-num">0{i + 1}</span><div className="universe-core"><i /><i /></div><strong>{name}</strong><code>{key}</code><em>{kind}</em>{key === "unregistered" && <b>REGISTRATION PENDING</b>}</button>)}</div>
-    <div className="pipeline-card panel-cut"><div><MiniLabel>SAMPLE · GOVERNED EXECUTION CONTRACT</MiniLabel><strong>An agent is only as safe as its least reversible action.</strong></div>{["SOURCE", "STONE", "CANDIDATE", "MASON", "WRITE PLAN", "AUTHORIZATION", "EXECUTION", "VERIFY", "RECEIPT"].map((x, i) => <span key={x}><i>{String(i + 1).padStart(2, "0")}</i>{x}</span>)}</div>
+    <div className="overview-title"><div><MiniLabel>PROJECT UNIVERSES</MiniLabel><h2>Registered scopes and pending identities</h2></div><span>SNAPSHOT · authority registry · 2026-07-23</span></div>
+    <div className="universe-grid">{projectUniverses.map(([name, key, kind], index) => <button key={name} onClick={() => key !== "unregistered" && onOpenScope(key)} className={key === "unregistered" ? "pending" : ""}><span className="universe-num">0{index + 1}</span><div className="universe-core"><i /><i /></div><strong>{name}</strong><code>{key}</code><em>{kind}</em>{key === "unregistered" && <b>REGISTRATION PENDING</b>}</button>)}</div>
+    <div className="pipeline-card panel-cut"><div><MiniLabel>GOVERNED EXECUTION CONTRACT</MiniLabel><strong>An agent is only as safe as its least reversible action.</strong></div>{["SOURCE", "STONE", "CANDIDATE", "MASON", "WRITE PLAN", "AUTHORIZATION", "EXECUTION", "VERIFY", "RECEIPT", "NEXT ACTION"].map((item, index) => <span key={item}><i>{String(index + 1).padStart(2, "0")}</i>{item}</span>)}</div>
   </section>;
 }
 
@@ -289,8 +354,8 @@ function CommandPalette({ onClose, onNavigate }: { onClose: () => void; onNaviga
     ["Open Observatory", "Watch event-driven workflow execution", "observatory"], ["Open Girls of Gaming canon", "Resolve girls-of-gaming", "overview"],
     ["Show Looper repository state", "Resolve github:neohack2023/Looper", "observatory"], ["Inspect migration parity", "Open runtime registry surface", "overview"],
     ["Find vocal-handoff research", "Search udio-algorithms research", "overview"],
-  ].filter((x) => `${x[0]} ${x[1]}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="palette-backdrop" onMouseDown={onClose}><div className="palette" onMouseDown={(e) => e.stopPropagation()}><div className="palette-search"><Search size={18} /><input autoFocus placeholder="Ask or navigate AI Knowledge System…" value={query} onChange={(e) => setQuery(e.target.value)} /><kbd>ESC</kbd></div><MiniLabel>COMMANDS + TRUSTED RETRIEVAL</MiniLabel>{commands.map(([title, sub, view]) => <button key={title} onClick={() => { onNavigate(view); onClose(); }}><Sparkles size={15} /><div><strong>{title}</strong><span>{sub}</span></div><em>↵</em></button>)}</div></div>;
+  ].filter((item) => `${item[0]} ${item[1]}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="palette-backdrop" onMouseDown={onClose}><div className="palette" onMouseDown={(event) => event.stopPropagation()}><div className="palette-search"><Search size={18} /><input autoFocus placeholder="Ask or navigate AI Knowledge System…" value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>ESC</kbd></div><MiniLabel>COMMANDS + TRUSTED RETRIEVAL</MiniLabel>{commands.map(([title, sub, view]) => <button key={title} onClick={() => { onNavigate(view); onClose(); }}><Sparkles size={15} /><div><strong>{title}</strong><span>{sub}</span></div><em>↵</em></button>)}</div></div>;
 }
 
 const navGroups = [
@@ -302,18 +367,18 @@ const navGroups = [
 
 export default function Cockpit() {
   const [view, setView] = useState("observatory"); const [palette, setPalette] = useState(false); const [scopeFocus, setScopeFocus] = useState<string>();
-  useEffect(() => { const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPalette(true); } if (e.key === "Escape") setPalette(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPalette(true); } if (event.key === "Escape") setPalette(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
   return <main className="cockpit-shell">
     <aside className="side-nav">
       <div className="brand"><div className="brand-mark"><BrainCircuit size={20} /></div><div><strong>AI KNOWLEDGE</strong><span>SYSTEM / 01</span></div></div>
-      <div className="environment"><i />CONTROL PLANE <b>OBSERVE</b></div>
+      <div className="environment"><i />CONTROL PLANE <b>TRANSITIONS</b></div>
       <nav>{navGroups.map((group) => <div className="nav-group" key={group.label || "top"}>{group.label && <span>{group.label}</span>}{group.items.map(([id, label, Icon]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)}><Icon size={15} />{label}{id === "observatory" && <i />}</button>)}</div>)}</nav>
-      <div className="nav-footer"><div><span>AUTHORITY MODEL</span><strong>notion_authoritative</strong><small>→ drive_shadow</small></div><button><Code2 size={14} />Read-only cockpit</button></div>
+      <div className="nav-footer"><div><span>AUTHORITY MODEL</span><strong>notion_authoritative</strong><small>→ drive_shadow</small></div><button><Code2 size={14} />Governed cockpit</button></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div className="crumbs"><span>AI_KNOWLEDGE_SYSTEM</span><b>/</b><strong>{view.toUpperCase().replaceAll("-", "_")}</strong>{scopeFocus && <><b>/</b><code>{scopeFocus}</code></>}</div><button className="command-trigger" onClick={() => setPalette(true)}><Search size={14} /><span>Ask AI Knowledge System…</span><kbd>⌘K</kbd></button><div className="top-status"><span><i />REGISTRY SNAPSHOT</span><b>20 JUL 2026</b></div></header>
+      <header className="topbar"><div className="crumbs"><span>AI_KNOWLEDGE_SYSTEM</span><b>/</b><strong>{view.toUpperCase().replaceAll("-", "_")}</strong>{scopeFocus && <><b>/</b><code>{scopeFocus}</code></>}</div><button className="command-trigger" onClick={() => setPalette(true)}><Search size={14} /><span>Ask AI Knowledge System…</span><kbd>⌘K</kbd></button><div className="top-status"><span><i />NEXT ACTIONS ACTIVE</span><b>23 JUL 2026</b></div></header>
       <div className="content-shell">{view === "observatory" ? <Observatory /> : <Overview onOpenScope={(key) => { setScopeFocus(key); setView("observatory"); }} />}</div>
-      <footer><span>AI_KNOWLEDGE_SYSTEM / OBSERVABILITY LAYER</span><span>READ ≠ WRITE</span><span>Telemetry unavailable → SIMULATION only</span><b>PRIVATE AGENT PREVIEW</b></footer>
+      <footer><span>AI_KNOWLEDGE_SYSTEM / OBSERVABILITY LAYER</span><span>READ ≠ WRITE</span><span>NEXT ACTION ≠ AUTHORIZATION</span><b>PRIVATE AGENT PREVIEW</b></footer>
     </div>
     {palette && <CommandPalette onClose={() => setPalette(false)} onNavigate={setView} />}
   </main>;
