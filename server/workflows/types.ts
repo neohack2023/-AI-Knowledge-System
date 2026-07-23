@@ -1,4 +1,5 @@
 import type { RuntimeMode } from "../../shared/runtime-mode.ts";
+import type { NextActionEnvelope, NextActionSelection } from "../../shared/next-actions.ts";
 
 export const executionStatuses = [
   "QUEUED",
@@ -20,6 +21,7 @@ export type WorkflowExecution = {
   workflow_id: string;
   scope_key: string;
   requested_by: string | null;
+  parent_execution_id: string | null;
   mode: WorkflowExecutionMode;
   status: WorkflowExecutionStatus;
   created_at: string;
@@ -29,6 +31,9 @@ export type WorkflowExecution = {
   input: JsonObject;
   output: JsonObject | null;
   error: WorkflowExecutionError | null;
+  result_class: string | null;
+  next_action_envelope: NextActionEnvelope | null;
+  selected_next_action: NextActionSelection | null;
 };
 
 export type WorkflowExecutionError = {
@@ -53,6 +58,7 @@ export type HandlerResult = {
   status: "RUNNING" | "WAITING" | "APPROVAL_REQUIRED" | "COMPLETED";
   current_stage: string | null;
   output?: JsonObject;
+  result_class?: string;
   event_type: string;
   event_data?: JsonObject;
 };
@@ -75,6 +81,7 @@ export type CreateExecutionRequest = {
   workflow_id: string;
   scope_key: string;
   requested_by?: string | null;
+  parent_execution_id?: string | null;
   mode: Extract<RuntimeMode, "LIVE" | "SIMULATION">;
   input?: JsonObject;
 };
