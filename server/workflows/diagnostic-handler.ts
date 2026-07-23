@@ -18,6 +18,7 @@ const checksum = async (value: string) => {
 export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
   readonly workflow_id = "internal-runtime-diagnostic";
   readonly version = "1.1.0";
+  readonly allowed_scope_keys = ["*"] as const;
   readonly supports_pause = true;
   readonly supports_cancel = true;
 
