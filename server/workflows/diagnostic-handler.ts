@@ -17,7 +17,7 @@ const checksum = async (value: string) => {
 
 export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
   readonly workflow_id = "internal-runtime-diagnostic";
-  readonly version = "1.0.0";
+  readonly version = "1.1.0";
   readonly supports_pause = true;
   readonly supports_cancel = true;
 
@@ -56,6 +56,7 @@ export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
       return {
         status: "COMPLETED",
         current_stage: "completed",
+        result_class: "DIAGNOSTIC_COMPLETE",
         output: {
           ...(execution.output ?? {}),
           diagnostic: "PASS",
