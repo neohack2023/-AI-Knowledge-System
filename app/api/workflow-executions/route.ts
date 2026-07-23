@@ -9,6 +9,7 @@ type OperationBody = {
   execution_id?: string;
   workflow_id?: string;
   scope_key?: string;
+  command?: string;
   mode?: Extract<RuntimeMode, "LIVE" | "SIMULATION">;
   input?: JsonObject;
   output?: JsonObject;
@@ -31,7 +32,11 @@ export async function GET(request: Request) {
   const executionId = url.searchParams.get("execution_id");
   try {
     if (executionId) return json(workflowExecutionKernel.getExecution(executionId));
-    return json({ live_workflows: workflowExecutionKernel.listLiveWorkflows(), simulation_transport: "client-only" });
+    return json({
+      live_workflows: workflowExecutionKernel.listLiveWorkflows(),
+      simulation_transport: "client-only",
+      next_action_contract: "registry-backed",
+    });
   } catch (error) {
     return handleError(error);
   }
@@ -79,6 +84,13 @@ export async function POST(request: Request) {
         message: body.error?.message ?? "Execution failed by request.",
       }));
       case "complete": return json(workflowExecutionKernel.complete(requireId(body), body.output ?? {}));
+      case "select_next_action": {
+        if (!body.command) throw new WorkflowKernelError("INVALID_REQUEST", "command is required.");
+        return json(workflowExecutionKernel.selectNextAction(requireId(body), body.command));
+      }
+      case "approve_next_action": return json(workflowExecutionKernel.approveNextAction(requireId(body)));
+      case "reject_next_action": return json(workflowExecutionKernel.rejectNextAction(requireId(body)));
+      case "spawn_next_action": return json(workflowExecutionKernel.spawnSelectedNextAction(requireId(body), body.input ?? {}), 201);
       default: throw new WorkflowKernelError("UNKNOWN_OPERATION", "Unknown workflow execution operation.");
     }
   } catch (error) {
