@@ -37,6 +37,7 @@ export class WorkflowExecutionKernel {
     return Array.from(this.handlers.values(), (handler) => ({
       workflow_id: handler.workflow_id,
       version: handler.version,
+      allowed_scope_keys: handler.allowed_scope_keys,
       supports_pause: handler.supports_pause,
       supports_cancel: handler.supports_cancel,
       next_actions: getDefaultResultClass(handler.workflow_id) !== null,
@@ -76,10 +77,19 @@ export class WorkflowExecutionKernel {
     this.executions.set(execution.execution_id, execution);
     this.events.set(execution.execution_id, []);
 
-    if (!this.handlers.has(request.workflow_id)) {
+    const handler = this.handlers.get(request.workflow_id);
+    if (!handler) {
       this.transitionToFailure(execution, {
         code: "LIVE_HANDLER_UNAVAILABLE",
         message: `No LIVE WorkflowHandler is registered for '${request.workflow_id}'.`,
+      });
+      return this.snapshot(execution.execution_id);
+    }
+
+    if (!this.handlerAllowsScope(handler, request.scope_key)) {
+      this.transitionToFailure(execution, {
+        code: "LIVE_SCOPE_UNAVAILABLE",
+        message: `Workflow '${request.workflow_id}' is not registered for scope '${request.scope_key}'.`,
       });
       return this.snapshot(execution.execution_id);
     }
@@ -307,7 +317,13 @@ export class WorkflowExecutionKernel {
     execution.result_class = resultClass;
 
     const targetAvailability = Object.fromEntries(
-      Array.from(this.handlers.keys(), (workflowId) => [workflowId, { available: true }]),
+      Array.from(this.handlers.entries(), ([workflowId, handler]) => {
+        const available = this.handlerAllowsScope(handler, execution.scope_key);
+        return [workflowId, {
+          available,
+          ...(available ? {} : { reason: `Target workflow '${workflowId}' is not registered for scope '${execution.scope_key}'.` }),
+        }];
+      }),
     );
     execution.next_action_envelope = resolveNextActionEnvelope({
       execution_id: execution.execution_id,
@@ -350,7 +366,14 @@ export class WorkflowExecutionKernel {
   private requireHandler(execution: WorkflowExecution) {
     const handler = this.handlers.get(execution.workflow_id);
     if (!handler) throw new WorkflowKernelError("LIVE_HANDLER_UNAVAILABLE", "No LIVE handler is registered.", 409);
+    if (!this.handlerAllowsScope(handler, execution.scope_key)) {
+      throw new WorkflowKernelError("LIVE_SCOPE_UNAVAILABLE", `Workflow '${execution.workflow_id}' is not registered for scope '${execution.scope_key}'.`, 409);
+    }
     return handler;
+  }
+
+  private handlerAllowsScope(handler: WorkflowHandler, scopeKey: string) {
+    return handler.allowed_scope_keys.includes("*") || handler.allowed_scope_keys.includes(scopeKey);
   }
 
   private requirePendingNextAction(execution: WorkflowExecution): NextActionSelection {
