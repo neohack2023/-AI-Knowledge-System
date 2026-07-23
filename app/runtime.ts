@@ -156,16 +156,19 @@ export class SimulationEventTransport implements WorkflowEventTransport {
     executionId: string, status: RuntimeStatus, duration = 0, nextStage?: string,
     nextActionEnvelope?: NextActionEnvelope,
   ): WorkflowEvent {
+    const nextActionEvent = type.startsWith("next_action.");
     const read = ["source", "scope", "capability", "retrieval", "stone", "mason", "verification"].includes(stage.id);
     return {
       id: `${executionId}-${Date.now()}-${Math.random().toString(16).slice(2, 7)}`,
       timestamp: new Date().toISOString(), event_type: type, workflow_id: workflow.id, execution_id: executionId,
-      scope_key: scopeKey, stage: type === "next_action.generated" ? "Next actions" : stage.label, node_id: stage.id, source: stage.source,
-      authority: stage.authority, capability: workflow.capability,
-      operation: type === "next_action.generated" ? "Resolve legal follow-up transitions" : stage.operation,
+      scope_key: scopeKey, stage: nextActionEvent ? "Next actions" : stage.label, node_id: nextActionEvent ? "next-action" : stage.id,
+      source: nextActionEvent ? "NextActionEnvelope" : stage.source,
+      authority: nextActionEvent ? "Workflow transition registry" : stage.authority,
+      capability: workflow.capability,
+      operation: nextActionEvent ? "Resolve legal follow-up transitions" : stage.operation,
       status,
       duration: Math.round(duration), input_summary: read ? `Bound ${scopeKey} context` : "Approved write-plan digest",
-      output_summary: type === "next_action.generated"
+      output_summary: nextActionEvent
         ? `${nextActionEnvelope?.available_actions.length ?? 0} available · ${nextActionEnvelope?.blocked_actions.length ?? 0} blocked`
         : status === "COMPLETED" ? `${stage.label} contract satisfied` : status === "APPROVAL REQUIRED" ? "Downstream execution paused" : undefined,
       provenance: "Registry-backed simulation event · no durable state changed", next_stage: nextStage,
