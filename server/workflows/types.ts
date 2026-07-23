@@ -71,6 +71,7 @@ export type WorkflowHandlerContext = {
 export interface WorkflowHandler {
   readonly workflow_id: string;
   readonly version: string;
+  readonly allowed_scope_keys: readonly string[];
   readonly supports_pause: boolean;
   readonly supports_cancel: boolean;
   start(context: WorkflowHandlerContext): Promise<HandlerResult>;
