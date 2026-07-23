@@ -1,4 +1,9 @@
 import { InternalDiagnosticWorkflowHandler } from "./diagnostic-handler.ts";
+import {
+  getDefaultResultClass,
+  resolveNextActionEnvelope,
+  type NextActionSelection,
+} from "../../shared/next-actions.ts";
 import type {
   CreateExecutionRequest,
   ExecutionEvent,
@@ -34,6 +39,7 @@ export class WorkflowExecutionKernel {
       version: handler.version,
       supports_pause: handler.supports_pause,
       supports_cancel: handler.supports_cancel,
+      next_actions: getDefaultResultClass(handler.workflow_id) !== null,
     }));
   }
 
@@ -52,6 +58,7 @@ export class WorkflowExecutionKernel {
       workflow_id: request.workflow_id,
       scope_key: request.scope_key,
       requested_by: request.requested_by ?? null,
+      parent_execution_id: request.parent_execution_id ?? null,
       mode: "LIVE",
       status: "QUEUED",
       created_at: now,
@@ -61,6 +68,9 @@ export class WorkflowExecutionKernel {
       input: request.input ?? {},
       output: null,
       error: null,
+      result_class: null,
+      next_action_envelope: null,
+      selected_next_action: null,
     };
 
     this.executions.set(execution.execution_id, execution);
@@ -74,7 +84,10 @@ export class WorkflowExecutionKernel {
       return this.snapshot(execution.execution_id);
     }
 
-    this.emit(execution, "workflow.execution.created", { mode: "LIVE" });
+    this.emit(execution, "workflow.execution.created", {
+      mode: "LIVE",
+      parent_execution_id: execution.parent_execution_id,
+    });
     return this.snapshot(execution.execution_id);
   }
 
@@ -133,6 +146,7 @@ export class WorkflowExecutionKernel {
     }
     execution.status = "CANCELLED";
     execution.completed_at = new Date().toISOString();
+    execution.next_action_envelope = null;
     this.emit(execution, "workflow.execution.cancelled");
     return this.snapshot(executionId);
   }
@@ -151,8 +165,112 @@ export class WorkflowExecutionKernel {
     execution.current_stage = "completed";
     execution.completed_at = new Date().toISOString();
     execution.output = output;
+    execution.result_class = typeof output.result_class === "string"
+      ? output.result_class
+      : getDefaultResultClass(execution.workflow_id);
     this.emit(execution, "workflow.execution.completed");
+    this.generateNextActions(execution);
     return this.snapshot(executionId);
+  }
+
+  selectNextAction(executionId: string, command: string): ExecutionSnapshot {
+    const execution = this.requireExecution(executionId);
+    this.assertStatus(execution, ["COMPLETED"], "select a next action for");
+    const envelope = execution.next_action_envelope;
+    if (!envelope) throw new WorkflowKernelError("NEXT_ACTIONS_UNAVAILABLE", "This execution has no next-action envelope.", 409);
+
+    const blocked = envelope.blocked_actions.find((candidate) => candidate.command === command);
+    if (blocked) throw new WorkflowKernelError("NEXT_ACTION_BLOCKED", blocked.blocked_reason, 409);
+
+    const selected = envelope.available_actions.find((candidate) => candidate.command === command);
+    if (!selected) throw new WorkflowKernelError("NEXT_ACTION_NOT_FOUND", `Next action '${command}' is not valid for this result.`, 404);
+
+    const now = new Date().toISOString();
+    execution.selected_next_action = {
+      command: selected.command,
+      target_workflow_id: selected.target_workflow_id ?? null,
+      selected_at: now,
+      decision: selected.requires_approval ? "PENDING_APPROVAL" : "SELECTED",
+      decided_at: selected.requires_approval ? null : now,
+      child_execution_id: null,
+    };
+
+    this.emit(
+      execution,
+      selected.requires_approval ? "next_action.approval_required" : "next_action.selected",
+      {
+        command: selected.command,
+        autonomy: selected.autonomy,
+        target_workflow_id: selected.target_workflow_id ?? null,
+        terminal: selected.terminal ?? false,
+      },
+    );
+    return this.snapshot(executionId);
+  }
+
+  approveNextAction(executionId: string): ExecutionSnapshot {
+    const execution = this.requireExecution(executionId);
+    const selection = this.requirePendingNextAction(execution);
+    selection.decision = "APPROVED";
+    selection.decided_at = new Date().toISOString();
+    this.emit(execution, "next_action.approved", {
+      command: selection.command,
+      target_workflow_id: selection.target_workflow_id,
+    });
+    return this.snapshot(executionId);
+  }
+
+  rejectNextAction(executionId: string): ExecutionSnapshot {
+    const execution = this.requireExecution(executionId);
+    const selection = this.requirePendingNextAction(execution);
+    selection.decision = "REJECTED";
+    selection.decided_at = new Date().toISOString();
+    this.emit(execution, "next_action.rejected", {
+      command: selection.command,
+      target_workflow_id: selection.target_workflow_id,
+    });
+    return this.snapshot(executionId);
+  }
+
+  spawnSelectedNextAction(executionId: string, input: JsonObject = {}): ExecutionSnapshot {
+    const parent = this.requireExecution(executionId);
+    const selection = parent.selected_next_action;
+    if (!selection) throw new WorkflowKernelError("NEXT_ACTION_NOT_SELECTED", "Select a next action before spawning a follow-up execution.", 409);
+    if (selection.decision === "PENDING_APPROVAL") throw new WorkflowKernelError("NEXT_ACTION_APPROVAL_REQUIRED", "Approve the selected next action before spawning it.", 409);
+    if (selection.decision === "REJECTED") throw new WorkflowKernelError("NEXT_ACTION_REJECTED", "The selected next action was rejected.", 409);
+    if (!selection.target_workflow_id) throw new WorkflowKernelError("NEXT_ACTION_NOT_SPAWNABLE", "The selected next action does not target another workflow.", 409);
+    if (selection.child_execution_id) return this.snapshot(selection.child_execution_id);
+
+    const child = this.createExecution({
+      workflow_id: selection.target_workflow_id,
+      scope_key: parent.scope_key,
+      requested_by: parent.requested_by,
+      parent_execution_id: parent.execution_id,
+      mode: "LIVE",
+      input: {
+        ...input,
+        follow_up: {
+          parent_execution_id: parent.execution_id,
+          command: selection.command,
+        },
+      },
+    });
+
+    if (child.execution.status === "FAILED") {
+      throw new WorkflowKernelError(
+        child.execution.error?.code ?? "NEXT_ACTION_SPAWN_FAILED",
+        child.execution.error?.message ?? "The follow-up execution could not be created.",
+        409,
+      );
+    }
+
+    selection.child_execution_id = child.execution.execution_id;
+    this.emit(parent, "next_action.execution_created", {
+      command: selection.command,
+      child_execution_id: child.execution.execution_id,
+      target_workflow_id: selection.target_workflow_id,
+    });
+    return child;
   }
 
   private context(execution: WorkflowExecution) {
@@ -173,15 +291,53 @@ export class WorkflowExecutionKernel {
     execution.status = result.status;
     execution.current_stage = result.current_stage;
     if (result.output) execution.output = result.output;
-    if (result.status === "COMPLETED") execution.completed_at = new Date().toISOString();
+    if (result.result_class) execution.result_class = result.result_class;
+    if (result.status === "COMPLETED") {
+      execution.completed_at = new Date().toISOString();
+      execution.result_class ??= getDefaultResultClass(execution.workflow_id);
+    }
     this.emit(execution, result.event_type, result.event_data);
+    if (result.status === "COMPLETED") this.generateNextActions(execution);
     return this.snapshot(execution.execution_id);
+  }
+
+  private generateNextActions(execution: WorkflowExecution) {
+    const resultClass = execution.result_class ?? getDefaultResultClass(execution.workflow_id);
+    if (!resultClass) return;
+    execution.result_class = resultClass;
+
+    const targetAvailability = Object.fromEntries(
+      Array.from(this.handlers.keys(), (workflowId) => [workflowId, { available: true }]),
+    );
+    execution.next_action_envelope = resolveNextActionEnvelope({
+      execution_id: execution.execution_id,
+      scope_key: execution.scope_key,
+      workflow_id: execution.workflow_id,
+      current_state: execution.status,
+      result_class: resultClass,
+      authority_context: {
+        read_from: ["server workflow kernel", "registered LIVE handler"],
+        authority: "Server runtime execution state",
+        write_authorized: false,
+      },
+      target_availability: targetAvailability,
+    });
+
+    if (execution.next_action_envelope) {
+      this.emit(execution, "next_action.generated", {
+        result_class: resultClass,
+        recommended_action: execution.next_action_envelope.recommended_action,
+        available_commands: execution.next_action_envelope.available_actions.map((candidate) => candidate.command),
+        blocked_commands: execution.next_action_envelope.blocked_actions.map((candidate) => candidate.command),
+      });
+    }
   }
 
   private transitionToFailure(execution: WorkflowExecution, error: WorkflowExecutionError) {
     execution.status = "FAILED";
     execution.error = error;
     execution.completed_at = new Date().toISOString();
+    execution.next_action_envelope = null;
     this.emit(execution, "workflow.execution.failed", { error_code: error.code });
   }
 
@@ -195,6 +351,14 @@ export class WorkflowExecutionKernel {
     const handler = this.handlers.get(execution.workflow_id);
     if (!handler) throw new WorkflowKernelError("LIVE_HANDLER_UNAVAILABLE", "No LIVE handler is registered.", 409);
     return handler;
+  }
+
+  private requirePendingNextAction(execution: WorkflowExecution): NextActionSelection {
+    const selection = execution.selected_next_action;
+    if (!selection || selection.decision !== "PENDING_APPROVAL") {
+      throw new WorkflowKernelError("NEXT_ACTION_NOT_PENDING", "No next action is waiting for approval.", 409);
+    }
+    return selection;
   }
 
   private assertStatus(execution: WorkflowExecution, allowed: WorkflowExecution["status"][], operation: string) {
