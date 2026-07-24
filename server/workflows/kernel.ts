@@ -5,7 +5,11 @@ import {
   type NextActionSelection,
 } from "../../shared/next-actions.ts";
 import { ContextProvenanceService, ProvenanceValidationError } from "../provenance/service.ts";
-import type { ContextProvenanceEmission, ContextProvenanceEnvelope } from "../provenance/types.ts";
+import type {
+  ContextProvenanceEmission,
+  ContextProvenanceEnvelope,
+  GovernedWriteAuthorization,
+} from "../provenance/types.ts";
 import type {
   CreateExecutionRequest,
   ExecutionEvent,
@@ -297,7 +301,7 @@ export class WorkflowExecutionKernel {
       provenance: {
         list: () => structuredClone(this.provenance.get(execution.execution_id) ?? []),
         emit: (input: ContextProvenanceEmission) => this.recordProvenance(execution, input),
-        assertGovernedWriteAuthorization: (input: Parameters<ContextProvenanceService["assertGovernedWriteAuthorization"]>[0]) => {
+        assertGovernedWriteAuthorization: (input: GovernedWriteAuthorization) => {
           this.provenanceService.assertGovernedWriteAuthorization(input);
           this.emit(execution, "provenance.governed_write.authorization_validated", {
             write_plan_id: input.write_plan_id,
@@ -309,16 +313,19 @@ export class WorkflowExecutionKernel {
     };
   }
 
-  private recordProvenance(execution: WorkflowExecution, input: ContextProvenanceEmission) {
-    const envelope = this.provenanceService.emit({
+  private prepareProvenance(execution: WorkflowExecution, input: ContextProvenanceEmission) {
+    return this.provenanceService.emit({
       execution_id: execution.execution_id,
       workflow_id: execution.workflow_id,
       scope_key: execution.scope_key,
     }, input);
+  }
+
+  private appendPreparedProvenance(execution: WorkflowExecution, envelope: ContextProvenanceEnvelope) {
     const envelopes = this.provenance.get(execution.execution_id) ?? [];
     envelopes.push(envelope);
     this.provenance.set(execution.execution_id, envelopes);
-    this.emit(execution, `provenance.${input.operation.toLowerCase()}.emitted`, {
+    this.emit(execution, `provenance.${envelope.operation.toLowerCase()}.emitted`, {
       envelope_id: envelope.envelope_id,
       object_id: envelope.object_id,
       source_system: envelope.source_system,
@@ -326,6 +333,10 @@ export class WorkflowExecutionKernel {
       parent_evidence_count: envelope.parent_evidence_ids.length,
     });
     return structuredClone(envelope);
+  }
+
+  private recordProvenance(execution: WorkflowExecution, input: ContextProvenanceEmission) {
+    return this.appendPreparedProvenance(execution, this.prepareProvenance(execution, input));
   }
 
   private async invoke(execution: WorkflowExecution, operation: () => Promise<HandlerResult>) {
@@ -343,6 +354,18 @@ export class WorkflowExecutionKernel {
   }
 
   private applyHandlerResult(execution: WorkflowExecution, result: HandlerResult): ExecutionSnapshot {
+    let preparedProvenance: ContextProvenanceEnvelope[] = [];
+    try {
+      preparedProvenance = (result.provenance_emissions ?? []).map((input) => this.prepareProvenance(execution, input));
+    } catch (error) {
+      if (error instanceof ProvenanceValidationError) {
+        const failure = { code: error.code, message: error.message };
+        this.transitionToFailure(execution, failure);
+        throw new WorkflowKernelError(failure.code, failure.message, 409);
+      }
+      throw error;
+    }
+
     execution.status = result.status;
     execution.current_stage = result.current_stage;
     if (result.output) execution.output = result.output;
@@ -351,6 +374,7 @@ export class WorkflowExecutionKernel {
       execution.completed_at = new Date().toISOString();
       execution.result_class ??= getDefaultResultClass(execution.workflow_id);
     }
+    preparedProvenance.forEach((envelope) => this.appendPreparedProvenance(execution, envelope));
     this.emit(execution, result.event_type, result.event_data);
     if (result.status === "COMPLETED") this.generateNextActions(execution);
     return this.snapshot(execution.execution_id);
