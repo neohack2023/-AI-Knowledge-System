@@ -1,6 +1,6 @@
 # Context Provenance Envelope — Kernel Integration
 
-Status: Candidate / implementation branch
+Status: Review / CI validation gate
 Contract: `ContextProvenanceEnvelope/1.0`
 Scope: AI_MEMORY_OS / AI_KNOWLEDGE_SYSTEM execution kernel
 
@@ -105,6 +105,10 @@ locked STONE/MASON inputs
 ```
 
 Unwrapped connector data must not be promoted to trusted packet assembly once adapter integration is enabled.
+
+## Validation
+
+Repository CI is installed through `.github/workflows/ci.yml` and runs the repository-native `npm test` command, which performs the verified build followed by the Node test suite. Promotion out of review requires this gate to pass for the PR head.
 
 ## Current boundary
 
