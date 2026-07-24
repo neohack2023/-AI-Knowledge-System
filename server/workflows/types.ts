@@ -66,6 +66,7 @@ export type HandlerResult = {
   result_class?: string;
   event_type: string;
   event_data?: JsonObject;
+  provenance_emissions?: ContextProvenanceEmission[];
 };
 
 export type WorkflowProvenanceContext = {
