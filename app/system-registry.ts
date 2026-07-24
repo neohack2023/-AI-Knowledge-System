@@ -4,7 +4,8 @@ export type RuntimeStatus =
 
 export type StageId =
   | "source" | "scope" | "capability" | "retrieval" | "stone"
-  | "mason" | "write-plan" | "approval" | "execution" | "verification" | "receipt";
+  | "mason" | "write-plan" | "approval" | "execution" | "verification" | "receipt"
+  | "next-action";
 
 export type ScopeDefinition = {
   key: string;
@@ -150,6 +151,7 @@ export const graphNodes: GraphNode[] = [
   { id: "execution", label: "EXECUTION", type: "write", x: 4.0, y: -1.0, z: -.45, detail: "Authorized mutation · never retrieval" },
   { id: "verification", label: "VERIFY", type: "verify", x: 4.75, y: 1.2, z: .65, detail: "SIMULATION · re-fetch and compare destination state" },
   { id: "receipt", label: "RECEIPT", type: "evidence", x: 5.7, y: -.1, z: -.2, detail: "SIMULATION · execution closure" },
+  { id: "next-action", label: "NEXT ACTION", type: "router", x: 6.7, y: 1.15, z: .45, detail: "Registry-valid follow-up transitions · recommendation is not authorization" },
   { id: "notion", label: "NOTION", type: "authority", x: -.2, y: 2.65, z: -1.3, detail: "SNAPSHOT · authoritative migrated project memory until governed cutover" },
   { id: "drive", label: "DRIVE", type: "source", x: 1.8, y: 2.55, z: -1.5, detail: "SNAPSHOT · runtime control plane and drive_shadow surfaces" },
   { id: "github", label: "GITHUB", type: "authority", x: 3.85, y: 2.55, z: -1.1, detail: "SNAPSHOT · authoritative repository execution facts" },
@@ -169,6 +171,7 @@ export const graphEdges: GraphEdge[] = [
   { source: "approval", target: "execution", relation: "grant" },
   { source: "execution", target: "verification", relation: "observe result" },
   { source: "verification", target: "receipt", relation: "close" },
+  { source: "receipt", target: "next-action", relation: "offer legal transitions" },
   { source: "notion", target: "retrieval", relation: "memory authority" },
   { source: "drive", target: "scope", relation: "runtime registry" },
   { source: "github", target: "retrieval", relation: "repository facts" },

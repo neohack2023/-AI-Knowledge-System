@@ -1,0 +1,44 @@
+.next-actions-panel { margin-top:12px; padding:14px; }
+.next-actions-head { display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:11px; align-items:center; padding-bottom:12px; border-bottom:1px solid #183033; }
+.next-actions-mark { width:34px; height:34px; display:grid; place-items:center; color:var(--cyan); border:1px solid #2e625a; background:#091b19; }
+.next-actions-head h3 { margin:4px 0 2px; font-size:14px; font-weight:560; letter-spacing:.01em; }
+.next-actions-head p { margin:0; color:#607579; font:8px ui-monospace,monospace; letter-spacing:.08em; }
+.next-actions-summary { display:flex; gap:6px; }
+.next-actions-summary span { border:1px solid #243b3e; background:#081113; padding:5px 7px; color:#6f8986; font:8px ui-monospace,monospace; }
+.next-actions-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:11px; }
+.next-action-card { min-height:112px; text-align:left; border:1px solid #213538; background:linear-gradient(145deg,#0a1517,#071012); padding:11px; cursor:pointer; display:flex; flex-direction:column; gap:8px; }
+.next-action-card:hover { border-color:#3a665f; background:linear-gradient(145deg,#0d1d1d,#081416); }
+.next-action-card.recommended { border-color:#39796e; box-shadow:inset 2px 0 0 var(--teal); }
+.next-action-card.selected { border-color:var(--cyan); box-shadow:0 0 18px rgba(82,231,202,.10),inset 2px 0 0 var(--cyan); }
+.next-action-title { display:flex; align-items:center; gap:7px; color:#b9d0cd; }
+.next-action-title svg { color:var(--teal); }
+.next-action-title strong { font-size:10px; }
+.next-action-title b { margin-left:auto; color:#9debdc; border:1px solid #2d625a; padding:2px 5px; font:7px ui-monospace,monospace; letter-spacing:.08em; }
+.next-action-card p { margin:0; color:#718588; font-size:9px; line-height:1.5; }
+.next-action-meta { margin-top:auto; display:flex; align-items:center; gap:6px; min-width:0; }
+.next-action-meta span,.next-action-meta em { color:#7f9895; border:1px solid #203437; padding:2px 5px; font:7px ui-monospace,monospace; font-style:normal; white-space:nowrap; }
+.next-action-meta code { color:#4f7370; font-size:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.next-action-meta em { margin-left:auto; color:#b99f63; border-color:#493c21; }
+.blocked-actions { margin-top:11px; border-top:1px solid #182a2d; padding-top:10px; display:grid; gap:6px; }
+.blocked-actions>div { display:grid; grid-template-columns:18px 150px 180px 1fr; align-items:center; gap:8px; min-height:32px; padding:5px 8px; border:1px solid #3c2428; background:#150b0d; color:#9d7278; }
+.blocked-actions svg { color:var(--red); }
+.blocked-actions strong { color:#c89aa0; font-size:9px; }
+.blocked-actions code { color:#885b62; font-size:7px; }
+.blocked-actions span { font-size:8px; }
+.next-action-approval { margin-top:12px; padding:14px; display:grid; grid-template-columns:minmax(260px,1fr) minmax(380px,1.4fr) auto; gap:18px; align-items:center; border-color:#6f5423; background:linear-gradient(145deg,#1b1408,#0b0f0f); }
+.next-action-approval h3 { margin:5px 0; display:flex; align-items:center; gap:7px; color:#f2cf83; font-size:13px; }
+.next-action-approval p { margin:0; color:#917f62; font-size:9px; line-height:1.5; }
+.next-action-approval dl { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:0; }
+.next-action-approval dl div { border-left:1px solid #554323; padding-left:8px; }
+.next-action-approval dt { color:#79684c; font:7px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.1em; }
+.next-action-approval dd { margin:3px 0 0; color:#c7b48e; font-size:9px; }
+.next-action-approval dd code { color:#e1bd70; }
+.next-action-approval-buttons { display:flex; gap:7px; }
+.next-action-approval-buttons button { height:31px; white-space:nowrap; display:flex; align-items:center; gap:6px; padding:0 10px; cursor:pointer; }
+@media (max-width:980px) {
+  .next-actions-head { grid-template-columns:38px 1fr; }
+  .next-actions-summary { grid-column:1/-1; }
+  .next-action-approval { grid-template-columns:1fr; }
+  .blocked-actions>div { grid-template-columns:18px 1fr; }
+  .blocked-actions code,.blocked-actions span { grid-column:2; }
+}

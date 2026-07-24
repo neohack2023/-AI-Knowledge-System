@@ -34,13 +34,16 @@ test("SimulationEventTransport cannot present live trace or live execution label
 });
 
 test("fabricated and static cockpit facts carry explicit truth labels", async () => {
-  const [cockpit, registry] = await Promise.all([
+  const [cockpit, registry, nextActions] = await Promise.all([
     read("../app/cockpit.tsx"),
     read("../app/system-registry.ts"),
+    read("../shared/next-actions.ts"),
   ]);
-  for (const label of ["SAMPLE", "MOCK", "SNAPSHOT", "SIMULATION"]) {
+  for (const label of ["SAMPLE", "SNAPSHOT", "SIMULATION"]) {
     assert.match(`${cockpit}\n${registry}`, new RegExp(label));
   }
-  assert.match(cockpit, /Telemetry unavailable → SIMULATION only/);
+  assert.match(cockpit, /NEXT ACTION ≠ AUTHORIZATION/);
+  assert.match(cockpit, /Registry-backed transition selection · simulation only/);
+  assert.match(nextActions, /write_authorized: false/);
   assert.match(registry, /SNAPSHOT · authoritative repository execution facts/);
 });
