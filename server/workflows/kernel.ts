@@ -4,6 +4,8 @@ import {
   resolveNextActionEnvelope,
   type NextActionSelection,
 } from "../../shared/next-actions.ts";
+import { ContextProvenanceService, ProvenanceValidationError } from "../provenance/service.ts";
+import type { ContextProvenanceEmission, ContextProvenanceEnvelope } from "../provenance/types.ts";
 import type {
   CreateExecutionRequest,
   ExecutionEvent,
@@ -27,7 +29,9 @@ export class WorkflowKernelError extends Error {
 export class WorkflowExecutionKernel {
   private readonly executions = new Map<string, WorkflowExecution>();
   private readonly events = new Map<string, ExecutionEvent[]>();
+  private readonly provenance = new Map<string, ContextProvenanceEnvelope[]>();
   private readonly handlers = new Map<string, WorkflowHandler>();
+  private readonly provenanceService = new ContextProvenanceService();
 
   constructor(handlers: WorkflowHandler[] = [new InternalDiagnosticWorkflowHandler()]) {
     handlers.forEach((handler) => this.handlers.set(handler.workflow_id, handler));
@@ -41,6 +45,7 @@ export class WorkflowExecutionKernel {
       supports_pause: handler.supports_pause,
       supports_cancel: handler.supports_cancel,
       next_actions: getDefaultResultClass(handler.workflow_id) !== null,
+      provenance_contract: "ContextProvenanceEnvelope/1.0",
     }));
   }
 
@@ -76,6 +81,7 @@ export class WorkflowExecutionKernel {
 
     this.executions.set(execution.execution_id, execution);
     this.events.set(execution.execution_id, []);
+    this.provenance.set(execution.execution_id, []);
 
     const handler = this.handlers.get(request.workflow_id);
     if (!handler) {
@@ -97,6 +103,7 @@ export class WorkflowExecutionKernel {
     this.emit(execution, "workflow.execution.created", {
       mode: "LIVE",
       parent_execution_id: execution.parent_execution_id,
+      provenance_contract: "ContextProvenanceEnvelope/1.0",
     });
     return this.snapshot(execution.execution_id);
   }
@@ -284,16 +291,54 @@ export class WorkflowExecutionKernel {
   }
 
   private context(execution: WorkflowExecution) {
-    return { execution: structuredClone(execution), now: () => new Date().toISOString() };
+    return {
+      execution: structuredClone(execution),
+      now: () => new Date().toISOString(),
+      provenance: {
+        list: () => structuredClone(this.provenance.get(execution.execution_id) ?? []),
+        emit: (input: ContextProvenanceEmission) => this.recordProvenance(execution, input),
+        assertGovernedWriteAuthorization: (input: Parameters<ContextProvenanceService["assertGovernedWriteAuthorization"]>[0]) => {
+          this.provenanceService.assertGovernedWriteAuthorization(input);
+          this.emit(execution, "provenance.governed_write.authorization_validated", {
+            write_plan_id: input.write_plan_id,
+            authorization_id: input.authorization_id,
+            destination: input.destination,
+          });
+        },
+      },
+    };
+  }
+
+  private recordProvenance(execution: WorkflowExecution, input: ContextProvenanceEmission) {
+    const envelope = this.provenanceService.emit({
+      execution_id: execution.execution_id,
+      workflow_id: execution.workflow_id,
+      scope_key: execution.scope_key,
+    }, input);
+    const envelopes = this.provenance.get(execution.execution_id) ?? [];
+    envelopes.push(envelope);
+    this.provenance.set(execution.execution_id, envelopes);
+    this.emit(execution, `provenance.${input.operation.toLowerCase()}.emitted`, {
+      envelope_id: envelope.envelope_id,
+      object_id: envelope.object_id,
+      source_system: envelope.source_system,
+      authority_state: envelope.authority_state,
+      parent_evidence_count: envelope.parent_evidence_ids.length,
+    });
+    return structuredClone(envelope);
   }
 
   private async invoke(execution: WorkflowExecution, operation: () => Promise<HandlerResult>) {
     try {
       return await operation();
     } catch (error) {
-      const failure = { code: "HANDLER_FAILED", message: error instanceof Error ? error.message : "Workflow handler failed." };
+      const provenanceFailure = error instanceof ProvenanceValidationError;
+      const failure = {
+        code: provenanceFailure ? error.code : "HANDLER_FAILED",
+        message: error instanceof Error ? error.message : "Workflow handler failed.",
+      };
       this.transitionToFailure(execution, failure);
-      throw new WorkflowKernelError(failure.code, failure.message, 500);
+      throw new WorkflowKernelError(failure.code, failure.message, provenanceFailure ? 409 : 500);
     }
   }
 
@@ -412,6 +457,7 @@ export class WorkflowExecutionKernel {
     return {
       execution: structuredClone(execution),
       events: structuredClone(this.events.get(executionId) ?? []),
+      provenance_envelopes: structuredClone(this.provenance.get(executionId) ?? []),
     };
   }
 }
