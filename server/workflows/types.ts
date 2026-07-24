@@ -1,5 +1,10 @@
 import type { RuntimeMode } from "../../shared/runtime-mode.ts";
 import type { NextActionEnvelope, NextActionSelection } from "../../shared/next-actions.ts";
+import type {
+  ContextProvenanceEmission,
+  ContextProvenanceEnvelope,
+  GovernedWriteAuthorization,
+} from "../provenance/types.ts";
 
 export const executionStatuses = [
   "QUEUED",
@@ -63,9 +68,16 @@ export type HandlerResult = {
   event_data?: JsonObject;
 };
 
+export type WorkflowProvenanceContext = {
+  list: () => ContextProvenanceEnvelope[];
+  emit: (input: ContextProvenanceEmission) => ContextProvenanceEnvelope;
+  assertGovernedWriteAuthorization: (input: GovernedWriteAuthorization) => void;
+};
+
 export type WorkflowHandlerContext = {
   execution: Readonly<WorkflowExecution>;
   now: () => string;
+  provenance: WorkflowProvenanceContext;
 };
 
 export interface WorkflowHandler {
@@ -90,4 +102,5 @@ export type CreateExecutionRequest = {
 export type ExecutionSnapshot = {
   execution: WorkflowExecution;
   events: ExecutionEvent[];
+  provenance_envelopes: ContextProvenanceEnvelope[];
 };
