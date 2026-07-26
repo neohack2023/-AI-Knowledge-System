@@ -32,7 +32,7 @@
       "validated": { "type": "boolean" }
     }
   },
-  "expected_schema_fingerprint": "sha256:c456484d06a8fd1ddf5466aa9bda703ab4717846ce27fa5668e5fc4c8754fb18",
+  "expected_schema_fingerprint": "sha256:77378d6648bfb17e402e30bb5516cec546ad5e6a07228aeebe85906fd111cda6",
   "handler_ref": "workflow:internal-runtime-diagnostic",
   "trust_level": "INTERNAL_NATIVE",
   "data_access": "EXECUTION_LOCAL",
