@@ -22,6 +22,10 @@ export class CapabilityDiscoveryRuntime {
     return this.service.registryFingerprint();
   }
 
+  async inventoryProjectionFingerprint() {
+    return this.service.inventoryProjectionFingerprint();
+  }
+
   async discover(input: CapabilityDiscoveryInput): Promise<CapabilityDiscoverySnapshot> {
     const envelope = await this.service.discover({ ...input, now: input.now ?? this.now });
     const snapshot: CapabilityDiscoverySnapshot = {
