@@ -20,6 +20,41 @@ const tokenOverlap = (left: string, right: string) => {
 
 const scopeMatches = (patterns: string[], scopeKey: string) => patterns.includes("*") || patterns.includes(scopeKey);
 
+type CapabilityHealthEvaluation = {
+  compatible: boolean;
+  reason_code: Extract<CapabilityDecisionReasonCode, "HEALTH_NOT_VERIFIED" | "HEALTH_VERIFICATION_EXPIRED"> | null;
+  reason_detail: string | null;
+};
+
+export const evaluateCapabilityHealth = (
+  health: RuntimeCapabilityDefinition["health"],
+  evaluatedAt: string,
+): CapabilityHealthEvaluation => {
+  if (health.status !== "VERIFIED") {
+    return {
+      compatible: false,
+      reason_code: "HEALTH_NOT_VERIFIED",
+      reason_detail: `Capability health is ${health.status}.`,
+    };
+  }
+
+  if (health.expires_at) {
+    const evaluatedAtMs = Date.parse(evaluatedAt);
+    const expiresAtMs = Date.parse(health.expires_at);
+    if (!Number.isFinite(evaluatedAtMs) || !Number.isFinite(expiresAtMs) || expiresAtMs <= evaluatedAtMs) {
+      return {
+        compatible: false,
+        reason_code: "HEALTH_VERIFICATION_EXPIRED",
+        reason_detail: Number.isFinite(expiresAtMs)
+          ? `Capability health verification expired at ${health.expires_at}.`
+          : "Capability health expiry is invalid and cannot be trusted.",
+      };
+    }
+  }
+
+  return { compatible: true, reason_code: null, reason_detail: null };
+};
+
 const candidateFrom = (
   definition: RuntimeCapabilityDefinition,
   score: number,
@@ -55,6 +90,7 @@ export const evaluateCapabilityPolicy = (
   definition: RuntimeCapabilityDefinition,
   input: CapabilityDiscoveryInput,
   handlerAvailable: boolean,
+  evaluatedAt: string,
 ): CapabilityPolicyEvaluation => {
   const reasonCodes: CapabilityDecisionReasonCode[] = [];
   const reasonDetails: string[] = [];
@@ -138,10 +174,10 @@ export const evaluateCapabilityPolicy = (
     reasonDetails.push(`Capability does not support ${input.mode}.`);
   }
 
-  const healthCompatible = definition.health.status === "VERIFIED";
-  if (!healthCompatible) {
-    reasonCodes.push("HEALTH_NOT_VERIFIED");
-    reasonDetails.push(`Capability health is ${definition.health.status}.`);
+  const healthEvaluation = evaluateCapabilityHealth(definition.health, evaluatedAt);
+  if (!healthEvaluation.compatible && healthEvaluation.reason_code && healthEvaluation.reason_detail) {
+    reasonCodes.push(healthEvaluation.reason_code);
+    reasonDetails.push(healthEvaluation.reason_detail);
   }
 
   if (!handlerAvailable) {
@@ -156,7 +192,7 @@ export const evaluateCapabilityPolicy = (
     authorityCompatible,
     scopeCompatible,
     modeCompatible,
-    healthCompatible,
+    healthEvaluation.compatible,
   );
 
   return {
