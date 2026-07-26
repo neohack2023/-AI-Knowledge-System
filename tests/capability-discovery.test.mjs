@@ -28,6 +28,9 @@ test("runtime capability inventory exposes summaries without preloading executab
   assert.equal(body.execution_authority, "NONE");
   assert.equal(body.persistence, "PROCESS_LOCAL");
   assert.match(body.registry_fingerprint, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(body.registry_fingerprint_basis, "FULL_POLICY_DEFINITION");
+  assert.match(body.inventory_projection_fingerprint, /^sha256:[0-9a-f]{64}$/);
+  assert.notEqual(body.registry_fingerprint, body.inventory_projection_fingerprint);
   assert.ok(body.capabilities.some((capability) => capability.capability_id === "cap:internal-runtime-diagnostic"));
   assert.ok(body.capabilities.every((capability) => !("input_schema" in capability)));
 });
@@ -55,6 +58,7 @@ test("discovery preserves exact scope and records eligible and rejected candidat
     discovered.body.envelope.eligible_candidates.map((candidate) => candidate.capability_id),
     ["cap:internal-runtime-diagnostic"],
   );
+  assert.ok(discovered.body.envelope.eligible_candidates[0].match_reasons.includes("explicit capability candidate constraint"));
   assert.ok(discovered.body.envelope.rejected_candidates.some((candidate) => (
     candidate.capability_id === "cap:capability-discovery"
     && candidate.reason_codes.includes("REQUESTED_CAPABILITY_MISMATCH")
@@ -65,6 +69,36 @@ test("discovery preserves exact scope and records eligible and rejected candidat
     "capability.candidate.rejected",
     "capability.discovery.completed",
   ]);
+});
+
+test("explicit capability IDs constrain candidates but do not bypass intent boundaries", async () => {
+  const discovered = await post({
+    action: "discover",
+    scope_key: "global-working-memory",
+    mode: "LIVE",
+    intent_class: "write-canon-now",
+    requested_capability_id: "cap:internal-runtime-diagnostic",
+    authority_domains: ["server-runtime-execution-state"],
+  });
+
+  assert.equal(discovered.response.status, 201);
+  assert.equal(discovered.body.envelope.resolution_state, "NO_MATCH");
+  assert.equal(discovered.body.envelope.recommended_capability_id, null);
+  assert.deepEqual(discovered.body.envelope.eligible_candidates, []);
+  const requested = discovered.body.envelope.rejected_candidates.find((candidate) => (
+    candidate.capability_id === "cap:internal-runtime-diagnostic"
+  ));
+  assert.ok(requested);
+  assert.ok(requested.match_reasons.includes("explicit capability candidate constraint"));
+  assert.ok(requested.reason_codes.includes("INTENT_MISMATCH"));
+
+  const selected = await post({
+    action: "select",
+    discovery_id: discovered.body.envelope.discovery_id,
+    capability_id: "cap:internal-runtime-diagnostic",
+  });
+  assert.equal(selected.response.status, 409);
+  assert.equal(selected.body.error.code, "CAPABILITY_SELECTION_BLOCKED");
 });
 
 test("schema materialization requires an eligible selection and never authorizes execution", async () => {
