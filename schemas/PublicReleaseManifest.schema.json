@@ -11,6 +11,7 @@
     "default_classification",
     "allowlist",
     "denylist",
+    "binary_rules",
     "content_rules",
     "exceptions",
     "private_terms"
@@ -29,6 +30,10 @@
       "type": "array",
       "items": { "$ref": "#/$defs/pathRule" }
     },
+    "binary_rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/binaryRule" }
+    },
     "content_rules": {
       "type": "array",
       "minItems": 1,
@@ -43,8 +48,15 @@
       "additionalProperties": false,
       "required": ["environment_variable", "local_file"],
       "properties": {
-        "environment_variable": { "type": "string", "minLength": 1 },
-        "local_file": { "type": "string", "minLength": 1 }
+        "environment_variable": {
+          "type": "string",
+          "pattern": "^[A-Z_][A-Z0-9_]*$"
+        },
+        "local_file": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        }
       }
     }
   },
@@ -69,6 +81,24 @@
         "id": { "type": "string", "minLength": 1 },
         "pattern": { "type": "string", "minLength": 1 },
         "classification": { "$ref": "#/$defs/classification" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "binaryRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path_pattern", "extensions", "max_bytes", "inspection", "reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path_pattern": { "type": "string", "minLength": 1 },
+        "extensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^\\.[a-z0-9]+$" }
+        },
+        "max_bytes": { "type": "integer", "minimum": 1 },
+        "inspection": { "const": "SIZE_AND_SHA256" },
         "reason": { "type": "string", "minLength": 1 }
       }
     },
