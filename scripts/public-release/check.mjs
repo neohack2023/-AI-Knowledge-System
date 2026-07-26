@@ -2,6 +2,7 @@
 
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import {
   checkRepository,
@@ -18,12 +19,35 @@ const argumentValue = (name, fallback) => {
 };
 
 const hasFlag = (name) => process.argv.includes(name);
+const hasArgument = (name) => process.argv.includes(name);
 
 try {
+  const trustedPrivateTermMode = hasFlag("--trusted-private-terms");
+  const rootWasExplicit = hasArgument("--root");
   const root = path.resolve(argumentValue("--root", process.cwd()));
   const manifestPath = argumentValue("--manifest", "public-release-manifest.yaml");
   const reportPath = argumentValue("--report", "outputs/public-release-report.json");
-  const trustedPrivateTerms = hasFlag("--trusted-private-terms")
+
+  if (trustedPrivateTermMode) {
+    const scannerRoot = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../..",
+    );
+
+    if (!rootWasExplicit) {
+      throw new Error(
+        "--trusted-private-terms requires an explicit --root pointing to the candidate checkout.",
+      );
+    }
+
+    if (root === scannerRoot) {
+      throw new Error(
+        "Trusted private-term scanning must run trusted scanner code from a separate checkout; --root cannot be the scanner checkout.",
+      );
+    }
+  }
+
+  const trustedPrivateTerms = trustedPrivateTermMode
     ? parsePrivateTerms(process.env.PUBLIC_RELEASE_PRIVATE_TERMS ?? "")
     : undefined;
   const { passed, report } = checkRepository({
