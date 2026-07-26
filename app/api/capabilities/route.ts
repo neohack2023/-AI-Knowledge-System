@@ -19,13 +19,19 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const discoveryId = url.searchParams.get("discovery_id");
     if (discoveryId) return json(capabilityDiscoveryRuntime.get(discoveryId));
+    const [registryFingerprint, inventoryProjectionFingerprint] = await Promise.all([
+      capabilityDiscoveryRuntime.registryFingerprint(),
+      capabilityDiscoveryRuntime.inventoryProjectionFingerprint(),
+    ]);
     return json({
       capability_registry_contract: "RuntimeCapabilityDefinition/1.0",
       capability_discovery_contract: "CapabilityDiscoveryEnvelope/1.0",
       capability_materialization_contract: "MaterializedCapability/1.0",
       persistence: "PROCESS_LOCAL",
       execution_authority: "NONE",
-      registry_fingerprint: await capabilityDiscoveryRuntime.registryFingerprint(),
+      registry_fingerprint: registryFingerprint,
+      registry_fingerprint_basis: "FULL_POLICY_DEFINITION",
+      inventory_projection_fingerprint: inventoryProjectionFingerprint,
       capabilities: capabilityDiscoveryRuntime.listCapabilities(),
     });
   } catch (error) {
