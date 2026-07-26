@@ -3,19 +3,15 @@
 Status: active development for issue #11  
 Source contract: `RepoRegistrySource/1.0`  
 Compiled contracts: `CompiledAiosRegistry/1.0` and `AiosRegistryInventory/1.0`  
-Resolution contract: `ScopeResolutionResult/1.0`
+Resolution contract: `ScopeResolutionResult/1.0`  
+Composition contract: `PortableAiosRuntime/0.1`
 
 ## Purpose
 
 Phase 1 moves portable scope, alias, capability, workflow, and authority configuration into versioned repository files. These files are public starter configuration, not an export of the maintainer's private Notion or Google Drive registries.
 
 ```text
-config/registry.json
-config/scopes/*.json
-config/aliases/*.json
-config/capabilities/*.json
-config/workflows/*.json
-config/authority/*.json
+config source files
         |
         v
 validate exact IDs, references, health, handlers, and schema fingerprints
@@ -24,7 +20,13 @@ validate exact IDs, references, health, handlers, and schema fingerprints
 compile deterministic full-policy and compact-inventory artifacts
         |
         v
-resolve exact scope without loading packets or granting execution authority
+verify checked-in runtime snapshot matches compiler output exactly
+        |
+        v
+portable composition root
+   |                    |
+   v                    v
+exact scope resolver    capability discovery/materialization
 ```
 
 ## Commands
@@ -39,7 +41,7 @@ Compilation writes two untracked operational artifacts under `outputs/registry/`
 - `compiled-registry.json`, the complete portable policy snapshot
 - `registry-inventory.json`, the compact discovery projection
 
-The full-policy fingerprint and compact-inventory fingerprint are separate. The compiler does not include wall-clock compilation time, absolute paths, host metadata, or provider state in either artifact, so identical source inputs produce byte-identical outputs on separate machines.
+The edge-compatible runtime consumes the checked-in deterministic snapshot at `packages/runtime-composition/compiled-public-registry.ts`. CI recompiles the source registry and requires byte-equivalent object content, including both fingerprints. A stale or manually altered runtime snapshot fails the Phase 1 registry job.
 
 ## Deterministic routing tables
 
@@ -73,15 +75,30 @@ A successful scope resolution still reports:
 
 Routing identifies a legal scope candidate. It does not grant data access, workflow entry, or mutation authority.
 
-## Compiled capability compatibility loader
+## Portable runtime composition
 
-`packages/capability-registry/compiled-provider.ts` converts the compiled capability collection into a stable provider snapshot for the existing discovery service. It validates contract headers, identifiers, handler references, schema fingerprints, and duplicate capability IDs before returning cloned definitions.
+`server/runtime/portable.ts` is the active composition root for this slice. It loads one immutable compiled registry snapshot, creates the capability provider from that snapshot, and exposes exact scope resolution against the same registry identity.
 
-The loader exposes metadata and definitions only. It declares `execution_authority=NONE` and `destination_write_authorized=false`. Wiring it into the active runtime remains a separate patch so the transition can be tested without silently replacing execution truth.
+The existing capability API now uses this composition root instead of the in-code native capability array. Discovery envelopes carry the compiled registry version and full-policy fingerprint. Materialization rechecks the same fingerprint before loading a schema.
+
+The composition root exposes no execution method. It declares:
+
+- `execution_authority=NONE`
+- `destination_write_authorized=false`
+- `workflow_execution_entrypoint=WorkflowExecutionKernel`
+
+All later LIVE execution must still enter the existing kernel. Registry loading, scope resolution, capability discovery, and schema materialization do not create a parallel authority path.
+
+## HTTP surfaces
+
+- `GET /api/scopes/resolve` returns the resolver contract and compiled registry identity.
+- `POST /api/scopes/resolve` performs exact, non-semantic resolution without loading project packets.
+- `GET /api/capabilities` reports the same compiled registry version and fingerprints.
+- Existing capability discovery, selection, approval, rejection, and materialization operations remain process-local and non-executing.
 
 ## Current validation gates
 
-The compiler fails closed for:
+The compiler and runtime tests fail closed for:
 
 - malformed JSON and contract headers
 - duplicate scope, alias, capability, workflow, and authority IDs
@@ -92,6 +109,11 @@ The compiler fails closed for:
 - capability/workflow handler-reference disagreement
 - unavailable handlers
 - malformed, stale, or mismatched capability schema fingerprints
+- checked-in runtime snapshot drift
+- compiled capability contract or fingerprint mismatch
+- duplicate capability IDs in the compiled provider
+- inactive, unhealthy, or expired exact scope matches
+- registry identity divergence between scope and capability HTTP surfaces
 
 Diagnostics include a stable error code, repository-relative file, field, and actionable message.
 
@@ -99,13 +121,13 @@ Diagnostics include a stable error code, repository-relative file, field, and ac
 
 - Repository configuration is the portable public default, not the maintainer's private canon.
 - Notion and Drive adapters may later import observations, but they do not become canonical compiler dependencies.
-- The default validation and compile path performs no cloud-provider reads and executes no workflows.
+- The default validation, compile, resolution, discovery, and composition paths perform no cloud-provider reads.
 - `READ_FROM`, `AUTHORITY`, execution permission, and destination-write permission remain separate.
 - Runtime mutation of registry source files is outside this slice and must use the governed write path.
 
 ## Next bounded work
 
-1. Wire the compiled capability provider into the existing discovery runtime behind a compatibility composition root.
-2. Expose exact scope resolution through the direct TypeScript API and existing HTTP surface.
-3. Bind discovery envelopes to the compiled registry version and full-policy fingerprint.
-4. Add deprecation, replacement, overlap-precedence, ambiguity, and inventory-only delta tests.
+1. Add deprecation, replacement, overlap-precedence, ambiguity, and inventory-only delta tests.
+2. Add registry compatibility rules for supported contract-version ranges and explicit migration failures.
+3. Introduce the portable authority-resolution service over compiled authority bindings.
+4. Prepare the handoff from issue #11 into the end-to-end portable runtime work in issue #12.
