@@ -20,7 +20,7 @@ const SOURCE_DIRECTORIES = {
 
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const asArray = (value) => Array.isArray(value) ? value : [];
-const normalizedKey = (value) => String(value ?? "").trim().toLowerCase();
+const normalizedKey = (value) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 const sha256Pattern = /^sha256:[a-f0-9]{64}$/;
 
 export const canonicalize = (value) => {
@@ -140,15 +140,21 @@ export const validateRegistrySources = (sources, options = {}) => {
   }
   for (const entry of sources.capabilities) {
     validateContractHeader(entry, "RuntimeCapabilityDefinition", diagnostics);
-    requireString(entry, "capability_id", diagnostics);
+    const capabilityId = requireString(entry, "capability_id", diagnostics);
+    const version = requireString(entry, "version", diagnostics);
     requireString(entry, "workflow_id", diagnostics);
     requireString(entry, "handler_ref", diagnostics);
     const expected = requireString(entry, "expected_schema_fingerprint", diagnostics);
     if (expected && !sha256Pattern.test(expected)) {
       diagnostics.push(diagnostic("INVALID_SCHEMA_FINGERPRINT", entry.file, "expected_schema_fingerprint", "Fingerprint must use sha256:<64 lowercase hex characters>."));
     }
-    if (expected && isObject(entry.value.input_schema) && isObject(entry.value.output_schema)) {
-      const actual = fingerprint({ input_schema: entry.value.input_schema, output_schema: entry.value.output_schema });
+    if (expected && capabilityId && version && isObject(entry.value.input_schema) && isObject(entry.value.output_schema)) {
+      const actual = fingerprint({
+        capability_id: capabilityId,
+        version,
+        input_schema: entry.value.input_schema,
+        output_schema: entry.value.output_schema,
+      });
       if (actual !== expected) {
         diagnostics.push(diagnostic("SCHEMA_FINGERPRINT_MISMATCH", entry.file, "expected_schema_fingerprint", `Expected ${expected}; computed ${actual}.`));
       }
@@ -219,21 +225,55 @@ export const validateRegistrySources = (sources, options = {}) => {
 
 const values = (entries, idField) => entries.map((entry) => entry.value).sort(sortBy(idField));
 
+const buildRoutingTables = (scopes, aliases) => {
+  const exactScopeKeys = {};
+  const exactProjectNames = {};
+  const exactAliases = {};
+  const childrenByParent = {};
+
+  for (const scope of scopes) {
+    exactScopeKeys[normalizedKey(scope.scope_key)] = scope.scope_key;
+    exactProjectNames[normalizedKey(scope.project_name)] = scope.scope_key;
+    if (scope.parent_scope_key) {
+      const children = childrenByParent[scope.parent_scope_key] ?? [];
+      children.push(scope.scope_key);
+      childrenByParent[scope.parent_scope_key] = children;
+    }
+  }
+  for (const alias of aliases) {
+    if (alias.status === "ACTIVE") exactAliases[normalizedKey(alias.alias)] = alias.scope_key;
+  }
+  for (const children of Object.values(childrenByParent)) children.sort();
+
+  return {
+    exact_scope_keys: exactScopeKeys,
+    exact_project_names: exactProjectNames,
+    exact_aliases: exactAliases,
+    children_by_parent: childrenByParent,
+  };
+};
+
 export const compileRegistry = async ({ root = process.cwd(), outDir = "outputs/registry", now } = {}) => {
   const sources = await loadRegistrySources(root);
   const diagnostics = validateRegistrySources(sources, { now });
   if (diagnostics.length) throw new RegistryValidationError(diagnostics);
 
+  const scopes = values(sources.scopes, "scope_key");
+  const aliases = values(sources.aliases, "alias_id");
+  const capabilities = values(sources.capabilities, "capability_id");
+  const workflows = values(sources.workflows, "workflow_id");
+  const authority = values(sources.authority, "binding_id");
   const policy = {
     schema_name: "CompiledAiosRegistry",
     schema_version: "1.0",
     registry_version: sources.manifest.registry_version,
     routing_precedence: asArray(sources.manifest.routing_precedence),
-    scopes: values(sources.scopes, "scope_key"),
-    aliases: values(sources.aliases, "alias_id"),
-    capabilities: values(sources.capabilities, "capability_id"),
-    workflows: values(sources.workflows, "workflow_id"),
-    authority: values(sources.authority, "binding_id"),
+    routing_tables: buildRoutingTables(scopes, aliases),
+    scopes,
+    aliases,
+    capabilities,
+    workflows,
+    authority,
   };
 
   const inventory = {
