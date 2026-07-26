@@ -121,7 +121,7 @@ test("blocked exact scopes fail closed instead of falling through", async () => 
 test("compiled capability loader returns an immutable provider snapshot without authority", async () => {
   const fixture = await compiledFixture();
   try {
-    const loaded = loadCompiledCapabilityRegistry(fixture.registry as never);
+    const loaded = loadCompiledCapabilityRegistry(fixture.registry as any);
     assert.equal(loaded.registry_version, fixture.registry.registry_version);
     assert.equal(loaded.registry_fingerprint, fixture.registry.registry_fingerprint);
     assert.equal(loaded.execution_authority, "NONE");
@@ -142,7 +142,7 @@ test("compiled capability loader rejects duplicate capability IDs", async () => 
     const registry = structuredClone(fixture.registry);
     registry.capabilities.push(structuredClone(registry.capabilities[0]));
     assert.throws(
-      () => loadCompiledCapabilityRegistry(registry as never),
+      () => loadCompiledCapabilityRegistry(registry as any),
       (error: unknown) => error instanceof Error && error.message.includes("appears more than once"),
     );
   } finally {
