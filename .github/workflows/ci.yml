@@ -41,10 +41,10 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Validate, resolve, and compile registry
+      - name: Validate, resolve, compose, and compile registry
         run: |
           mkdir -p outputs
-          node --experimental-transform-types --test tests/registry-compiler.test.mjs tests/phase1-scope-router.test.ts > outputs/registry-tests.tap 2>&1
+          node --experimental-transform-types --test tests/registry-compiler.test.mjs tests/phase1-scope-router.test.ts tests/phase1-portable-runtime.test.ts > outputs/registry-tests.tap 2>&1
           node scripts/registry/cli.mjs compile --out outputs/registry
 
       - name: Upload registry diagnostics
