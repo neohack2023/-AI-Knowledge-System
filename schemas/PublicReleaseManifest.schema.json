@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aios://schemas/PublicReleaseManifest/1.0",
+  "title": "PublicReleaseManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_name",
+    "schema_version",
+    "release_id",
+    "default_classification",
+    "allowlist",
+    "denylist",
+    "binary_rules",
+    "content_rules",
+    "exceptions",
+    "private_terms"
+  ],
+  "properties": {
+    "schema_name": { "const": "PublicReleaseManifest" },
+    "schema_version": { "const": "1.0" },
+    "release_id": { "type": "string", "minLength": 1 },
+    "default_classification": { "const": "UNRESOLVED" },
+    "allowlist": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/pathRule" }
+    },
+    "denylist": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pathRule" }
+    },
+    "binary_rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/binaryRule" }
+    },
+    "content_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/contentRule" }
+    },
+    "exceptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exceptionRule" }
+    },
+    "private_terms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_variable", "local_file"],
+      "properties": {
+        "environment_variable": {
+          "type": "string",
+          "pattern": "^[A-Z_][A-Z0-9_]*$"
+        },
+        "local_file": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "classification": {
+      "enum": [
+        "PUBLIC_CORE",
+        "PUBLIC_TEMPLATE",
+        "PUBLIC_SYNTHETIC_FIXTURE",
+        "PRIVATE_KNOWLEDGE",
+        "PRIVATE_BINDING",
+        "PRIVATE_EVIDENCE",
+        "SECRET",
+        "UNRESOLVED"
+      ]
+    },
+    "pathRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pattern", "classification", "reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string", "minLength": 1 },
+        "classification": { "$ref": "#/$defs/classification" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "binaryRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path_pattern", "extensions", "max_bytes", "inspection", "reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path_pattern": { "type": "string", "minLength": 1 },
+        "extensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^\\.[a-z0-9]+$" }
+        },
+        "max_bytes": { "type": "integer", "minimum": 1 },
+        "inspection": { "const": "SIGNATURE_SIZE_AND_SHA256" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "contentRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "classification", "pattern", "flags", "replacement"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "classification": { "$ref": "#/$defs/classification" },
+        "pattern": { "type": "string", "minLength": 1 },
+        "flags": { "type": "string", "pattern": "^[dgimsuvy]*$" },
+        "replacement": { "type": "string", "minLength": 1 }
+      }
+    },
+    "exceptionRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content_rule_id", "path_pattern", "pattern", "flags", "reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "content_rule_id": { "type": "string", "minLength": 1 },
+        "path_pattern": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string", "minLength": 1 },
+        "flags": { "type": "string", "pattern": "^[dgimsuvy]*$" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
