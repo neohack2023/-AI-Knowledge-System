@@ -32,7 +32,7 @@ jobs:
             terms="$PRIVATE_TERMS_VARIABLE"
             mode="CONFIGURED_VARIABLE"
           else
-            terms="aios-ci-private-term-sentinel"
+            terms="aios-ci-private-term-${GITHUB_RUN_ID}"
             mode="SENTINEL_ONLY"
           fi
           delimiter="AIOS_PRIVATE_TERMS_$(date +%s%N)"
@@ -73,7 +73,7 @@ jobs:
             terms="$PRIVATE_TERMS_VARIABLE"
             mode="CONFIGURED_VARIABLE"
           else
-            terms="aios-ci-private-term-sentinel"
+            terms="aios-ci-private-term-${GITHUB_RUN_ID}"
             mode="SENTINEL_ONLY"
           fi
           delimiter="AIOS_PRIVATE_TERMS_$(date +%s%N)"
