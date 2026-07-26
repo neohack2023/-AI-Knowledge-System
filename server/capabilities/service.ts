@@ -17,6 +17,13 @@ export class CapabilityDiscoveryError extends Error {
 
 export type CapabilityRegistryProvider = () => readonly RuntimeCapabilityDefinition[];
 
+export type CapabilityRegistryMetadata = {
+  registry_version: string;
+  registry_fingerprint: string;
+  inventory_projection_fingerprint: string;
+  registry_source: "COMPILED_PUBLIC_REGISTRY" | "NATIVE_RUNTIME_REGISTRY";
+};
+
 const reject = (
   candidate: CapabilityCandidate,
   reasonCodes: RejectedCapabilityCandidate["reason_codes"],
@@ -34,7 +41,10 @@ const byCapabilityId = (
 ) => left.capability_id.localeCompare(right.capability_id);
 
 export class CapabilityDiscoveryService {
-  constructor(private readonly registryProvider: CapabilityRegistryProvider) {}
+  constructor(
+    private readonly registryProvider: CapabilityRegistryProvider,
+    private readonly compiledMetadata?: CapabilityRegistryMetadata,
+  ) {}
 
   listDefinitions() {
     return this.registryProvider()
@@ -59,6 +69,14 @@ export class CapabilityDiscoveryService {
     })).sort((left, right) => left.capability_id.localeCompare(right.capability_id));
   }
 
+  registryVersion() {
+    return this.compiledMetadata?.registry_version ?? "runtime-handler-registry/1.0";
+  }
+
+  registrySource() {
+    return this.compiledMetadata?.registry_source ?? "NATIVE_RUNTIME_REGISTRY";
+  }
+
   private registryFingerprintFor(definitions: readonly RuntimeCapabilityDefinition[]) {
     return sha256Fingerprint({
       schema_name: "RuntimeCapabilityRegistryPolicy",
@@ -68,15 +86,17 @@ export class CapabilityDiscoveryService {
   }
 
   async registryFingerprint() {
-    return this.registryFingerprintFor(this.listDefinitions());
+    return this.compiledMetadata?.registry_fingerprint
+      ?? this.registryFingerprintFor(this.listDefinitions());
   }
 
   async inventoryProjectionFingerprint() {
-    return sha256Fingerprint({
-      schema_name: "CapabilityInventoryProjection",
-      schema_version: "1.0",
-      summaries: this.listSummaries(),
-    });
+    return this.compiledMetadata?.inventory_projection_fingerprint
+      ?? sha256Fingerprint({
+        schema_name: "CapabilityInventoryProjection",
+        schema_version: "1.0",
+        summaries: this.listSummaries(),
+      });
   }
 
   async discover(input: CapabilityDiscoveryInput): Promise<CapabilityDiscoveryEnvelope> {
@@ -141,7 +161,7 @@ export class CapabilityDiscoveryService {
     const second = eligible[1];
     const confidenceMargin = top && second ? Number((top.match_score - second.match_score).toFixed(4)) : top ? top.match_score : null;
     const ambiguous = Boolean(top && second && confidenceMargin !== null && confidenceMargin < 0.1);
-    const registryFingerprint = await this.registryFingerprintFor(definitions);
+    const registryFingerprint = await this.registryFingerprint();
 
     return {
       schema_name: "CapabilityDiscoveryEnvelope",
@@ -155,7 +175,7 @@ export class CapabilityDiscoveryService {
       intent_text: input.intent_text ?? null,
       requested_capability_id: input.requested_capability_id ?? null,
       authority_domains: [...(input.authority_domains ?? [])],
-      registry_version: "runtime-handler-registry/1.0",
+      registry_version: this.registryVersion(),
       registry_fingerprint: registryFingerprint,
       candidates_considered: definitions.length,
       eligible_candidates: structuredClone(eligible),
@@ -205,7 +225,7 @@ export class CapabilityDiscoveryService {
       );
     }
 
-    const currentRegistryFingerprint = await this.registryFingerprintFor(definitions);
+    const currentRegistryFingerprint = await this.registryFingerprint();
     if (currentRegistryFingerprint !== envelope.registry_fingerprint) {
       throw new CapabilityDiscoveryError(
         "CAPABILITY_REGISTRY_CHANGED",
