@@ -18,6 +18,8 @@ intent + exact scope
   -> eligible + rejected candidates
   -> explicit selection
   -> optional materialization-only approval
+  -> registry snapshot freshness check
+  -> health freshness check
   -> schema fingerprint verification
   -> exact schema packet
 ```
@@ -72,7 +74,7 @@ Every runtime definition declares:
 - trust, data access, reversibility, and blast radius
 - autonomy and approval requirements
 - supported execution modes
-- health state and verification source
+- health state, verification source, and optional expiry
 - source authority
 
 The GET `/api/capabilities` inventory returns summaries only. It intentionally omits executable schemas.
@@ -87,6 +89,18 @@ The GET `/api/capabilities` inventory returns summaries only. It intentionally o
 - recommended candidate only when the confidence margin is not ambiguous
 - registry fingerprint and version
 - observable discovery events
+
+The registered `cap:capability-discovery` handler is the exact `api:/api/capabilities#discover` action. Its materialized input schema requires `action`, `scope_key`, `mode`, and `intent_class`. Its output schema matches the process-local route response:
+
+```text
+envelope
+selection
+materialized_capability
+events
+persistence
+execution_authority
+requested_by
+```
 
 A no-match result is successful read-only discovery. It must not invent a tool or silently widen scope.
 
@@ -108,6 +122,19 @@ Capabilities may require an explicit approval before materialization. That appro
 
 Materialization requires a capability that was eligible in the referenced discovery and was selected or approved.
 
+Discovery and materialization are bound to one immutable registry decision surface:
+
+1. Discovery clones and sorts one registry snapshot.
+2. Policy evaluation and `registry_fingerprint` are computed from that same snapshot.
+3. Materialization clones one current registry snapshot.
+4. The selected capability version, workflow ID, schema refs, and expected schema fingerprint must still match.
+5. The full current registry fingerprint must still equal the discovery fingerprint.
+6. Any mismatch fails closed and requires a new discovery.
+
+This prevents a capability or policy definition from changing between selection and schema loading.
+
+Health is evaluated at both boundaries. `status=VERIFIED` is insufficient when `health.expires_at` is non-null and has passed. Expired or invalid health attestations are ineligible during discovery and blocked again during materialization.
+
 Before returning schemas, the runtime recomputes the SHA-256 fingerprint over:
 
 - capability ID
@@ -116,6 +143,13 @@ Before returning schemas, the runtime recomputes the SHA-256 fingerprint over:
 - output schema
 
 A mismatch fails closed with `CAPABILITY_SCHEMA_FINGERPRINT_MISMATCH`.
+
+Additional fail-closed materialization errors include:
+
+- `CAPABILITY_DEFINITION_CHANGED`
+- `CAPABILITY_REGISTRY_CHANGED`
+- `CAPABILITY_HEALTH_EXPIRED`
+- `CAPABILITY_HEALTH_BLOCKED`
 
 ## Observability
 
@@ -141,13 +175,16 @@ Implemented now:
 - code-native runtime capability definitions
 - compact inventory
 - deterministic intent/scope/authority/mode/health filtering
+- time-aware health expiry enforcement
 - overlap precedence support
 - explicit candidate selection
 - materialization-only approval semantics
+- exact handler input/output schema contracts
+- immutable registry snapshot binding between discovery and materialization
 - just-in-time schema loading
 - SHA-256 schema verification
 - process-local event trace
-- API and fail-closed tests
+- API and source-level fail-closed tests
 
 Not implemented in this slice:
 
