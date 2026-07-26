@@ -28,11 +28,18 @@ const reject = (
   reason_details: reasonDetails,
 });
 
+const byCapabilityId = (
+  left: Pick<RuntimeCapabilityDefinition, "capability_id">,
+  right: Pick<RuntimeCapabilityDefinition, "capability_id">,
+) => left.capability_id.localeCompare(right.capability_id);
+
 export class CapabilityDiscoveryService {
   constructor(private readonly registryProvider: CapabilityRegistryProvider) {}
 
   listDefinitions() {
-    return this.registryProvider().map((definition) => structuredClone(definition));
+    return this.registryProvider()
+      .map((definition) => structuredClone(definition))
+      .sort(byCapabilityId);
   }
 
   listSummaries() {
@@ -49,11 +56,23 @@ export class CapabilityDiscoveryService {
       health_status: definition.health.status,
       schema_refs: [definition.input_schema_ref, definition.output_schema_ref],
       source_authority: definition.source_authority,
-    }));
+    })).sort((left, right) => left.capability_id.localeCompare(right.capability_id));
   }
 
   async registryFingerprint() {
-    return sha256Fingerprint(this.listSummaries());
+    return sha256Fingerprint({
+      schema_name: "RuntimeCapabilityRegistryPolicy",
+      schema_version: "1.0",
+      definitions: this.listDefinitions(),
+    });
+  }
+
+  async inventoryProjectionFingerprint() {
+    return sha256Fingerprint({
+      schema_name: "CapabilityInventoryProjection",
+      schema_version: "1.0",
+      summaries: this.listSummaries(),
+    });
   }
 
   async discover(input: CapabilityDiscoveryInput): Promise<CapabilityDiscoveryEnvelope> {
