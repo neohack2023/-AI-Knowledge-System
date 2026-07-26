@@ -36,6 +36,10 @@ export async function GET(request: Request) {
       live_workflows: workflowExecutionKernel.listLiveWorkflows(),
       simulation_transport: "client-only",
       next_action_contract: "registry-backed",
+      capability_discovery_endpoint: "/api/capabilities",
+      capability_discovery_contract: "CapabilityDiscoveryEnvelope/1.0",
+      capability_materialization_contract: "MaterializedCapability/1.0",
+      capability_execution_authority: "NONE",
     });
   } catch (error) {
     return handleError(error);
