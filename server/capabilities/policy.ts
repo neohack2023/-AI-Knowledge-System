@@ -63,15 +63,21 @@ export const evaluateCapabilityPolicy = (
   const normalizedIntentText = normalize(input.intent_text ?? "");
 
   let score = 0;
+  const requestedCapabilityMatches = (
+    !input.requested_capability_id
+    || definition.capability_id === input.requested_capability_id
+  );
+
   if (input.requested_capability_id) {
-    if (definition.capability_id === input.requested_capability_id) {
-      score = 1;
-      matchReasons.push("explicit capability request");
+    if (requestedCapabilityMatches) {
+      matchReasons.push("explicit capability candidate constraint");
     } else {
       reasonCodes.push("REQUESTED_CAPABILITY_MISMATCH");
       reasonDetails.push(`Request targeted '${input.requested_capability_id}', not '${definition.capability_id}'.`);
     }
-  } else {
+  }
+
+  if (requestedCapabilityMatches) {
     const exactIntent = definition.intent_classes.find((intentClass) => normalize(intentClass) === normalizedIntent);
     if (exactIntent) {
       score = 1;
