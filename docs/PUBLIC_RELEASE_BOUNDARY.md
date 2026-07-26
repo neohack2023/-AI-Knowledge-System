@@ -154,15 +154,31 @@ Pull-request authors control candidate paths and bytes. They may disguise plaint
 
 The ordinary `pull_request` workflow runs build, tests, and the public boundary with a harmless synthetic private-term sentinel. Pull-request code never receives the configured private dictionary.
 
-Confidential owner-term validation is deliberately not a GitHub pull-request workflow. Immediately before merge or release, an authorized maintainer uses a trusted checkout in a maintainer-only private channel and runs:
+Confidential owner-term validation is deliberately not a GitHub pull-request workflow. Immediately before merge or release, an authorized maintainer uses two separate checkouts in a maintainer-only private channel:
+
+```text
+/trusted-aios-scanner   trusted base-revision validator and dependencies
+/candidate-checkout     pull-request files treated strictly as data
+```
+
+Run the trusted validator directly from the trusted checkout. Do not invoke `npm`, package scripts, dependencies, JavaScript, lifecycle hooks, or other executable content from the candidate checkout.
 
 ```sh
-PUBLIC_RELEASE_PRIVATE_TERMS="$(cat /private/path/terms)" npm run check:public-release
+cd /trusted-aios-scanner
+
+PUBLIC_RELEASE_PRIVATE_TERMS="$(cat /private/path/terms)" \
+node scripts/public-release/check.mjs \
+  --trusted-private-terms \
+  --root /candidate-checkout \
+  --manifest public-release-manifest.yaml \
+  --report /private/output/public-release-report.json
 ```
+
+`--trusted-private-terms` requires an explicit candidate `--root` and refuses to scan the validator's own checkout. This makes the trust boundary machine-checkable: trusted code inspects candidate files without handing the confidential dictionary to candidate-controlled package scripts.
 
 The maintainer must review the exit status and privacy-safe report privately. Neither the dictionary, detailed result, nor pass/fail status may be uploaded to public Actions artifacts, logs, comments, or commit statuses. Because applying a confidential dictionary to attacker-chosen content creates a membership oracle even when match details are hidden, this check must not be posted as a pull-request status. Ordinary CI continues to prove scanner plumbing with a harmless synthetic sentinel, but does not claim owner-specific coverage.
 
-Synthetic tests cover nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content and paths, forbidden exceptions, empty content rules, unsafe private-term paths, unapproved binaries, signature-valid approved binaries, disguised-text signature rejection, signature-prefix spoofing with embedded sensitive content, and CI secret isolation.
+Synthetic tests cover nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content and paths, forbidden exceptions, empty content rules, unsafe private-term paths, unapproved binaries, signature-valid approved binaries, disguised-text signature rejection, signature-prefix spoofing with embedded sensitive content, CI secret isolation, and trusted-scanner separation.
 
 ## Non-goals for this slice
 
