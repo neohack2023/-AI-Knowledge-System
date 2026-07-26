@@ -3,7 +3,11 @@
 import path from "node:path";
 import process from "node:process";
 
-import { checkRepository, PublicReleaseBoundaryError } from "./lib.mjs";
+import {
+  checkRepository,
+  parsePrivateTerms,
+  PublicReleaseBoundaryError,
+} from "./lib.mjs";
 
 const argumentValue = (name, fallback) => {
   const index = process.argv.indexOf(name);
@@ -13,11 +17,21 @@ const argumentValue = (name, fallback) => {
   return value;
 };
 
+const hasFlag = (name) => process.argv.includes(name);
+
 try {
   const root = path.resolve(argumentValue("--root", process.cwd()));
   const manifestPath = argumentValue("--manifest", "public-release-manifest.yaml");
   const reportPath = argumentValue("--report", "outputs/public-release-report.json");
-  const { passed, report } = checkRepository({ root, manifestPath, reportPath });
+  const trustedPrivateTerms = hasFlag("--trusted-private-terms")
+    ? parsePrivateTerms(process.env.PUBLIC_RELEASE_PRIVATE_TERMS ?? "")
+    : undefined;
+  const { passed, report } = checkRepository({
+    root,
+    manifestPath,
+    reportPath,
+    privateTerms: trustedPrivateTerms,
+  });
 
   const summary = report.summary;
   console.log([
@@ -27,6 +41,7 @@ try {
     `blocked=${summary.blocked_files}`,
     `unresolved=${summary.unresolved_files}`,
     `findings=${summary.sensitive_findings}`,
+    `binaries=${summary.binary_files_approved}`,
     `report=${reportPath}`,
   ].join(" | "));
 
