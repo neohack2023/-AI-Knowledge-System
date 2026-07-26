@@ -30,6 +30,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# private public-release term dictionary
+.public-release-private-terms
+
 # vercel
 .vercel
 
