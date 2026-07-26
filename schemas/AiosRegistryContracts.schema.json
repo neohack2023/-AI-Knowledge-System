@@ -126,6 +126,33 @@
         "health": { "$ref": "#/$defs/health" }
       }
     },
+    "routingTables": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact_scope_keys", "exact_project_names", "exact_aliases", "children_by_parent"],
+      "properties": {
+        "exact_scope_keys": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "exact_project_names": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "exact_aliases": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "children_by_parent": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
     "compiledAiosRegistry": {
       "type": "object",
       "additionalProperties": false,
@@ -134,6 +161,7 @@
         "schema_version",
         "registry_version",
         "routing_precedence",
+        "routing_tables",
         "scopes",
         "aliases",
         "capabilities",
@@ -147,6 +175,7 @@
         "schema_version": { "const": "1.0" },
         "registry_version": { "type": "string", "minLength": 1 },
         "routing_precedence": { "type": "array", "items": { "type": "string" } },
+        "routing_tables": { "$ref": "#/$defs/routingTables" },
         "scopes": { "type": "array", "items": { "$ref": "#/$defs/scopeDefinition" } },
         "aliases": { "type": "array", "items": { "$ref": "#/$defs/aliasDefinition" } },
         "capabilities": { "type": "array", "items": { "$ref": "#/$defs/runtimeCapabilityDefinition" } },
