@@ -17,10 +17,22 @@
       "reason": "Optional hosting declarations without credentials."
     },
     {
+      "id": "bundled-font-assets",
+      "pattern": ".vinext/fonts/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Repository-tracked application font assets and generated styles."
+    },
+    {
       "id": "application-source",
       "pattern": "app/**",
       "classification": "PUBLIC_CORE",
       "reason": "Repository-owned application source."
+    },
+    {
+      "id": "build-source",
+      "pattern": "build/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Repository build integration source."
     },
     {
       "id": "database-source",
@@ -33,6 +45,12 @@
       "pattern": "docs/**",
       "classification": "PUBLIC_TEMPLATE",
       "reason": "Public architecture and operating documentation."
+    },
+    {
+      "id": "database-migration-metadata",
+      "pattern": "drizzle/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Repository-owned migration metadata without live data."
     },
     {
       "id": "public-examples",
@@ -77,6 +95,12 @@
       "reason": "Versioned public JSON Schemas."
     },
     {
+      "id": "worker-runtime",
+      "pattern": "worker/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Repository-owned worker entry point."
+    },
+    {
       "id": "future-portable-packages",
       "pattern": "packages/**",
       "classification": "PUBLIC_CORE",
@@ -99,6 +123,12 @@
       "pattern": ".gitignore",
       "classification": "PUBLIC_TEMPLATE",
       "reason": "Repository ignore policy."
+    },
+    {
+      "id": "root-npm-config",
+      "pattern": ".npmrc",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Repository package-manager behavior without credentials."
     },
     {
       "id": "root-readme",
@@ -164,7 +194,7 @@
       "id": "root-next-config",
       "pattern": "next.config.ts",
       "classification": "PUBLIC_TEMPLATE",
-      "reason": "Optional framework configuration."
+      "reason": "Framework configuration."
     },
     {
       "id": "release-manifest",
