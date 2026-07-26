@@ -15,7 +15,7 @@ The release process is allowlist-first and fail-closed:
 tracked repository file
   -> recursive path classification
   -> path privacy inspection
-  -> text scan or explicit binary admission rule
+  -> text scan or signature-validated binary admission rule
   -> exception validation
   -> unresolved finding gate
   -> privacy-safe release report
@@ -54,7 +54,7 @@ Every candidate artifact resolves to exactly one classification:
 - The validator scans Git-tracked release candidates, not arbitrary ignored workspace files.
 - A private terms file may be supplied locally through `.public-release-private-terms` or `PUBLIC_RELEASE_PRIVATE_TERMS`. The file is ignored by Git, repository-relative, denylisted, and never becomes part of the release artifact.
 - Normal pull-request CI uses only a synthetic sentinel. It never exposes the configured owner-term dictionary to pull-request-controlled scripts.
-- A separate `pull_request_target` workflow runs the trusted base-revision scanner against candidate files without executing candidate code. Only that protected workflow may receive the configured owner-term secret or variable.
+- Confidential owner terms are used only in a maintainer-only private pre-merge or pre-release channel. They are never supplied to a contributor-visible GitHub workflow or reported as a pull-request check.
 - Generated reports record finding type, redacted path, location, fingerprints, binary admission evidence, and rule IDs without reproducing sensitive values.
 
 ## Path policy
@@ -88,10 +88,11 @@ Every releasable binary must match an explicit `binary_rules` entry that declare
 - a bounded path pattern
 - permitted file extensions
 - a maximum byte size
-- `SIZE_AND_SHA256` inspection
+- a recognized file-format signature matching the extension
+- `SIGNATURE_SIZE_AND_SHA256` inspection
 - a durable review reason
 
-Approved binaries are recorded with their policy ID, byte size, and SHA-256 fingerprint. A binary without a matching rule, or one exceeding its rule's size limit, resolves to `UNRESOLVED` and blocks release.
+The scanner validates the extension-specific magic bytes before it can skip text inspection. An admitted extension with missing or mismatched signature bytes resolves to `UNRESOLVED`; this prevents plaintext disguised as a font, image, document, or archive from bypassing content inspection. Approved binaries are recorded with their policy ID, byte size, and SHA-256 fingerprint. A binary without a matching rule, or one exceeding its rule's size limit, also blocks release.
 
 This is a release-packaging rule, not a universal ban on user files. Deployers may define their own reviewed binary policies for their distribution while runtime imports remain subject to user authorization and local policy.
 
@@ -127,6 +128,7 @@ The process exits unsuccessfully when it finds:
 - an exception targeting a secret or owner-term rule
 - an unsafe private-term configuration
 - an unapproved or oversized binary
+- a binary extension whose file signature is absent or mismatched
 
 ## Export report
 
@@ -146,19 +148,21 @@ Reports are operational evidence. They are not authority, authorization, or proo
 
 ## CI gate
 
+### Threat model
+
+Pull-request authors control candidate paths and bytes. They may disguise plaintext secrets as an allowlisted binary extension to evade text rules, so extensions are not trusted as evidence of format. They may also submit batches of guessed names and observe a public check repeatedly; any confidential dictionary applied to that input becomes a membership oracle through diagnostics or the check's pass/fail bit. The controls below therefore fail closed on extension/signature disagreement and keep real owner-term evaluation and its outcome outside contributor-visible infrastructure.
+
 The ordinary `pull_request` workflow runs build, tests, and the public boundary with a harmless synthetic private-term sentinel. Pull-request code never receives the configured private dictionary.
 
-The protected owner-term workflow:
+Confidential owner-term validation is deliberately not a GitHub pull-request workflow. Immediately before merge or release, an authorized maintainer uses a trusted checkout in a maintainer-only private channel and runs:
 
-1. loads scanner code from the trusted base revision
-2. checks out candidate files without persisted credentials
-3. executes no candidate package scripts, tests, actions, or lifecycle hooks
-4. injects the configured private dictionary only into the trusted scanner process
-5. uploads a privacy-safe boundary report
+```sh
+PUBLIC_RELEASE_PRIVATE_TERMS="$(cat /private/path/terms)" npm run check:public-release
+```
 
-A configured repository secret named `PUBLIC_RELEASE_PRIVATE_TERMS` is preferred. A repository variable with the same name is accepted only when its terms are intentionally non-secret. When neither is configured, the protected workflow reports `SENTINEL_ONLY` and does not claim owner-specific coverage.
+The maintainer must review the exit status and privacy-safe report privately. Neither the dictionary, detailed result, nor pass/fail status may be uploaded to public Actions artifacts, logs, comments, or commit statuses. Because applying a confidential dictionary to attacker-chosen content creates a membership oracle even when match details are hidden, this check must not be posted as a pull-request status. Ordinary CI continues to prove scanner plumbing with a harmless synthetic sentinel, but does not claim owner-specific coverage.
 
-Synthetic tests cover nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content and paths, forbidden exceptions, empty content rules, unsafe private-term paths, unapproved binaries, approved binary evidence, and CI secret isolation.
+Synthetic tests cover nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content and paths, forbidden exceptions, empty content rules, unsafe private-term paths, unapproved binaries, signature-valid approved binaries, disguised-text signature rejection, and CI secret isolation.
 
 ## Non-goals for this slice
 

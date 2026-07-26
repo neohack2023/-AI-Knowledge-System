@@ -98,7 +98,7 @@
           "items": { "type": "string", "pattern": "^\\.[a-z0-9]+$" }
         },
         "max_bytes": { "type": "integer", "minimum": 1 },
-        "inspection": { "const": "SIZE_AND_SHA256" },
+        "inspection": { "const": "SIGNATURE_SIZE_AND_SHA256" },
         "reason": { "type": "string", "minLength": 1 }
       }
     },

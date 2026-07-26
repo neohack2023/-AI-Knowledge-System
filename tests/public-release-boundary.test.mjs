@@ -246,19 +246,31 @@ test("repository checks fail closed for unapproved binaries and admit reviewed f
   }
 });
 
-test("pull-request CI uses only a synthetic term while protected base code owns private scanning", () => {
+test("admitted extensions with invalid signatures fail closed before text scanning is skipped", () => {
+  const root = createTrackedRepository({
+    ".vinext/fonts/attack/leak.woff2": `ghp_${"A".repeat(32)} sample-owner`,
+  });
+  try {
+    const result = checkRepository({ root, privateTerms: ["sample-owner"], environment: {} });
+    assert.equal(result.passed, false);
+    assert.equal(result.report.summary.binary_files_approved, 0);
+    assert.equal(result.report.summary.unresolved_files, 1);
+    assert.match(result.report.unresolved[0].reason, /does not match.*binary file signature/);
+    assert.equal(result.report.included.some((record) => record.content_scanned === false), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("confidential owner terms stay outside contributor-visible GitHub workflows", () => {
   const ci = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-  const protectedScan = readFileSync(
-    new URL("../.github/workflows/protected-owner-term-scan.yml", import.meta.url),
-    "utf8",
+  const boundaryDocumentation = readFileSync(
+    new URL("../docs/PUBLIC_RELEASE_BOUNDARY.md", import.meta.url), "utf8",
   );
 
   assert.doesNotMatch(ci, /secrets\.PUBLIC_RELEASE_PRIVATE_TERMS/);
   assert.doesNotMatch(ci, /vars\.PUBLIC_RELEASE_PRIVATE_TERMS/);
   assert.match(ci, /SENTINEL_ONLY/);
-
-  assert.match(protectedScan, /pull_request_target/);
-  assert.match(protectedScan, /trusted\/scripts\/public-release\/check\.mjs/);
-  assert.match(protectedScan, /--trusted-private-terms/);
-  assert.doesNotMatch(protectedScan, /npm ci|npm test/);
+  assert.match(boundaryDocumentation, /maintainer-only private channel/);
+  assert.match(boundaryDocumentation, /must not be posted as a pull-request status/);
 });

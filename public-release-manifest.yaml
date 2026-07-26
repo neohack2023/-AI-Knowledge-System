@@ -249,8 +249,8 @@
         ".woff2"
       ],
       "max_bytes": 1048576,
-      "inspection": "SIZE_AND_SHA256",
-      "reason": "Bundled framework font assets are admitted only by path, extension, size limit, and recorded SHA-256 fingerprint."
+      "inspection": "SIGNATURE_SIZE_AND_SHA256",
+      "reason": "Bundled framework font assets are admitted only by path, extension-matched signature, size limit, and recorded SHA-256 fingerprint."
     }
   ],
   "content_rules": [

@@ -164,14 +164,14 @@ export const validateManifest = (manifest) => {
       !rule?.id
       || !rule.path_pattern
       || !rule.reason
-      || rule.inspection !== "SIZE_AND_SHA256"
+      || rule.inspection !== "SIGNATURE_SIZE_AND_SHA256"
       || !Number.isInteger(rule.max_bytes)
       || rule.max_bytes < 1
       || !extensionsValid
     ) {
       throw new PublicReleaseBoundaryError(
         "MANIFEST_INVALID_BINARY_RULE",
-        "binary_rules require id, path_pattern, extensions, max_bytes, SIZE_AND_SHA256 inspection, and reason.",
+        "binary_rules require id, path_pattern, extensions, max_bytes, SIGNATURE_SIZE_AND_SHA256 inspection, and reason.",
       );
     }
     if (binaryRuleIds.has(rule.id)) {
@@ -459,25 +459,39 @@ const readPrefix = (absolutePath, length = 8192) => {
   }
 };
 
-const hasBinarySignature = (buffer) => {
+const matchesBinarySignature = (extension, buffer) => {
   const ascii = buffer.subarray(0, 16).toString("latin1");
-  return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
-    || ascii.startsWith("%PDF-")
-    || ascii.startsWith("PK\u0003\u0004")
-    || ascii.startsWith("GIF87a")
-    || ascii.startsWith("GIF89a")
-    || buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
-    || ascii.startsWith("wOFF")
-    || ascii.startsWith("wOF2")
-    || (ascii.startsWith("RIFF") && buffer.subarray(8, 12).toString("latin1") === "WEBP");
+  const startsWith = (...bytes) => buffer.subarray(0, bytes.length).equals(Buffer.from(bytes));
+  const signatures = {
+    ".avif": () => ascii.slice(4, 8) === "ftyp" && ["avif", "avis"].includes(ascii.slice(8, 12)),
+    ".gif": () => ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a"),
+    ".ico": () => startsWith(0x00, 0x00, 0x01, 0x00),
+    ".jpeg": () => startsWith(0xff, 0xd8, 0xff),
+    ".jpg": () => startsWith(0xff, 0xd8, 0xff),
+    ".pdf": () => ascii.startsWith("%PDF-"),
+    ".png": () => startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+    ".svgz": () => startsWith(0x1f, 0x8b),
+    ".webp": () => ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP",
+    ".woff": () => ascii.startsWith("wOFF"),
+    ".woff2": () => ascii.startsWith("wOF2"),
+    ".zip": () => startsWith(0x50, 0x4b, 0x03, 0x04)
+      || startsWith(0x50, 0x4b, 0x05, 0x06)
+      || startsWith(0x50, 0x4b, 0x07, 0x08),
+  };
+  return signatures[extension]?.() ?? false;
 };
 
 const inspectFile = (absolutePath) => {
   const sizeBytes = statSync(absolutePath).size;
   const extension = path.extname(absolutePath).toLowerCase();
   const prefix = readPrefix(absolutePath);
-  const isBinary = binaryExtensions.has(extension) || prefix.includes(0) || hasBinarySignature(prefix);
-  if (isBinary) return { kind: "BINARY", size_bytes: sizeBytes };
+  if (binaryExtensions.has(extension)) {
+    if (!matchesBinarySignature(extension, prefix)) {
+      return { kind: "INVALID_BINARY_SIGNATURE", size_bytes: sizeBytes, extension };
+    }
+    return { kind: "BINARY", size_bytes: sizeBytes, extension };
+  }
+  if (prefix.includes(0)) return { kind: "BINARY", size_bytes: sizeBytes, extension };
   if (sizeBytes > 5 * 1024 * 1024) {
     throw new PublicReleaseBoundaryError(
       "TEXT_FILE_TOO_LARGE",
@@ -532,6 +546,16 @@ export const checkRepository = ({
 
     const absoluteFilePath = path.resolve(root, file);
     const inspection = inspectFile(absoluteFilePath);
+    if (inspection.kind === "INVALID_BINARY_SIGNATURE") {
+      unresolved.push({
+        file: safeFile,
+        path_fingerprint: reportPathFingerprint,
+        classification: "UNRESOLVED",
+        rule_id: null,
+        reason: `File extension '${inspection.extension}' does not match its required binary file signature.`,
+      });
+      continue;
+    }
     if (inspection.kind === "BINARY") {
       const binaryDecision = classifyBinaryPath(manifest, file, inspection.size_bytes);
       if (!binaryDecision.allowed) {
