@@ -1,0 +1,12 @@
+{
+  "schema_name": "WorkflowRegistryEntry",
+  "schema_version": "1.0",
+  "workflow_id": "internal-runtime-diagnostic",
+  "version": "1.2.0",
+  "status": "ACTIVE",
+  "handler_ref": "workflow:internal-runtime-diagnostic",
+  "handler_available": true,
+  "execution_modes": ["LIVE"],
+  "scope_policy": "EXACT_INHERITANCE",
+  "next_action_policy": "REGISTRY_BACKED"
+}
