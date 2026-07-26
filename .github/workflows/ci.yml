@@ -39,15 +39,20 @@ jobs:
           node-version: '22'
 
       - name: Test public release contracts
-        run: node --test tests/public-release-boundary.test.mjs
+        run: |
+          mkdir -p outputs
+          node --test tests/public-release-boundary.test.mjs > outputs/public-release-tests.tap 2>&1
 
       - name: Validate public release boundary
+        if: always()
         run: node scripts/public-release/check.mjs --manifest public-release-manifest.yaml --report outputs/public-release-report.json
 
-      - name: Upload public release report
+      - name: Upload public release diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: public-release-boundary-report
-          path: outputs/public-release-report.json
-          if-no-files-found: ignore
+          path: |
+            outputs/public-release-tests.tap
+            outputs/public-release-report.json
+          if-no-files-found: warn
