@@ -35,6 +35,50 @@ test("runtime capability inventory exposes summaries without preloading executab
   assert.ok(body.capabilities.every((capability) => !("input_schema" in capability)));
 });
 
+test("materialized discovery schema matches the exact discover API response", async () => {
+  const requestBody = {
+    action: "discover",
+    execution_id: "execution-discovery-contract-test",
+    workflow_id: "aios-master-operator",
+    scope_key: "global-working-memory",
+    mode: "LIVE",
+    intent_class: "capability-discovery",
+    requested_capability_id: "cap:capability-discovery",
+    authority_domains: ["runtime-capability-registry"],
+  };
+  const discovered = await post(requestBody);
+  assert.equal(discovered.response.status, 201);
+
+  const discoveryId = discovered.body.envelope.discovery_id;
+  const selected = await post({
+    action: "select",
+    discovery_id: discoveryId,
+    capability_id: "cap:capability-discovery",
+  });
+  assert.equal(selected.response.status, 200);
+
+  const materialized = await post({ action: "materialize", discovery_id: discoveryId });
+  assert.equal(materialized.response.status, 200);
+  const capability = materialized.body.materialized_capability;
+  assert.equal(capability.capability_version, "1.1.0");
+  assert.equal(capability.input_schema.properties.action.const, "discover");
+  assert.deepEqual(
+    [...capability.input_schema.required].sort(),
+    ["action", "intent_class", "mode", "scope_key"].sort(),
+  );
+
+  const outputSchema = capability.output_schema;
+  assert.equal(outputSchema.additionalProperties, false);
+  assert.ok(!("discovery_envelope" in outputSchema.properties));
+  for (const requiredKey of outputSchema.required) {
+    assert.ok(Object.hasOwn(discovered.body, requiredKey), `discover response is missing required key '${requiredKey}'`);
+  }
+  assert.deepEqual(
+    Object.keys(discovered.body).sort(),
+    Object.keys(outputSchema.properties).sort(),
+  );
+});
+
 test("discovery preserves exact scope and records eligible and rejected candidates", async () => {
   const discovered = await post({
     action: "discover",
