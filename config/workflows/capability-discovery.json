@@ -1,0 +1,12 @@
+{
+  "schema_name": "WorkflowRegistryEntry",
+  "schema_version": "1.0",
+  "workflow_id": "capability-discovery",
+  "version": "1.1.0",
+  "status": "ACTIVE",
+  "handler_ref": "api:/api/capabilities#discover",
+  "handler_available": true,
+  "execution_modes": ["LIVE"],
+  "scope_policy": "EXACT_INHERITANCE",
+  "next_action_policy": "NONE"
+}
