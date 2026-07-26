@@ -1,0 +1,14 @@
+{
+  "schema_name": "ScopeDefinition",
+  "schema_version": "1.0",
+  "scope_key": "global-runtime",
+  "project_name": "Global Runtime",
+  "parent_scope_key": null,
+  "status": "ACTIVE",
+  "description": "Provider-neutral synthetic root scope for the public starter registry.",
+  "health": {
+    "status": "VERIFIED",
+    "checked_at": "2026-07-26T00:00:00.000Z",
+    "expires_at": null
+  }
+}
