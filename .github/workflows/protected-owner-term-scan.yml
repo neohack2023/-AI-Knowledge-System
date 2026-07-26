@@ -1,0 +1,66 @@
+name: Protected owner-term release scan
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  owner-term-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted base revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Checkout candidate files without credentials
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run trusted owner-term scan
+        env:
+          PRIVATE_TERMS_SECRET: ${{ secrets.PUBLIC_RELEASE_PRIVATE_TERMS }}
+          PRIVATE_TERMS_VARIABLE: ${{ vars.PUBLIC_RELEASE_PRIVATE_TERMS }}
+        run: |
+          if [ -n "$PRIVATE_TERMS_SECRET" ]; then
+            terms="$PRIVATE_TERMS_SECRET"
+            mode="CONFIGURED_SECRET"
+          elif [ -n "$PRIVATE_TERMS_VARIABLE" ]; then
+            terms="$PRIVATE_TERMS_VARIABLE"
+            mode="CONFIGURED_VARIABLE"
+          else
+            terms="aios-protected-sentinel-${GITHUB_RUN_ID}"
+            mode="SENTINEL_ONLY"
+          fi
+
+          mkdir -p "$GITHUB_WORKSPACE/outputs"
+          PUBLIC_RELEASE_PRIVATE_TERMS="$terms" \
+          PUBLIC_RELEASE_PRIVATE_TERMS_MODE="$mode" \
+          node "$GITHUB_WORKSPACE/trusted/scripts/public-release/check.mjs" \
+            --trusted-private-terms \
+            --root "$GITHUB_WORKSPACE/candidate" \
+            --manifest public-release-manifest.yaml \
+            --report "$GITHUB_WORKSPACE/outputs/protected-owner-term-report.json"
+
+      - name: Upload protected boundary diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: protected-owner-term-boundary-report
+          path: outputs/protected-owner-term-report.json
+          if-no-files-found: warn
