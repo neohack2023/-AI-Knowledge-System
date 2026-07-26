@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 export const PUBLIC_CLASSIFICATIONS = new Set([
@@ -73,6 +82,16 @@ const validateRegex = (pattern, flags, id) => {
   }
 };
 
+const isSafeRepositoryRelativePath = (value) => {
+  const normalized = normalizePath(value);
+  return Boolean(normalized)
+    && !path.isAbsolute(value)
+    && !/^[A-Za-z]:\//.test(normalized)
+    && normalized !== ".."
+    && !normalized.startsWith("../")
+    && !normalized.includes("/../");
+};
+
 export const validateManifest = (manifest) => {
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     throw new PublicReleaseBoundaryError("MANIFEST_INVALID", "Manifest must be an object.");
@@ -93,9 +112,17 @@ export const validateManifest = (manifest) => {
     throw new PublicReleaseBoundaryError("MANIFEST_INVALID", "release_id is required.");
   }
 
-  for (const field of ["allowlist", "denylist", "content_rules", "exceptions"]) requireArray(manifest, field);
+  for (const field of ["allowlist", "denylist", "binary_rules", "content_rules", "exceptions"]) {
+    requireArray(manifest, field);
+  }
   if (manifest.allowlist.length === 0) {
     throw new PublicReleaseBoundaryError("MANIFEST_EMPTY_ALLOWLIST", "allowlist must not be empty.");
+  }
+  if (manifest.content_rules.length === 0) {
+    throw new PublicReleaseBoundaryError(
+      "MANIFEST_EMPTY_CONTENT_RULES",
+      "content_rules must contain at least one blocking rule.",
+    );
   }
 
   const pathRuleIds = new Set();
@@ -124,6 +151,42 @@ export const validateManifest = (manifest) => {
     }
   }
 
+  const binaryRuleIds = new Set();
+  for (const rule of manifest.binary_rules) {
+    const extensionsValid = Array.isArray(rule?.extensions)
+      && rule.extensions.length > 0
+      && rule.extensions.every((extension) => (
+        typeof extension === "string"
+        && /^\.[a-z0-9]+$/.test(extension)
+        && extension === extension.toLowerCase()
+      ));
+    if (
+      !rule?.id
+      || !rule.path_pattern
+      || !rule.reason
+      || rule.inspection !== "SIZE_AND_SHA256"
+      || !Number.isInteger(rule.max_bytes)
+      || rule.max_bytes < 1
+      || !extensionsValid
+    ) {
+      throw new PublicReleaseBoundaryError(
+        "MANIFEST_INVALID_BINARY_RULE",
+        "binary_rules require id, path_pattern, extensions, max_bytes, SIZE_AND_SHA256 inspection, and reason.",
+      );
+    }
+    if (binaryRuleIds.has(rule.id)) {
+      throw new PublicReleaseBoundaryError("MANIFEST_DUPLICATE_ID", `Duplicate binary rule id '${rule.id}'.`);
+    }
+    if (new Set(rule.extensions).size !== rule.extensions.length) {
+      throw new PublicReleaseBoundaryError(
+        "MANIFEST_INVALID_BINARY_RULE",
+        `Binary rule '${rule.id}' contains duplicate extensions.`,
+      );
+    }
+    binaryRuleIds.add(rule.id);
+    globToRegExp(rule.path_pattern);
+  }
+
   const contentRulesById = new Map();
   for (const rule of manifest.content_rules) {
     if (!rule?.id || !rule.pattern || !rule.replacement || typeof rule.flags !== "string") {
@@ -147,7 +210,14 @@ export const validateManifest = (manifest) => {
 
   const exceptionIds = new Set();
   for (const exception of manifest.exceptions) {
-    if (!exception?.id || !exception.content_rule_id || !exception.path_pattern || !exception.pattern || !exception.reason) {
+    if (
+      !exception?.id
+      || !exception.content_rule_id
+      || !exception.path_pattern
+      || !exception.pattern
+      || typeof exception.flags !== "string"
+      || !exception.reason
+    ) {
       throw new PublicReleaseBoundaryError(
         "MANIFEST_INVALID",
         "exceptions require id, content_rule_id, path_pattern, pattern, flags, and reason.",
@@ -180,13 +250,24 @@ export const validateManifest = (manifest) => {
     }
 
     globToRegExp(exception.path_pattern);
-    validateRegex(exception.pattern, exception.flags ?? "g", exception.id);
+    validateRegex(exception.pattern, exception.flags, exception.id);
   }
 
-  if (!manifest.private_terms?.environment_variable || !manifest.private_terms?.local_file) {
+  if (
+    typeof manifest.private_terms?.environment_variable !== "string"
+    || !/^[A-Z_][A-Z0-9_]*$/.test(manifest.private_terms.environment_variable)
+    || typeof manifest.private_terms?.local_file !== "string"
+    || !isSafeRepositoryRelativePath(manifest.private_terms.local_file)
+  ) {
     throw new PublicReleaseBoundaryError(
-      "MANIFEST_INVALID",
-      "private_terms.environment_variable and private_terms.local_file are required.",
+      "MANIFEST_INVALID_PRIVATE_TERMS",
+      "private_terms requires an uppercase environment variable and a safe repository-relative local_file.",
+    );
+  }
+  if (!manifest.denylist.some((rule) => matchesGlob(manifest.private_terms.local_file, rule.pattern))) {
+    throw new PublicReleaseBoundaryError(
+      "MANIFEST_PRIVATE_TERM_FILE_NOT_DENIED",
+      "private_terms.local_file must be covered by a denylist rule.",
     );
   }
   return manifest;
@@ -214,6 +295,36 @@ export const classifyPath = (manifest, filePath) => {
   const allowed = manifest.allowlist.find((rule) => matchesGlob(normalized, rule.pattern));
   if (allowed) return { allowed: true, rule: allowed, classification: allowed.classification };
   return { allowed: false, rule: null, classification: manifest.default_classification };
+};
+
+export const classifyBinaryPath = (manifest, filePath, sizeBytes) => {
+  const normalized = normalizePath(filePath);
+  const extension = path.extname(normalized).toLowerCase();
+  const rule = manifest.binary_rules.find((candidate) => (
+    candidate.extensions.includes(extension) && matchesGlob(normalized, candidate.path_pattern)
+  ));
+  if (!rule) {
+    return {
+      allowed: false,
+      rule: null,
+      classification: "UNRESOLVED",
+      reason: "Binary content requires an explicit reviewed binary rule.",
+    };
+  }
+  if (sizeBytes > rule.max_bytes) {
+    return {
+      allowed: false,
+      rule,
+      classification: "UNRESOLVED",
+      reason: `Binary content exceeds the ${rule.max_bytes}-byte limit for rule '${rule.id}'.`,
+    };
+  }
+  return {
+    allowed: true,
+    rule,
+    classification: null,
+    reason: rule.reason,
+  };
 };
 
 const maskExceptions = (text, filePath, ruleId, exceptions) => {
@@ -302,15 +413,10 @@ export const redactText = (text, findings) => {
   return redacted;
 };
 
-export const loadPrivateTerms = (root, manifest, environment = process.env) => {
-  const rawValues = [];
-  const environmentValue = environment[manifest.private_terms.environment_variable];
-  if (environmentValue) rawValues.push(...environmentValue.split(/[\n,]/));
-
-  const privateTermsPath = path.resolve(root, manifest.private_terms.local_file);
-  if (existsSync(privateTermsPath)) rawValues.push(...readFileSync(privateTermsPath, "utf8").split("\n"));
-
-  const terms = [...new Set(rawValues
+export const parsePrivateTerms = (input) => {
+  const values = Array.isArray(input) ? input : [input];
+  const terms = [...new Set(values
+    .flatMap((value) => String(value ?? "").split(/[\n,]/))
     .map((value) => value.trim())
     .filter((value) => value && !value.startsWith("#")))];
   if (terms.some((term) => term.length < 3)) {
@@ -322,6 +428,17 @@ export const loadPrivateTerms = (root, manifest, environment = process.env) => {
   return terms;
 };
 
+export const loadPrivateTerms = (root, manifest, environment = process.env) => {
+  const rawValues = [];
+  const environmentValue = environment[manifest.private_terms.environment_variable];
+  if (environmentValue) rawValues.push(environmentValue);
+
+  const privateTermsPath = path.resolve(root, manifest.private_terms.local_file);
+  if (existsSync(privateTermsPath)) rawValues.push(readFileSync(privateTermsPath, "utf8"));
+
+  return parsePrivateTerms(rawValues);
+};
+
 export const listTrackedFiles = (root) => execFileSync("git", ["ls-files", "-z"], {
   cwd: root,
   encoding: "utf8",
@@ -331,36 +448,67 @@ const binaryExtensions = new Set([
   ".avif", ".gif", ".ico", ".jpeg", ".jpg", ".pdf", ".png", ".svgz", ".webp", ".woff", ".woff2", ".zip",
 ]);
 
-const readTextCandidate = (absolutePath) => {
-  if (binaryExtensions.has(path.extname(absolutePath).toLowerCase())) return null;
-  if (statSync(absolutePath).size > 5 * 1024 * 1024) {
+const readPrefix = (absolutePath, length = 8192) => {
+  const descriptor = openSync(absolutePath, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const bytesRead = readSync(descriptor, buffer, 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    closeSync(descriptor);
+  }
+};
+
+const hasBinarySignature = (buffer) => {
+  const ascii = buffer.subarray(0, 16).toString("latin1");
+  return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    || ascii.startsWith("%PDF-")
+    || ascii.startsWith("PK\u0003\u0004")
+    || ascii.startsWith("GIF87a")
+    || ascii.startsWith("GIF89a")
+    || buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
+    || ascii.startsWith("wOFF")
+    || ascii.startsWith("wOF2")
+    || (ascii.startsWith("RIFF") && buffer.subarray(8, 12).toString("latin1") === "WEBP");
+};
+
+const inspectFile = (absolutePath) => {
+  const sizeBytes = statSync(absolutePath).size;
+  const extension = path.extname(absolutePath).toLowerCase();
+  const prefix = readPrefix(absolutePath);
+  const isBinary = binaryExtensions.has(extension) || prefix.includes(0) || hasBinarySignature(prefix);
+  if (isBinary) return { kind: "BINARY", size_bytes: sizeBytes };
+  if (sizeBytes > 5 * 1024 * 1024) {
     throw new PublicReleaseBoundaryError(
       "TEXT_FILE_TOO_LARGE",
       `Text candidate '${absolutePath}' exceeds the 5 MiB inspection limit.`,
     );
   }
-  const buffer = readFileSync(absolutePath);
-  if (buffer.includes(0)) return null;
-  return buffer.toString("utf8");
+  return { kind: "TEXT", size_bytes: sizeBytes, text: readFileSync(absolutePath, "utf8") };
 };
 
 const pathFingerprint = (filePath) => `sha256:${createHash("sha256").update(filePath).digest("hex")}`;
+const fileFingerprint = (absolutePath) => `sha256:${createHash("sha256").update(readFileSync(absolutePath)).digest("hex")}`;
 
 export const checkRepository = ({
   root = process.cwd(),
   manifestPath = "public-release-manifest.yaml",
   reportPath = "outputs/public-release-report.json",
   environment = process.env,
+  privateTerms: suppliedPrivateTerms,
 } = {}) => {
   const absoluteManifestPath = path.resolve(root, manifestPath);
   const manifestText = readFileSync(absoluteManifestPath, "utf8");
   const manifest = parseManifest(manifestText);
-  const privateTerms = loadPrivateTerms(root, manifest, environment);
+  const privateTerms = suppliedPrivateTerms === undefined
+    ? loadPrivateTerms(root, manifest, environment)
+    : parsePrivateTerms(suppliedPrivateTerms);
   const trackedFiles = listTrackedFiles(root);
   const included = [];
   const blocked = [];
   const unresolved = [];
   const findings = [];
+  let binaryFilesApproved = 0;
 
   for (const file of trackedFiles) {
     const rawPathFindings = scanPath(file, manifest, privateTerms);
@@ -382,20 +530,47 @@ export const checkRepository = ({
       continue;
     }
 
-    const text = readTextCandidate(path.resolve(root, file));
+    const absoluteFilePath = path.resolve(root, file);
+    const inspection = inspectFile(absoluteFilePath);
+    if (inspection.kind === "BINARY") {
+      const binaryDecision = classifyBinaryPath(manifest, file, inspection.size_bytes);
+      if (!binaryDecision.allowed) {
+        unresolved.push({
+          file: safeFile,
+          path_fingerprint: reportPathFingerprint,
+          classification: binaryDecision.classification,
+          rule_id: binaryDecision.rule?.id ?? null,
+          reason: binaryDecision.reason,
+        });
+        continue;
+      }
+      binaryFilesApproved += 1;
+      included.push({
+        file: safeFile,
+        path_fingerprint: reportPathFingerprint,
+        classification: decision.classification,
+        rule_id: decision.rule.id,
+        content_scanned: false,
+        inspection_status: "BINARY_POLICY_APPROVED",
+        binary_policy_id: binaryDecision.rule.id,
+        binary_size_bytes: inspection.size_bytes,
+        binary_fingerprint: fileFingerprint(absoluteFilePath),
+      });
+      continue;
+    }
+
     included.push({
       file: safeFile,
       path_fingerprint: reportPathFingerprint,
       classification: decision.classification,
       rule_id: decision.rule.id,
-      content_scanned: text !== null,
+      content_scanned: true,
+      inspection_status: "TEXT_SCANNED",
     });
-    if (text !== null) {
-      findings.push(...scanText(text, file, manifest, privateTerms).map((finding) => ({
-        ...finding,
-        file: safeFile,
-      })));
-    }
+    findings.push(...scanText(inspection.text, file, manifest, privateTerms).map((finding) => ({
+      ...finding,
+      file: safeFile,
+    })));
   }
 
   const passed = blocked.length === 0 && unresolved.length === 0 && findings.length === 0;
@@ -412,9 +587,12 @@ export const checkRepository = ({
       blocked_files: blocked.length,
       unresolved_files: unresolved.length,
       sensitive_findings: findings.length,
+      binary_files_approved: binaryFilesApproved,
       private_terms_loaded: privateTerms.length,
       private_terms_mode: environment.PUBLIC_RELEASE_PRIVATE_TERMS_MODE
-        ?? (privateTerms.length > 0 ? "LOCAL_OR_ENVIRONMENT" : "NOT_CONFIGURED"),
+        ?? (suppliedPrivateTerms === undefined
+          ? (privateTerms.length > 0 ? "LOCAL_OR_ENVIRONMENT" : "NOT_CONFIGURED")
+          : "TRUSTED_OVERRIDE"),
     },
     included,
     blocked,
