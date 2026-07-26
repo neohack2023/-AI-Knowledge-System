@@ -128,9 +128,16 @@ test("compiled capability loader returns an immutable provider snapshot without 
     assert.equal(loaded.destination_write_authorized, false);
 
     const first = loaded.listDefinitions();
-    assert.equal(first.length, 1);
+    const registeredIds = fixture.registry.capabilities
+      .map((capability) => String(capability.capability_id))
+      .sort();
+    assert.equal(first.length, registeredIds.length);
+    assert.deepEqual(first.map((capability) => capability.capability_id), registeredIds);
     first[0].capability_id = "mutated";
-    assert.equal(loaded.listDefinitions()[0].capability_id, "cap:internal-runtime-diagnostic");
+    assert.deepEqual(
+      loaded.listDefinitions().map((capability) => capability.capability_id),
+      registeredIds,
+    );
   } finally {
     await fixture.cleanup();
   }
