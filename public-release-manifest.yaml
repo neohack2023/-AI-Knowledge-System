@@ -241,6 +241,18 @@
       "reason": "Generated reports and runtime artifacts are not source release inputs."
     }
   ],
+  "binary_rules": [
+    {
+      "id": "bundled-geist-fonts",
+      "path_pattern": ".vinext/fonts/**/*.woff2",
+      "extensions": [
+        ".woff2"
+      ],
+      "max_bytes": 1048576,
+      "inspection": "SIZE_AND_SHA256",
+      "reason": "Bundled framework font assets are admitted only by path, extension, size limit, and recorded SHA-256 fingerprint."
+    }
+  ],
   "content_rules": [
     {
       "id": "notion-url",
