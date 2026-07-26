@@ -34,7 +34,8 @@ export async function GET(request: Request) {
       execution_authority: "NONE",
       workflow_execution_entrypoint: "WorkflowExecutionKernel",
       registry_fingerprint: registryFingerprint,
-      registry_fingerprint_basis: "FULL_COMPILED_POLICY",
+      registry_fingerprint_basis: "FULL_POLICY_DEFINITION",
+      registry_fingerprint_scope: "FULL_COMPILED_REGISTRY",
       inventory_projection_fingerprint: inventoryProjectionFingerprint,
       capabilities: capabilityDiscoveryRuntime.listCapabilities(),
     });
