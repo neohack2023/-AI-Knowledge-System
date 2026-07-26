@@ -206,9 +206,9 @@
   "denylist": [
     {
       "id": "environment-files",
-      "pattern": ".env*",
+      "pattern": "**/.env*",
       "classification": "SECRET",
-      "reason": "Environment files may contain credentials or private bindings."
+      "reason": "Environment files at any depth may contain credentials or private bindings."
     },
     {
       "id": "private-term-file",
@@ -294,14 +294,6 @@
       "pattern": "\\b[A-Z0-9._%+-]+@[^\\s@]+\\.invalid\\b",
       "flags": "gi",
       "reason": "The reserved invalid top-level domain is safe for synthetic configuration."
-    },
-    {
-      "id": "public-repository-url-owner-term",
-      "content_rule_id": "owner-term",
-      "path_pattern": "**",
-      "pattern": "https?:\\/\\/github\\.com\\/[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[^\\s)\\]}>]+)?",
-      "flags": "gi",
-      "reason": "Explicitly public repository URLs may contain an owner or organization name."
     }
   ],
   "private_terms": {
