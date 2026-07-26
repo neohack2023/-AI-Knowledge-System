@@ -13,11 +13,12 @@ The release process is allowlist-first:
 
 ```text
 tracked repository file
-  -> path classification
+  -> recursive path classification
+  -> path privacy inspection
   -> content inspection
   -> exception validation
   -> unresolved finding gate
-  -> release report
+  -> privacy-safe release report
   -> publishable artifact
 ```
 
@@ -44,13 +45,16 @@ Every candidate artifact resolves to exactly one classification:
 - `schemas/PublicReleaseManifest.schema.json` defines the public manifest contract.
 - The validator scans Git-tracked files, not arbitrary ignored workspace files.
 - A private terms file may be supplied locally through `.public-release-private-terms` or `PUBLIC_RELEASE_PRIVATE_TERMS`. The file is ignored by Git and never becomes part of the release artifact.
-- Generated reports record finding type, file, location, and rule ID without reproducing full sensitive values.
+- GitHub Actions injects `PUBLIC_RELEASE_PRIVATE_TERMS` from the repository secret first, then the repository variable. When neither is configured, CI uses a synthetic sentinel and reports `SENTINEL_ONLY` rather than claiming owner-specific coverage.
+- Generated reports record finding type, redacted path, location, fingerprints, and rule ID without reproducing full sensitive values.
 
 ## Path policy
 
 A file is publishable only when an allowlist rule classifies it as public. Unknown paths resolve to `UNRESOLVED` and fail closed.
 
-Deny rules take precedence over allow rules. Tracked environment files, key material, local databases, provider exports, raw execution artifacts, and private-term files always block release.
+Deny rules take precedence over allow rules. Tracked environment files at any directory depth, key material, local databases, provider exports, raw execution artifacts, and private-term files always block release.
+
+Paths are inspected for private terms before they are written to the report. A private path blocks release, is redacted in diagnostics, and is represented by a SHA-256 path fingerprint.
 
 Directory-level public rules are permitted only for repository-owned source surfaces whose contents are also scanned. A future folder that may mix public and private objects must use narrower file-level rules.
 
@@ -62,7 +66,7 @@ The initial scanner blocks:
 - common secret and token formats
 - PEM private-key material
 - non-synthetic email addresses
-- locally supplied owner-specific terms
+- locally or CI-supplied owner-specific terms
 
 The scanner is intentionally extensible. Provider adapters may register additional public-boundary checks, but they may not weaken core rules.
 
@@ -70,12 +74,14 @@ The scanner is intentionally extensible. Provider adapters may register addition
 
 Exceptions are narrow, reviewable policy objects. Each exception must declare:
 
-- the content rule it applies to
+- the non-secret content rule it applies to
 - an exact or bounded path pattern
 - a regular expression matching only the intended public value
 - a durable reason
 
-Valid examples include `@example.com` identities in synthetic tests and an explicitly public repository URL in project documentation. An exception may not suppress an entire rule across the repository, approve a secret, or turn production provider data into a fixture.
+Reserved example-domain identities are valid exception candidates. Exceptions may not target `SECRET` rules, suppress owner-term findings, disable an entire rule across the repository, or turn production provider data into a fixture.
+
+A public URL that contains a private owner term must be renamed, omitted, or handled by a future exact-reference contract. The current `PublicReleaseManifest/1.0` deliberately provides no owner-term suppression mechanism.
 
 ## Release command
 
@@ -83,15 +89,17 @@ Valid examples include `@example.com` identities in synthetic tests and an expli
 npm run check:public-release
 ```
 
-The command validates the manifest, classifies every tracked file, scans allowed text files, and writes a machine-readable report to `outputs/public-release-report.json`.
+The command validates the manifest, classifies every tracked file, scans paths and allowed text files, and writes a machine-readable report to `outputs/public-release-report.json`.
 
 The process exits unsuccessfully when it finds:
 
 - an invalid manifest
 - an unclassified tracked path
 - a tracked denylisted file
+- a private term in a release path
 - sensitive content without a valid exception
-- an invalid or empty private-term rule
+- an exception targeting a secret or owner-term rule
+- an invalid private-term rule
 
 ## Export report
 
@@ -101,17 +109,20 @@ The report contains:
 - included public files and classifications
 - excluded or blocked files
 - unresolved files
-- redacted finding previews
-- rule and exception IDs
+- redacted path and content findings
+- path and value fingerprints
+- private-term input mode and count
 - final pass/fail state
 
 Reports are operational evidence. They are not authority, authorization, or proof that unscanned external sources are safe.
 
 ## CI gate
 
-The normal test command runs the public-release check. CI must prevent merging when the repository boundary regresses.
+The normal test command and the dedicated public-boundary job both receive the configured private-term dictionary. The dedicated job produces downloadable TAP and boundary-report diagnostics.
 
-Synthetic tests inject private URLs, credentials, ordinary email addresses, and owner terms to prove that the scanner fails. Equivalent synthetic content must continue to pass.
+A configured repository secret named `PUBLIC_RELEASE_PRIVATE_TERMS` is preferred. A repository variable with the same name is accepted for non-sensitive test terms. The synthetic fallback proves plumbing only and is clearly reported as `SENTINEL_ONLY`.
+
+Synthetic tests inject nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content, owner terms in paths, and forbidden exceptions. Equivalent synthetic content must continue to pass.
 
 ## Non-goals for this slice
 
