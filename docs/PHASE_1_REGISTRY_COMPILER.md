@@ -1,8 +1,9 @@
 # Phase 1 Registry Compiler
 
-Status: development foundation for issue #11  
+Status: active development for issue #11  
 Source contract: `RepoRegistrySource/1.0`  
-Compiled contracts: `CompiledAiosRegistry/1.0` and `AiosRegistryInventory/1.0`
+Compiled contracts: `CompiledAiosRegistry/1.0` and `AiosRegistryInventory/1.0`  
+Resolution contract: `ScopeResolutionResult/1.0`
 
 ## Purpose
 
@@ -21,6 +22,9 @@ validate exact IDs, references, health, handlers, and schema fingerprints
         |
         v
 compile deterministic full-policy and compact-inventory artifacts
+        |
+        v
+resolve exact scope without loading packets or granting execution authority
 ```
 
 ## Commands
@@ -37,9 +41,20 @@ Compilation writes two untracked operational artifacts under `outputs/registry/`
 
 The full-policy fingerprint and compact-inventory fingerprint are separate. The compiler does not include wall-clock compilation time, absolute paths, host metadata, or provider state in either artifact, so identical source inputs produce byte-identical outputs on separate machines.
 
+## Deterministic routing tables
+
+The compiled policy contains machine-generated lookup tables:
+
+- `exact_scope_keys`
+- `exact_project_names`
+- `exact_aliases`
+- `children_by_parent`
+
+Keys are normalized by trimming, collapsing whitespace, and applying lowercase comparison. Values remain canonical registered scope keys. These tables are part of the full-policy fingerprint, so routing-policy drift changes the compiled registry identity.
+
 ## Routing law
 
-The source manifest preserves this order:
+The resolver preserves this order:
 
 1. exact scope key
 2. exact project name
@@ -48,7 +63,21 @@ The source manifest preserves this order:
 5. bounded conversational continuity mapped to a registered scope
 6. ambiguity or no-match
 
-Semantic similarity may later propose candidates, but it may not silently select a durable scope.
+Bounded continuity must be explicitly authorized by the caller and must point to an already registered scope. Semantic similarity may later propose candidates, but it may not silently select a durable scope.
+
+A successful scope resolution still reports:
+
+- `scope_packet_loaded=false`
+- `workflow_execution_authorized=false`
+- `destination_write_authorized=false`
+
+Routing identifies a legal scope candidate. It does not grant data access, workflow entry, or mutation authority.
+
+## Compiled capability compatibility loader
+
+`packages/capability-registry/compiled-provider.ts` converts the compiled capability collection into a stable provider snapshot for the existing discovery service. It validates contract headers, identifiers, handler references, schema fingerprints, and duplicate capability IDs before returning cloned definitions.
+
+The loader exposes metadata and definitions only. It declares `execution_authority=NONE` and `destination_write_authorized=false`. Wiring it into the active runtime remains a separate patch so the transition can be tested without silently replacing execution truth.
 
 ## Current validation gates
 
@@ -76,7 +105,7 @@ Diagnostics include a stable error code, repository-relative file, field, and ac
 
 ## Next bounded work
 
-1. Ratify the JSON Schema bundle for every registry source type and compiled artifact.
-2. Add exact project-name, alias, parent/subproject, ambiguity, and no-match resolution services over the compiled artifact.
-3. Replace the native in-code capability array with a compatibility adapter consuming the compiled registry without changing discovery authorization rules.
-4. Add deprecation, replacement, overlap-precedence, and inventory-only delta tests.
+1. Wire the compiled capability provider into the existing discovery runtime behind a compatibility composition root.
+2. Expose exact scope resolution through the direct TypeScript API and existing HTTP surface.
+3. Bind discovery envelopes to the compiled registry version and full-policy fingerprint.
+4. Add deprecation, replacement, overlap-precedence, ambiguity, and inventory-only delta tests.
