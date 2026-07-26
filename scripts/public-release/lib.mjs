@@ -28,37 +28,35 @@ export class PublicReleaseBoundaryError extends Error {
 
 const normalizePath = (value) => value.replaceAll("\\", "/").replace(/^\.\//, "");
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const withGlobalFlag = (flags = "g") => flags.includes("g") ? flags : `${flags}g`;
 
 export const globToRegExp = (pattern) => {
   const normalized = normalizePath(pattern);
   let source = "^";
   for (let index = 0; index < normalized.length; index += 1) {
     const character = normalized[index];
-    if (character === "*") {
-      if (normalized[index + 1] === "*") {
-        if (normalized[index + 2] === "/") {
-          source += "(?:.*/)?";
-          index += 2;
-        } else {
-          source += ".*";
-          index += 1;
-        }
+    if (character === "*" && normalized[index + 1] === "*") {
+      if (normalized[index + 2] === "/") {
+        source += "(?:.*/)?";
+        index += 2;
       } else {
-        source += "[^/]*";
+        source += ".*";
+        index += 1;
       }
+    } else if (character === "*") {
+      source += "[^/]*";
     } else if (character === "?") {
       source += "[^/]";
     } else {
       source += escapeRegex(character);
     }
   }
-  source += "$";
-  return new RegExp(source);
+  return new RegExp(`${source}$`);
 };
 
 export const matchesGlob = (filePath, pattern) => globToRegExp(pattern).test(normalizePath(filePath));
 
-const ensureArray = (manifest, field) => {
+const requireArray = (manifest, field) => {
   if (!Array.isArray(manifest[field])) {
     throw new PublicReleaseBoundaryError("MANIFEST_INVALID", `${field} must be an array.`);
   }
@@ -95,26 +93,29 @@ export const validateManifest = (manifest) => {
     throw new PublicReleaseBoundaryError("MANIFEST_INVALID", "release_id is required.");
   }
 
-  for (const field of ["allowlist", "denylist", "content_rules", "exceptions"]) ensureArray(manifest, field);
+  for (const field of ["allowlist", "denylist", "content_rules", "exceptions"]) requireArray(manifest, field);
   if (manifest.allowlist.length === 0) {
     throw new PublicReleaseBoundaryError("MANIFEST_EMPTY_ALLOWLIST", "allowlist must not be empty.");
   }
 
-  const ids = new Set();
+  const pathRuleIds = new Set();
   for (const [listName, rules] of [["allowlist", manifest.allowlist], ["denylist", manifest.denylist]]) {
     for (const rule of rules) {
       if (!rule?.id || !rule.pattern || !rule.reason) {
-        throw new PublicReleaseBoundaryError("MANIFEST_INVALID", `${listName} rules require id, pattern, and reason.`);
+        throw new PublicReleaseBoundaryError(
+          "MANIFEST_INVALID",
+          `${listName} rules require id, pattern, classification, and reason.`,
+        );
       }
-      if (ids.has(rule.id)) {
+      if (pathRuleIds.has(rule.id)) {
         throw new PublicReleaseBoundaryError("MANIFEST_DUPLICATE_ID", `Duplicate rule id '${rule.id}'.`);
       }
-      ids.add(rule.id);
+      pathRuleIds.add(rule.id);
       globToRegExp(rule.pattern);
-      const validClassification = listName === "allowlist"
+      const valid = listName === "allowlist"
         ? PUBLIC_CLASSIFICATIONS.has(rule.classification)
         : BLOCKING_CLASSIFICATIONS.has(rule.classification);
-      if (!validClassification) {
+      if (!valid) {
         throw new PublicReleaseBoundaryError(
           "MANIFEST_INVALID_CLASSIFICATION",
           `${listName} rule '${rule.id}' has invalid classification '${rule.classification}'.`,
@@ -172,7 +173,6 @@ export const validateManifest = (manifest) => {
       "private_terms.environment_variable and private_terms.local_file are required.",
     );
   }
-
   return manifest;
 };
 
@@ -184,7 +184,7 @@ export const parseManifest = (text) => {
     throw new PublicReleaseBoundaryError(
       "MANIFEST_PARSE_FAILED",
       "public-release-manifest.yaml must use the supported JSON-compatible YAML representation.",
-      { cause: error.message },
+      { cause: error instanceof Error ? error.message : String(error) },
     );
   }
 };
@@ -197,40 +197,27 @@ export const classifyPath = (manifest, filePath) => {
   if (denied) return { allowed: false, rule: denied, classification: denied.classification };
   const allowed = manifest.allowlist.find((rule) => matchesGlob(normalized, rule.pattern));
   if (allowed) return { allowed: true, rule: allowed, classification: allowed.classification };
-  return {
-    allowed: false,
-    rule: null,
-    classification: manifest.default_classification,
-  };
+  return { allowed: false, rule: null, classification: manifest.default_classification };
 };
-
-const globalFlags = (flags = "g") => flags.includes("g") ? flags : `${flags}g`;
 
 const maskExceptions = (text, filePath, ruleId, exceptions) => {
   let masked = text;
   for (const exception of exceptions) {
     if (exception.content_rule_id !== ruleId || !matchesGlob(filePath, exception.path_pattern)) continue;
-    const expression = new RegExp(exception.pattern, globalFlags(exception.flags));
+    const expression = new RegExp(exception.pattern, withGlobalFlag(exception.flags));
     masked = masked.replace(expression, (match) => " ".repeat(match.length));
   }
   return masked;
 };
 
 const lineAndColumn = (text, offset) => {
-  const preceding = text.slice(0, offset);
-  const lines = preceding.split("\n");
+  const lines = text.slice(0, offset).split("\n");
   return { line: lines.length, column: lines.at(-1).length + 1 };
-};
-
-const safePreview = (text, start, end, replacement) => {
-  const left = text.slice(Math.max(0, start - 32), start).replaceAll(/\s+/g, " ");
-  const right = text.slice(end, Math.min(text.length, end + 32)).replaceAll(/\s+/g, " ");
-  return `${left}${replacement}${right}`.slice(0, 160);
 };
 
 const findingsForRule = (text, filePath, rule, exceptions) => {
   const masked = maskExceptions(text, filePath, rule.id, exceptions);
-  const expression = new RegExp(rule.pattern, globalFlags(rule.flags));
+  const expression = new RegExp(rule.pattern, withGlobalFlag(rule.flags));
   const findings = [];
   for (const match of masked.matchAll(expression)) {
     if (typeof match.index !== "number") continue;
@@ -246,7 +233,7 @@ const findingsForRule = (text, filePath, rule, exceptions) => {
       end: match.index + match[0].length,
       replacement: rule.replacement,
       fingerprint: `sha256:${createHash("sha256").update(originalMatch).digest("hex")}`,
-      preview: safePreview(text, match.index, match.index + match[0].length, rule.replacement),
+      preview: rule.replacement,
     });
   }
   return findings;
@@ -288,16 +275,17 @@ export const redactText = (text, findings) => {
 };
 
 export const loadPrivateTerms = (root, manifest, environment = process.env) => {
-  const values = [];
+  const rawValues = [];
   const environmentValue = environment[manifest.private_terms.environment_variable];
-  if (environmentValue) values.push(...environmentValue.split(/[\n,]/));
+  if (environmentValue) rawValues.push(...environmentValue.split(/[\n,]/));
 
   const privateTermsPath = path.resolve(root, manifest.private_terms.local_file);
-  if (existsSync(privateTermsPath)) values.push(...readFileSync(privateTermsPath, "utf8").split("\n"));
+  if (existsSync(privateTermsPath)) rawValues.push(...readFileSync(privateTermsPath, "utf8").split("\n"));
 
-  const terms = [...new Set(values.map((value) => value.trim()).filter((value) => value && !value.startsWith("#")))];
-  const invalid = terms.filter((term) => term.length < 3);
-  if (invalid.length > 0) {
+  const terms = [...new Set(rawValues
+    .map((value) => value.trim())
+    .filter((value) => value && !value.startsWith("#")))];
+  if (terms.some((term) => term.length < 3)) {
     throw new PublicReleaseBoundaryError(
       "PRIVATE_TERM_TOO_SHORT",
       "Private terms must contain at least three characters.",
@@ -339,7 +327,6 @@ export const checkRepository = ({
   const manifest = parseManifest(manifestText);
   const privateTerms = loadPrivateTerms(root, manifest, environment);
   const trackedFiles = listTrackedFiles(root);
-
   const included = [];
   const blocked = [];
   const unresolved = [];
@@ -359,8 +346,7 @@ export const checkRepository = ({
       continue;
     }
 
-    const absolutePath = path.resolve(root, file);
-    const text = readTextCandidate(absolutePath);
+    const text = readTextCandidate(path.resolve(root, file));
     included.push({
       file,
       classification: decision.classification,
@@ -395,6 +381,5 @@ export const checkRepository = ({
   const absoluteReportPath = path.resolve(root, reportPath);
   mkdirSync(path.dirname(absoluteReportPath), { recursive: true });
   writeFileSync(absoluteReportPath, `${JSON.stringify(report, null, 2)}\n`);
-
   return { passed, report, manifest };
 };
