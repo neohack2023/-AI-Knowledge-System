@@ -72,8 +72,11 @@ test("overlapping exact aliases fail closed with file and field diagnostics", as
       () => validateRegistry({ root, now: fixedNow }),
       (error) => {
         assert.ok(error instanceof RegistryValidationError);
-        assert.ok(error.diagnostics.some((item) =>
-          item.code === "OVERLAPPING_EXACT_ALIAS" && item.file.endsWith("duplicate.json") && item.field === "alias"));
+        const conflict = error.diagnostics.find((item) =>
+          item.code === "OVERLAPPING_EXACT_ALIAS" && item.field === "alias");
+        assert.ok(conflict);
+        assert.match(conflict.file, /^config\/aliases\/.+\.json$/);
+        assert.match(conflict.message, /conflicts with config\/aliases\/.+\.json/);
         return true;
       },
     );
