@@ -10,6 +10,9 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PUBLIC_RELEASE_PRIVATE_TERMS: aios-ci-private-term-${{ github.run_id }}
+      PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,29 +23,6 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Load private-term policy input
-        env:
-          PRIVATE_TERMS_SECRET: ${{ secrets.PUBLIC_RELEASE_PRIVATE_TERMS }}
-          PRIVATE_TERMS_VARIABLE: ${{ vars.PUBLIC_RELEASE_PRIVATE_TERMS }}
-        run: |
-          if [ -n "$PRIVATE_TERMS_SECRET" ]; then
-            terms="$PRIVATE_TERMS_SECRET"
-            mode="CONFIGURED_SECRET"
-          elif [ -n "$PRIVATE_TERMS_VARIABLE" ]; then
-            terms="$PRIVATE_TERMS_VARIABLE"
-            mode="CONFIGURED_VARIABLE"
-          else
-            terms="aios-ci-private-term-${GITHUB_RUN_ID}"
-            mode="SENTINEL_ONLY"
-          fi
-          delimiter="AIOS_PRIVATE_TERMS_$(date +%s%N)"
-          {
-            echo "PUBLIC_RELEASE_PRIVATE_TERMS<<$delimiter"
-            printf '%s\n' "$terms"
-            echo "$delimiter"
-            echo "PUBLIC_RELEASE_PRIVATE_TERMS_MODE=$mode"
-          } >> "$GITHUB_ENV"
-
       - name: Install dependencies
         run: npm ci
 
@@ -52,6 +32,9 @@ jobs:
   public-release-boundary:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      PUBLIC_RELEASE_PRIVATE_TERMS: aios-ci-private-term-${{ github.run_id }}
+      PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,29 +43,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Load private-term policy input
-        env:
-          PRIVATE_TERMS_SECRET: ${{ secrets.PUBLIC_RELEASE_PRIVATE_TERMS }}
-          PRIVATE_TERMS_VARIABLE: ${{ vars.PUBLIC_RELEASE_PRIVATE_TERMS }}
-        run: |
-          if [ -n "$PRIVATE_TERMS_SECRET" ]; then
-            terms="$PRIVATE_TERMS_SECRET"
-            mode="CONFIGURED_SECRET"
-          elif [ -n "$PRIVATE_TERMS_VARIABLE" ]; then
-            terms="$PRIVATE_TERMS_VARIABLE"
-            mode="CONFIGURED_VARIABLE"
-          else
-            terms="aios-ci-private-term-${GITHUB_RUN_ID}"
-            mode="SENTINEL_ONLY"
-          fi
-          delimiter="AIOS_PRIVATE_TERMS_$(date +%s%N)"
-          {
-            echo "PUBLIC_RELEASE_PRIVATE_TERMS<<$delimiter"
-            printf '%s\n' "$terms"
-            echo "$delimiter"
-            echo "PUBLIC_RELEASE_PRIVATE_TERMS_MODE=$mode"
-          } >> "$GITHUB_ENV"
 
       - name: Test public release contracts
         run: |
