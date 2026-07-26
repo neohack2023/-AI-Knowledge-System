@@ -239,7 +239,8 @@ test("repository checks fail closed for unapproved binaries and admit reviewed f
     assert.equal(approved.passed, true);
     assert.equal(approved.report.summary.binary_files_approved, 1);
     const fontRecord = approved.report.included.find((record) => record.binary_policy_id === "bundled-geist-fonts");
-    assert.equal(fontRecord.inspection_status, "BINARY_POLICY_APPROVED");
+    assert.equal(fontRecord.inspection_status, "BINARY_SIGNATURE_AND_CONTENT_SCANNED");
+    assert.equal(fontRecord.content_scanned, true);
     assert.match(fontRecord.binary_fingerprint, /^sha256:/);
   } finally {
     rmSync(approvedRoot, { recursive: true, force: true });
@@ -257,6 +258,27 @@ test("admitted extensions with invalid signatures fail closed before text scanni
     assert.equal(result.report.summary.unresolved_files, 1);
     assert.match(result.report.unresolved[0].reason, /does not match.*binary file signature/);
     assert.equal(result.report.included.some((record) => record.content_scanned === false), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a valid magic prefix cannot hide sensitive plaintext in an admitted binary", () => {
+  const root = createTrackedRepository({
+    ".vinext/fonts/attack/leak.woff2": Buffer.from(
+      `wOF2\0\0\0\0ghp_${"B".repeat(32)} sample-owner`,
+      "latin1",
+    ),
+  });
+  try {
+    const result = checkRepository({ root, privateTerms: ["sample-owner"], environment: {} });
+    assert.equal(result.passed, false);
+    assert.equal(result.report.summary.binary_files_approved, 1);
+    assert.deepEqual(
+      result.report.findings.map((finding) => finding.rule_id).sort(),
+      ["owner-term", "secret-token"],
+    );
+    assert.ok(result.report.findings.every((finding) => finding.source_kind === "BINARY_CONTENT"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -489,7 +489,12 @@ const inspectFile = (absolutePath) => {
     if (!matchesBinarySignature(extension, prefix)) {
       return { kind: "INVALID_BINARY_SIGNATURE", size_bytes: sizeBytes, extension };
     }
-    return { kind: "BINARY", size_bytes: sizeBytes, extension };
+    return {
+      kind: "BINARY",
+      size_bytes: sizeBytes,
+      extension,
+      inspection_text: readFileSync(absolutePath).toString("utf8"),
+    };
   }
   if (prefix.includes(0)) return { kind: "BINARY", size_bytes: sizeBytes, extension };
   if (sizeBytes > 5 * 1024 * 1024) {
@@ -569,17 +574,23 @@ export const checkRepository = ({
         continue;
       }
       binaryFilesApproved += 1;
+      const binaryFindings = scanText(inspection.inspection_text, file, manifest, privateTerms).map((finding) => ({
+        ...finding,
+        file: safeFile,
+        source_kind: "BINARY_CONTENT",
+      }));
       included.push({
         file: safeFile,
         path_fingerprint: reportPathFingerprint,
         classification: decision.classification,
         rule_id: decision.rule.id,
-        content_scanned: false,
-        inspection_status: "BINARY_POLICY_APPROVED",
+        content_scanned: true,
+        inspection_status: "BINARY_SIGNATURE_AND_CONTENT_SCANNED",
         binary_policy_id: binaryDecision.rule.id,
         binary_size_bytes: inspection.size_bytes,
         binary_fingerprint: fileFingerprint(absoluteFilePath),
       });
+      findings.push(...binaryFindings);
       continue;
     }
 

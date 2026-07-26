@@ -92,7 +92,7 @@ Every releasable binary must match an explicit `binary_rules` entry that declare
 - `SIGNATURE_SIZE_AND_SHA256` inspection
 - a durable review reason
 
-The scanner validates the extension-specific magic bytes before it can skip text inspection. An admitted extension with missing or mismatched signature bytes resolves to `UNRESOLVED`; this prevents plaintext disguised as a font, image, document, or archive from bypassing content inspection. Approved binaries are recorded with their policy ID, byte size, and SHA-256 fingerprint. A binary without a matching rule, or one exceeding its rule's size limit, also blocks release.
+The scanner validates extension-specific magic bytes and also runs blocking content rules over the binary byte stream before admission. An admitted extension with missing or mismatched signature bytes resolves to `UNRESOLVED`; a matching magic prefix cannot hide embedded ASCII secrets or owner terms. This prevents plaintext disguised as a font, image, document, or archive—and a signature-prefixed variant—from bypassing content inspection. Approved binaries are recorded with their policy ID, byte size, and SHA-256 fingerprint. A binary without a matching rule, or one exceeding its rule's size limit, also blocks release.
 
 This is a release-packaging rule, not a universal ban on user files. Deployers may define their own reviewed binary policies for their distribution while runtime imports remain subject to user authorization and local policy.
 
@@ -140,7 +140,7 @@ The report contains:
 - unresolved files
 - redacted path and content findings
 - path, value, and approved-binary fingerprints
-- binary policy IDs and sizes
+- binary policy IDs, sizes, signature status, and content-scan status
 - private-term input mode and count
 - final pass/fail state
 
@@ -162,7 +162,7 @@ PUBLIC_RELEASE_PRIVATE_TERMS="$(cat /private/path/terms)" npm run check:public-r
 
 The maintainer must review the exit status and privacy-safe report privately. Neither the dictionary, detailed result, nor pass/fail status may be uploaded to public Actions artifacts, logs, comments, or commit statuses. Because applying a confidential dictionary to attacker-chosen content creates a membership oracle even when match details are hidden, this check must not be posted as a pull-request status. Ordinary CI continues to prove scanner plumbing with a harmless synthetic sentinel, but does not claim owner-specific coverage.
 
-Synthetic tests cover nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content and paths, forbidden exceptions, empty content rules, unsafe private-term paths, unapproved binaries, signature-valid approved binaries, disguised-text signature rejection, and CI secret isolation.
+Synthetic tests cover nested environment files, private URLs, credentials, ordinary email addresses, owner terms in content and paths, forbidden exceptions, empty content rules, unsafe private-term paths, unapproved binaries, signature-valid approved binaries, disguised-text signature rejection, signature-prefix spoofing with embedded sensitive content, and CI secret isolation.
 
 ## Non-goals for this slice
 
