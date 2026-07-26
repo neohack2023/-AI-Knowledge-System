@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
+  checkRepository,
+  classifyBinaryPath,
   classifyPath,
   loadPrivateTerms,
   matchesGlob,
@@ -14,11 +25,25 @@ import {
   validateManifest,
 } from "../scripts/public-release/lib.mjs";
 
-const manifest = parseManifest(readFileSync(new URL("../public-release-manifest.yaml", import.meta.url), "utf8"));
+const manifestText = readFileSync(new URL("../public-release-manifest.yaml", import.meta.url), "utf8");
+const manifest = parseManifest(manifestText);
 
 const expectBoundaryError = (code) => (error) => (
   error instanceof PublicReleaseBoundaryError && error.code === code
 );
+
+const createTrackedRepository = (files) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "aios-public-boundary-"));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  writeFileSync(path.join(root, "public-release-manifest.yaml"), manifestText);
+  for (const [filePath, content] of Object.entries(files)) {
+    const absolutePath = path.join(root, filePath);
+    mkdirSync(path.dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, content);
+  }
+  execFileSync("git", ["add", "-A"], { cwd: root });
+  return root;
+};
 
 test("glob matching preserves exact roots and recursive directory rules", () => {
   assert.equal(matchesGlob("docs/PUBLIC_RELEASE_BOUNDARY.md", "docs/**"), true);
@@ -93,7 +118,7 @@ test("owner terms in release paths block and can be redacted from reports", () =
   assert.equal(redactText(filePath, findings), "docs/[REDACTED:OWNER_TERM]-notes.md");
 });
 
-test("private owner terms load from the configured CI environment variable", () => {
+test("private owner terms load from the configured environment variable", () => {
   const terms = loadPrivateTerms(process.cwd(), manifest, {
     PUBLIC_RELEASE_PRIVATE_TERMS: "sample-owner, sample-project\nsample-alias",
   });
@@ -118,6 +143,16 @@ test("manifest validation rejects fail-open defaults and duplicate rule IDs", ()
   const duplicate = structuredClone(manifest);
   duplicate.allowlist.push(structuredClone(duplicate.allowlist[0]));
   assert.throws(() => validateManifest(duplicate), expectBoundaryError("MANIFEST_DUPLICATE_ID"));
+});
+
+test("manifest validation rejects an empty content-rule set", () => {
+  const empty = structuredClone(manifest);
+  empty.content_rules = [];
+  empty.exceptions = [];
+  assert.throws(
+    () => validateManifest(empty),
+    expectBoundaryError("MANIFEST_EMPTY_CONTENT_RULES"),
+  );
 });
 
 test("manifest validation forbids exceptions that suppress secret rules", () => {
@@ -152,4 +187,78 @@ test("manifest validation forbids owner-term suppression exceptions", () => {
     () => validateManifest(unsafe),
     expectBoundaryError("MANIFEST_OWNER_TERM_EXCEPTION_FORBIDDEN"),
   );
+});
+
+test("private-term files must stay repository-relative and denylisted", () => {
+  const unsafe = structuredClone(manifest);
+  unsafe.private_terms.local_file = "../outside/private-terms";
+  assert.throws(
+    () => validateManifest(unsafe),
+    expectBoundaryError("MANIFEST_INVALID_PRIVATE_TERMS"),
+  );
+
+  const notDenied = structuredClone(manifest);
+  notDenied.private_terms.local_file = "config/private-terms.txt";
+  assert.throws(
+    () => validateManifest(notDenied),
+    expectBoundaryError("MANIFEST_PRIVATE_TERM_FILE_NOT_DENIED"),
+  );
+});
+
+test("binary admission is explicit, bounded, and fingerprinted", () => {
+  const approved = classifyBinaryPath(manifest, ".vinext/fonts/test/font.woff2", 128);
+  assert.equal(approved.allowed, true);
+  assert.equal(approved.rule.id, "bundled-geist-fonts");
+
+  const unapproved = classifyBinaryPath(manifest, "public/private.png", 128);
+  assert.equal(unapproved.allowed, false);
+  assert.equal(unapproved.classification, "UNRESOLVED");
+
+  const oversized = classifyBinaryPath(manifest, ".vinext/fonts/test/font.woff2", 2 * 1024 * 1024);
+  assert.equal(oversized.allowed, false);
+});
+
+test("repository checks fail closed for unapproved binaries and admit reviewed fonts", () => {
+  const blockedRoot = createTrackedRepository({
+    "public/private.png": Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  });
+  try {
+    const blocked = checkRepository({ root: blockedRoot, environment: {} });
+    assert.equal(blocked.passed, false);
+    assert.equal(blocked.report.summary.unresolved_files, 1);
+    assert.match(blocked.report.unresolved[0].reason, /explicit reviewed binary rule/);
+  } finally {
+    rmSync(blockedRoot, { recursive: true, force: true });
+  }
+
+  const approvedRoot = createTrackedRepository({
+    ".vinext/fonts/test/font.woff2": Buffer.from("wOF2synthetic-font-fixture", "latin1"),
+  });
+  try {
+    const approved = checkRepository({ root: approvedRoot, environment: {} });
+    assert.equal(approved.passed, true);
+    assert.equal(approved.report.summary.binary_files_approved, 1);
+    const fontRecord = approved.report.included.find((record) => record.binary_policy_id === "bundled-geist-fonts");
+    assert.equal(fontRecord.inspection_status, "BINARY_POLICY_APPROVED");
+    assert.match(fontRecord.binary_fingerprint, /^sha256:/);
+  } finally {
+    rmSync(approvedRoot, { recursive: true, force: true });
+  }
+});
+
+test("pull-request CI uses only a synthetic term while protected base code owns private scanning", () => {
+  const ci = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const protectedScan = readFileSync(
+    new URL("../.github/workflows/protected-owner-term-scan.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(ci, /secrets\.PUBLIC_RELEASE_PRIVATE_TERMS/);
+  assert.doesNotMatch(ci, /vars\.PUBLIC_RELEASE_PRIVATE_TERMS/);
+  assert.match(ci, /SENTINEL_ONLY/);
+
+  assert.match(protectedScan, /pull_request_target/);
+  assert.match(protectedScan, /trusted\/scripts\/public-release\/check\.mjs/);
+  assert.match(protectedScan, /--trusted-private-terms/);
+  assert.doesNotMatch(protectedScan, /npm ci|npm test/);
 });
