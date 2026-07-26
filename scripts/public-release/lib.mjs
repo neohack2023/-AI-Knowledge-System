@@ -124,7 +124,7 @@ export const validateManifest = (manifest) => {
     }
   }
 
-  const contentRuleIds = new Set();
+  const contentRulesById = new Map();
   for (const rule of manifest.content_rules) {
     if (!rule?.id || !rule.pattern || !rule.replacement || typeof rule.flags !== "string") {
       throw new PublicReleaseBoundaryError(
@@ -132,10 +132,9 @@ export const validateManifest = (manifest) => {
         "content_rules require id, pattern, flags, classification, and replacement.",
       );
     }
-    if (contentRuleIds.has(rule.id)) {
+    if (contentRulesById.has(rule.id)) {
       throw new PublicReleaseBoundaryError("MANIFEST_DUPLICATE_ID", `Duplicate content rule id '${rule.id}'.`);
     }
-    contentRuleIds.add(rule.id);
     if (!BLOCKING_CLASSIFICATIONS.has(rule.classification) || rule.classification === "UNRESOLVED") {
       throw new PublicReleaseBoundaryError(
         "MANIFEST_INVALID_CLASSIFICATION",
@@ -143,6 +142,7 @@ export const validateManifest = (manifest) => {
       );
     }
     validateRegex(rule.pattern, rule.flags, rule.id);
+    contentRulesById.set(rule.id, rule);
   }
 
   const exceptionIds = new Set();
@@ -157,12 +157,28 @@ export const validateManifest = (manifest) => {
       throw new PublicReleaseBoundaryError("MANIFEST_DUPLICATE_ID", `Duplicate exception id '${exception.id}'.`);
     }
     exceptionIds.add(exception.id);
-    if (!contentRuleIds.has(exception.content_rule_id) && exception.content_rule_id !== "owner-term") {
+
+    if (exception.content_rule_id === "owner-term") {
+      throw new PublicReleaseBoundaryError(
+        "MANIFEST_OWNER_TERM_EXCEPTION_FORBIDDEN",
+        `Exception '${exception.id}' cannot suppress owner-term findings. Rename the public reference or remove the private term.`,
+      );
+    }
+
+    const contentRule = contentRulesById.get(exception.content_rule_id);
+    if (!contentRule) {
       throw new PublicReleaseBoundaryError(
         "MANIFEST_UNKNOWN_RULE",
         `Exception '${exception.id}' references unknown content rule '${exception.content_rule_id}'.`,
       );
     }
+    if (contentRule.classification === "SECRET") {
+      throw new PublicReleaseBoundaryError(
+        "MANIFEST_SECRET_EXCEPTION_FORBIDDEN",
+        `Exception '${exception.id}' cannot suppress SECRET rule '${exception.content_rule_id}'.`,
+      );
+    }
+
     globToRegExp(exception.path_pattern);
     validateRegex(exception.pattern, exception.flags ?? "g", exception.id);
   }
@@ -227,6 +243,7 @@ const findingsForRule = (text, filePath, rule, exceptions) => {
       file: normalizePath(filePath),
       rule_id: rule.id,
       classification: rule.classification,
+      source_kind: "CONTENT",
       line: location.line,
       column: location.column,
       start: match.index,
@@ -254,13 +271,24 @@ export const scanText = (text, filePath, manifest, privateTerms = []) => {
     findings.push(...findingsForRule(text, filePath, rule, manifest.exceptions));
   }
   for (const rule of ownerTermRules(privateTerms)) {
-    findings.push(...findingsForRule(text, filePath, rule, manifest.exceptions).map((finding) => ({
+    findings.push(...findingsForRule(text, filePath, rule, []).map((finding) => ({
       ...finding,
       rule_instance_id: rule.instance_id,
     })));
   }
   return findings.sort((left, right) => left.start - right.start || left.rule_id.localeCompare(right.rule_id));
 };
+
+export const scanPath = (filePath, manifest, privateTerms = []) => scanText(
+  normalizePath(filePath),
+  normalizePath(filePath),
+  manifest,
+  privateTerms,
+).map((finding) => ({
+  ...finding,
+  source_kind: "PATH",
+  line: 1,
+}));
 
 export const redactText = (text, findings) => {
   let redacted = text;
@@ -316,6 +344,8 @@ const readTextCandidate = (absolutePath) => {
   return buffer.toString("utf8");
 };
 
+const pathFingerprint = (filePath) => `sha256:${createHash("sha256").update(filePath).digest("hex")}`;
+
 export const checkRepository = ({
   root = process.cwd(),
   manifestPath = "public-release-manifest.yaml",
@@ -333,10 +363,16 @@ export const checkRepository = ({
   const findings = [];
 
   for (const file of trackedFiles) {
+    const rawPathFindings = scanPath(file, manifest, privateTerms);
+    const safeFile = rawPathFindings.length > 0 ? redactText(file, rawPathFindings) : file;
+    const reportPathFingerprint = rawPathFindings.length > 0 ? pathFingerprint(file) : null;
+    findings.push(...rawPathFindings.map((finding) => ({ ...finding, file: safeFile })));
+
     const decision = classifyPath(manifest, file);
     if (!decision.allowed) {
       const record = {
-        file,
+        file: safeFile,
+        path_fingerprint: reportPathFingerprint,
         classification: decision.classification,
         rule_id: decision.rule?.id ?? null,
         reason: decision.rule?.reason ?? "No allowlist rule matched this tracked path.",
@@ -348,12 +384,18 @@ export const checkRepository = ({
 
     const text = readTextCandidate(path.resolve(root, file));
     included.push({
-      file,
+      file: safeFile,
+      path_fingerprint: reportPathFingerprint,
       classification: decision.classification,
       rule_id: decision.rule.id,
       content_scanned: text !== null,
     });
-    if (text !== null) findings.push(...scanText(text, file, manifest, privateTerms));
+    if (text !== null) {
+      findings.push(...scanText(text, file, manifest, privateTerms).map((finding) => ({
+        ...finding,
+        file: safeFile,
+      })));
+    }
   }
 
   const passed = blocked.length === 0 && unresolved.length === 0 && findings.length === 0;
@@ -371,6 +413,8 @@ export const checkRepository = ({
       unresolved_files: unresolved.length,
       sensitive_findings: findings.length,
       private_terms_loaded: privateTerms.length,
+      private_terms_mode: environment.PUBLIC_RELEASE_PRIVATE_TERMS_MODE
+        ?? (privateTerms.length > 0 ? "LOCAL_OR_ENVIRONMENT" : "NOT_CONFIGURED"),
     },
     included,
     blocked,
