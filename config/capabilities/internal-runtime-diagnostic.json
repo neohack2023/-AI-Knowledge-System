@@ -14,7 +14,7 @@
   "overlap_group": "runtime-diagnostics",
   "precedence_priority": 100,
   "preferred_over": [],
-  "scope_allowlist": ["global-runtime"],
+  "scope_allowlist": ["*"],
   "scope_denylist": [],
   "authority_domains": ["server-runtime-execution-state"],
   "input_schema_ref": "aios://capabilities/internal-runtime-diagnostic/input/1.2.0",
