@@ -1,0 +1,13 @@
+{
+  "schema_name": "RepoRegistrySource",
+  "schema_version": "1.0",
+  "registry_version": "0.1.0-phase1",
+  "routing_precedence": [
+    "EXACT_SCOPE_KEY",
+    "EXACT_PROJECT_NAME",
+    "REGISTERED_ALIAS",
+    "EXPLICIT_PARENT_SUBPROJECT",
+    "BOUNDED_CONTINUITY",
+    "AMBIGUITY_OR_NO_MATCH"
+  ]
+}
