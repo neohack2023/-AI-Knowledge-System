@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aios://schemas/ScopeResolution/1.0",
+  "title": "Scope Resolution Result 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_name",
+    "schema_version",
+    "registry_version",
+    "registry_fingerprint",
+    "requested_scope",
+    "normalized_request",
+    "resolution_state",
+    "resolution_method",
+    "resolved_scope_key",
+    "candidates",
+    "durable_scope_selected",
+    "semantic_selection_used",
+    "scope_packet_loaded",
+    "workflow_execution_authorized",
+    "destination_write_authorized"
+  ],
+  "properties": {
+    "schema_name": { "const": "ScopeResolutionResult" },
+    "schema_version": { "const": "1.0" },
+    "registry_version": { "type": "string", "minLength": 1 },
+    "registry_fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "requested_scope": { "type": ["string", "null"] },
+    "normalized_request": { "type": "string" },
+    "resolution_state": { "enum": ["RESOLVED", "AMBIGUOUS", "NO_MATCH"] },
+    "resolution_method": {
+      "type": ["string", "null"],
+      "enum": [
+        "EXACT_SCOPE_KEY",
+        "EXACT_PROJECT_NAME",
+        "REGISTERED_ALIAS",
+        "EXPLICIT_PARENT_SUBPROJECT",
+        "BOUNDED_CONTINUITY",
+        null
+      ]
+    },
+    "resolved_scope_key": { "type": ["string", "null"] },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scope_key",
+          "project_name",
+          "parent_scope_key",
+          "match_basis",
+          "eligible",
+          "reason_codes"
+        ],
+        "properties": {
+          "scope_key": { "type": "string", "minLength": 1 },
+          "project_name": { "type": "string", "minLength": 1 },
+          "parent_scope_key": { "type": ["string", "null"] },
+          "match_basis": {
+            "enum": [
+              "EXACT_SCOPE_KEY",
+              "EXACT_PROJECT_NAME",
+              "REGISTERED_ALIAS",
+              "EXPLICIT_PARENT_SUBPROJECT",
+              "BOUNDED_CONTINUITY"
+            ]
+          },
+          "eligible": { "type": "boolean" },
+          "reason_codes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "durable_scope_selected": { "type": "boolean" },
+    "semantic_selection_used": { "const": false },
+    "scope_packet_loaded": { "const": false },
+    "workflow_execution_authorized": { "const": false },
+    "destination_write_authorized": { "const": false }
+  }
+}
