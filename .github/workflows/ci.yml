@@ -27,7 +27,18 @@ jobs:
         run: npm ci
 
       - name: Build and test
-        run: npm test
+        run: |
+          mkdir -p outputs
+          set -o pipefail
+          npm test 2>&1 | tee outputs/build-and-test.log
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-and-test-diagnostics
+          path: outputs/build-and-test.log
+          if-no-files-found: warn
 
   registry-contracts:
     runs-on: ubuntu-latest
