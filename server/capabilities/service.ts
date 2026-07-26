@@ -1,5 +1,5 @@
 import { capabilitySchemaFingerprint, sha256Fingerprint } from "./fingerprint.ts";
-import { evaluateCapabilityPolicy } from "./policy.ts";
+import { evaluateCapabilityHealth, evaluateCapabilityPolicy } from "./policy.ts";
 import type {
   CapabilityCandidate,
   CapabilityDiscoveryEnvelope,
@@ -59,12 +59,16 @@ export class CapabilityDiscoveryService {
     })).sort((left, right) => left.capability_id.localeCompare(right.capability_id));
   }
 
-  async registryFingerprint() {
+  private registryFingerprintFor(definitions: readonly RuntimeCapabilityDefinition[]) {
     return sha256Fingerprint({
       schema_name: "RuntimeCapabilityRegistryPolicy",
       schema_version: "1.0",
-      definitions: this.listDefinitions(),
+      definitions,
     });
+  }
+
+  async registryFingerprint() {
+    return this.registryFingerprintFor(this.listDefinitions());
   }
 
   async inventoryProjectionFingerprint() {
@@ -83,12 +87,18 @@ export class CapabilityDiscoveryService {
       throw new CapabilityDiscoveryError("CAPABILITY_SCOPE_REQUIRED", "scope_key is required.", 400);
     }
 
-    const definitions = this.registryProvider();
+    const generatedAt = (input.now ?? (() => new Date().toISOString()))();
+    const definitions = this.listDefinitions();
     const eligible: CapabilityCandidate[] = [];
     const rejected: RejectedCapabilityCandidate[] = [];
 
     for (const definition of definitions) {
-      const evaluation = evaluateCapabilityPolicy(definition, input, definition.handler_ref.trim().length > 0);
+      const evaluation = evaluateCapabilityPolicy(
+        definition,
+        input,
+        definition.handler_ref.trim().length > 0,
+        generatedAt,
+      );
       if (evaluation.eligible) eligible.push(evaluation.candidate);
       else rejected.push(reject(evaluation.candidate, evaluation.reason_codes, evaluation.reason_details));
     }
@@ -131,8 +141,7 @@ export class CapabilityDiscoveryService {
     const second = eligible[1];
     const confidenceMargin = top && second ? Number((top.match_score - second.match_score).toFixed(4)) : top ? top.match_score : null;
     const ambiguous = Boolean(top && second && confidenceMargin !== null && confidenceMargin < 0.1);
-    const generatedAt = (input.now ?? (() => new Date().toISOString()))();
-    const registryFingerprint = await this.registryFingerprint();
+    const registryFingerprint = await this.registryFingerprintFor(definitions);
 
     return {
       schema_name: "CapabilityDiscoveryEnvelope",
@@ -176,10 +185,44 @@ export class CapabilityDiscoveryService {
       throw new CapabilityDiscoveryError("CAPABILITY_NOT_DISCOVERED", `Capability '${capabilityId}' was not returned by this discovery.`, 404);
     }
 
-    const definition = this.registryProvider().find((item) => item.capability_id === capabilityId);
+    const materializedAt = now();
+    const definitions = this.listDefinitions();
+    const definition = definitions.find((item) => item.capability_id === capabilityId);
     if (!definition) throw new CapabilityDiscoveryError("CAPABILITY_DEFINITION_MISSING", `Capability '${capabilityId}' is no longer registered.`, 409);
-    if (definition.health.status !== "VERIFIED") {
-      throw new CapabilityDiscoveryError("CAPABILITY_HEALTH_BLOCKED", `Capability health is ${definition.health.status}.`, 409);
+
+    const definitionChanged = (
+      definition.version !== candidate.capability_version
+      || definition.workflow_id !== candidate.workflow_id
+      || definition.input_schema_ref !== candidate.input_schema_ref
+      || definition.output_schema_ref !== candidate.output_schema_ref
+      || definition.expected_schema_fingerprint !== candidate.expected_schema_fingerprint
+    );
+    if (definitionChanged) {
+      throw new CapabilityDiscoveryError(
+        "CAPABILITY_DEFINITION_CHANGED",
+        `Capability '${capabilityId}' changed after discovery; run discovery again before materialization.`,
+        409,
+      );
+    }
+
+    const currentRegistryFingerprint = await this.registryFingerprintFor(definitions);
+    if (currentRegistryFingerprint !== envelope.registry_fingerprint) {
+      throw new CapabilityDiscoveryError(
+        "CAPABILITY_REGISTRY_CHANGED",
+        "The runtime capability registry changed after discovery; run discovery again before materialization.",
+        409,
+      );
+    }
+
+    const healthEvaluation = evaluateCapabilityHealth(definition.health, materializedAt);
+    if (!healthEvaluation.compatible) {
+      throw new CapabilityDiscoveryError(
+        healthEvaluation.reason_code === "HEALTH_VERIFICATION_EXPIRED"
+          ? "CAPABILITY_HEALTH_EXPIRED"
+          : "CAPABILITY_HEALTH_BLOCKED",
+        healthEvaluation.reason_detail ?? "Capability health is not eligible for materialization.",
+        409,
+      );
     }
 
     const fingerprint = await capabilitySchemaFingerprint(definition);
@@ -210,7 +253,7 @@ export class CapabilityDiscoveryService {
       authorization_scope: "MATERIALIZATION_ONLY",
       execution_authorized: false,
       destination_write_authorized: false,
-      materialized_at: now(),
+      materialized_at: materializedAt,
     };
   }
 }
