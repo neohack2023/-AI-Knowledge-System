@@ -25,3 +25,29 @@ jobs:
 
       - name: Build and test
         run: npm test
+
+  public-release-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test public release contracts
+        run: node --test tests/public-release-boundary.test.mjs
+
+      - name: Validate public release boundary
+        run: node scripts/public-release/check.mjs --manifest public-release-manifest.yaml --report outputs/public-release-report.json
+
+      - name: Upload public release report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-release-boundary-report
+          path: outputs/public-release-report.json
+          if-no-files-found: ignore
