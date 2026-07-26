@@ -1,0 +1,281 @@
+{
+  "schema_name": "PublicReleaseManifest",
+  "schema_version": "1.0",
+  "release_id": "public-aios-v0.1-development",
+  "default_classification": "UNRESOLVED",
+  "allowlist": [
+    {
+      "id": "github-automation",
+      "pattern": ".github/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Repository automation and contribution configuration."
+    },
+    {
+      "id": "hosting-template",
+      "pattern": ".openai/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Optional hosting declarations without credentials."
+    },
+    {
+      "id": "application-source",
+      "pattern": "app/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Repository-owned application source."
+    },
+    {
+      "id": "database-source",
+      "pattern": "db/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Provider-neutral database integration source."
+    },
+    {
+      "id": "public-documentation",
+      "pattern": "docs/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public architecture and operating documentation."
+    },
+    {
+      "id": "public-examples",
+      "pattern": "examples/**",
+      "classification": "PUBLIC_SYNTHETIC_FIXTURE",
+      "reason": "Synthetic examples and optional starter demonstrations."
+    },
+    {
+      "id": "public-static-assets",
+      "pattern": "public/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public application assets."
+    },
+    {
+      "id": "release-and-build-scripts",
+      "pattern": "scripts/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Repository build, validation, and release tooling."
+    },
+    {
+      "id": "server-runtime",
+      "pattern": "server/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "AIOS server runtime and workflow kernel source."
+    },
+    {
+      "id": "shared-contracts",
+      "pattern": "shared/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Shared provider-neutral contracts and utilities."
+    },
+    {
+      "id": "public-tests",
+      "pattern": "tests/**",
+      "classification": "PUBLIC_SYNTHETIC_FIXTURE",
+      "reason": "Synthetic contract and regression tests."
+    },
+    {
+      "id": "public-schemas",
+      "pattern": "schemas/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Versioned public JSON Schemas."
+    },
+    {
+      "id": "future-portable-packages",
+      "pattern": "packages/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Portable package surface reserved by the public AIOS roadmap."
+    },
+    {
+      "id": "future-cli",
+      "pattern": "cli/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Portable command-line surface reserved by the public AIOS roadmap."
+    },
+    {
+      "id": "public-config",
+      "pattern": "config/**",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Versioned synthetic and provider-neutral configuration."
+    },
+    {
+      "id": "root-gitignore",
+      "pattern": ".gitignore",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Repository ignore policy."
+    },
+    {
+      "id": "root-readme",
+      "pattern": "README.md",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public repository documentation."
+    },
+    {
+      "id": "root-agents",
+      "pattern": "AGENTS.md",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public repository agent guidance."
+    },
+    {
+      "id": "root-license",
+      "pattern": "LICENSE",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public license."
+    },
+    {
+      "id": "root-package",
+      "pattern": "package.json",
+      "classification": "PUBLIC_CORE",
+      "reason": "Node package metadata and commands."
+    },
+    {
+      "id": "root-lockfile",
+      "pattern": "package-lock.json",
+      "classification": "PUBLIC_CORE",
+      "reason": "Reproducible dependency lockfile."
+    },
+    {
+      "id": "root-tsconfig",
+      "pattern": "tsconfig.json",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "TypeScript compiler configuration."
+    },
+    {
+      "id": "root-vite-config",
+      "pattern": "vite.config.ts",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Application build configuration."
+    },
+    {
+      "id": "root-drizzle-config",
+      "pattern": "drizzle.config.ts",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Optional database tooling configuration."
+    },
+    {
+      "id": "root-eslint-config",
+      "pattern": "eslint.config.mjs",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Lint configuration."
+    },
+    {
+      "id": "root-postcss-config",
+      "pattern": "postcss.config.mjs",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "CSS build configuration."
+    },
+    {
+      "id": "root-next-config",
+      "pattern": "next.config.ts",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Optional framework configuration."
+    },
+    {
+      "id": "release-manifest",
+      "pattern": "public-release-manifest.yaml",
+      "classification": "PUBLIC_CORE",
+      "reason": "Machine-checkable public release policy."
+    }
+  ],
+  "denylist": [
+    {
+      "id": "environment-files",
+      "pattern": ".env*",
+      "classification": "SECRET",
+      "reason": "Environment files may contain credentials or private bindings."
+    },
+    {
+      "id": "private-term-file",
+      "pattern": ".public-release-private-terms",
+      "classification": "PRIVATE_KNOWLEDGE",
+      "reason": "Local owner-term dictionaries must never be committed."
+    },
+    {
+      "id": "private-key-files",
+      "pattern": "**/*.pem",
+      "classification": "SECRET",
+      "reason": "Private or certificate key material is not publishable."
+    },
+    {
+      "id": "local-databases",
+      "pattern": "**/*.sqlite*",
+      "classification": "PRIVATE_KNOWLEDGE",
+      "reason": "Local databases may contain private runtime or memory state."
+    },
+    {
+      "id": "raw-provider-exports",
+      "pattern": "private-exports/**",
+      "classification": "PRIVATE_BINDING",
+      "reason": "Raw provider exports are outside the public repository boundary."
+    },
+    {
+      "id": "runtime-output",
+      "pattern": "outputs/**",
+      "classification": "PRIVATE_EVIDENCE",
+      "reason": "Generated reports and runtime artifacts are not source release inputs."
+    }
+  ],
+  "content_rules": [
+    {
+      "id": "notion-url",
+      "classification": "PRIVATE_BINDING",
+      "pattern": "https?:\\/\\/(?:www\\.)?(?:notion\\.so|app\\.notion\\.com)\\/[^\\s)\\]}>]+",
+      "flags": "gi",
+      "replacement": "[REDACTED:PRIVATE_BINDING]"
+    },
+    {
+      "id": "google-drive-url",
+      "classification": "PRIVATE_BINDING",
+      "pattern": "https?:\\/\\/(?:drive|docs)\\.google\\.com\\/[^\\s)\\]}>]+",
+      "flags": "gi",
+      "replacement": "[REDACTED:PRIVATE_BINDING]"
+    },
+    {
+      "id": "email-address",
+      "classification": "PRIVATE_BINDING",
+      "pattern": "\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b",
+      "flags": "gi",
+      "replacement": "[REDACTED:EMAIL]"
+    },
+    {
+      "id": "secret-token",
+      "classification": "SECRET",
+      "pattern": "\\b(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,})\\b",
+      "flags": "g",
+      "replacement": "[REDACTED:SECRET]"
+    },
+    {
+      "id": "private-key-block",
+      "classification": "SECRET",
+      "pattern": "-----BEGIN(?: RSA| EC| OPENSSH)? PRIVATE KEY-----",
+      "flags": "g",
+      "replacement": "[REDACTED:PRIVATE_KEY]"
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "synthetic-example-email",
+      "content_rule_id": "email-address",
+      "path_pattern": "**",
+      "pattern": "\\b[A-Z0-9._%+-]+@example\\.(?:com|org|net)\\b",
+      "flags": "gi",
+      "reason": "Reserved example domains are permitted for synthetic fixtures and documentation."
+    },
+    {
+      "id": "invalid-domain-email",
+      "content_rule_id": "email-address",
+      "path_pattern": "**",
+      "pattern": "\\b[A-Z0-9._%+-]+@[^\\s@]+\\.invalid\\b",
+      "flags": "gi",
+      "reason": "The reserved invalid top-level domain is safe for synthetic configuration."
+    },
+    {
+      "id": "public-repository-url-owner-term",
+      "content_rule_id": "owner-term",
+      "path_pattern": "**",
+      "pattern": "https?:\\/\\/github\\.com\\/[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[^\\s)\\]}>]+)?",
+      "flags": "gi",
+      "reason": "Explicitly public repository URLs may contain an owner or organization name."
+    }
+  ],
+  "private_terms": {
+    "environment_variable": "PUBLIC_RELEASE_PRIVATE_TERMS",
+    "local_file": ".public-release-private-terms"
+  }
+}
