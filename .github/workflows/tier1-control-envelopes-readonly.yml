@@ -1,0 +1,26 @@
+name: Tier 1 Control Envelopes Read-Only Validation
+on:
+  pull_request:
+    paths:
+      - 'governance/tier1-control-envelopes-v0.1.tar.gz'
+      - 'scripts/validate-tier1-control-envelopes.py'
+      - '.github/workflows/tier1-control-envelopes-readonly.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'governance/tier1-control-envelopes-v0.1.tar.gz'
+      - 'scripts/validate-tier1-control-envelopes.py'
+      - '.github/workflows/tier1-control-envelopes-readonly.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate frozen schemas and fixtures
+        run: python scripts/validate-tier1-control-envelopes.py
