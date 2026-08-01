@@ -13,11 +13,20 @@ async function loadFixture(name) {
   return JSON.parse(await readFile(path.join(fixtureDirectory, name), 'utf8'));
 }
 
+async function compileWithDiagnostics(blueprint) {
+  try {
+    return await compileSpatialAsset(blueprint, { generatedAt: fixedTime });
+  } catch (error) {
+    if (error?.details) console.error(JSON.stringify(error.details, null, 2));
+    throw error;
+  }
+}
+
 test('four frozen fixtures compile to Khronos-valid canonical glTF and GLB', async (context) => {
   const manifest = JSON.parse(await readFile(path.join(fixtureDirectory, 'manifest.json'), 'utf8'));
   for (const fixture of manifest.fixtures) {
     await context.test(fixture.file, async () => {
-      const result = await compileSpatialAsset(await loadFixture(fixture.file), { generatedAt: fixedTime });
+      const result = await compileWithDiagnostics(await loadFixture(fixture.file));
       assert.equal(result.receipt.status, 'PASS');
       assert.equal(result.receipt.authority.executionAuthorized, false);
       assert.equal(result.receipt.authority.destinationWriteAuthorized, false);
@@ -33,8 +42,8 @@ test('four frozen fixtures compile to Khronos-valid canonical glTF and GLB', asy
 
 test('repeated compilation produces the same normalized and output digests', async () => {
   const blueprint = await loadFixture('02-hierarchical-assembly.json');
-  const first = await compileSpatialAsset(blueprint, { generatedAt: fixedTime });
-  const second = await compileSpatialAsset(structuredClone(blueprint), { generatedAt: fixedTime });
+  const first = await compileWithDiagnostics(blueprint);
+  const second = await compileWithDiagnostics(structuredClone(blueprint));
   assert.equal(first.normalizedBlueprint.digest, second.normalizedBlueprint.digest);
   assert.deepEqual(first.receipt.outputs, second.receipt.outputs);
   assert.deepEqual(first.receipt.roundTrip, second.receipt.roundTrip);
@@ -42,7 +51,7 @@ test('repeated compilation produces the same normalized and output digests', asy
 });
 
 test('semantic component IDs and metadata survive glTFLoader round trips', async () => {
-  const result = await compileSpatialAsset(await loadFixture('03-bounded-pbr-materials.json'), { generatedAt: fixedTime });
+  const result = await compileWithDiagnostics(await loadFixture('03-bounded-pbr-materials.json'));
   const expectedIds = result.normalizedBlueprint.blueprint.nodes.map((node) => node.id).sort();
   const actualIds = result.identityMap.map((entry) => entry.componentId).sort();
   assert.deepEqual(actualIds, expectedIds);
