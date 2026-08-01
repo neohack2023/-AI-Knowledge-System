@@ -1,0 +1,84 @@
+{
+  "contract": "SpatialValidationReport/0.1",
+  "scope_key": "global-working-memory",
+  "execution_id": "exec-saf-n3d-0a-mock-001",
+  "candidate_id": "candidate-saf-n3d-0a-triangle",
+  "representation_family": "MESH_ASSET_DRAFT",
+  "validation_profile_id": "character-neural-draft-v0.1",
+  "components": [
+    {
+      "component_id": "fixture.triangle",
+      "role": "CHARACTER_BODY",
+      "topology_family": "POLYGONAL_MESH",
+      "units": "m",
+      "coordinate_system": "RIGHT_HANDED_Y_UP_NEGATIVE_Z_FORWARD",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          1,
+          1,
+          0
+        ]
+      },
+      "dimensions": [
+        1,
+        1,
+        0
+      ],
+      "vertex_count": 3,
+      "face_count": 1,
+      "connected_components": 1,
+      "degenerate_faces": 0,
+      "zero_area_faces": 0,
+      "non_manifold_edges": 3,
+      "flipped_normals": 0,
+      "self_intersections": 0,
+      "watertight_requirement": "COMPONENT_SPECIFIC",
+      "watertight_observed": false,
+      "watertight_result": "REVIEW_REQUIRED"
+    }
+  ],
+  "export_reimport": {
+    "export_result": "PASS",
+    "reimport_result": "PASS",
+    "format": "GLB",
+    "validator": "SAF structural GLB parser/0.1",
+    "structural_digest_match": true
+  },
+  "materials": {
+    "uv_present": false,
+    "uv_overlap_result": "NOT_APPLICABLE",
+    "channels_present": [],
+    "translation_loss": []
+  },
+  "rig": {
+    "state": "NOT_RUN",
+    "bone_count": null,
+    "hierarchy_valid": null,
+    "weights_normalized": null,
+    "socket_checks": [],
+    "deformation_tests": []
+  },
+  "rights": {
+    "state": "SYNTHETIC_FIXTURE",
+    "distribution": "TEST_ONLY"
+  },
+  "technical_outcome": "CONDITIONAL_PASS",
+  "human_review": {
+    "requirement": "REQUIRED",
+    "state": "PENDING",
+    "reason_codes": [
+      "IDENTITY_CRITICAL_PROFILE",
+      "OPEN_TRIANGLE_FIXTURE"
+    ],
+    "evidence_refs": []
+  },
+  "acceptance": {
+    "state": "PENDING",
+    "assigned_destination": "CANDIDATE_ASSET_PACKAGE"
+  }
+}

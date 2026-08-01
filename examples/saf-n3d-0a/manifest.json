@@ -1,0 +1,60 @@
+{
+  "contract": "FrozenFixtureManifest/0.1",
+  "files": [
+    {
+      "path": "gltf/minimal-triangle.bin.base64",
+      "sha256": "f665c8c4e238caefa4e94c5b918a26a726eb1f31509ccf10f7822c83ba80c7fd",
+      "byte_length": 57
+    },
+    {
+      "path": "gltf/minimal-triangle.gltf.json",
+      "sha256": "6c0d345e6bf0274be4c441b409f3ae86ef46d5e9b4b1bfe66896f0323db28a10",
+      "byte_length": 1221
+    },
+    {
+      "path": "negative/dispatch-auth-binding-mismatch.json",
+      "sha256": "f8a210134d6f8ebf7133e581343c3f004bd062efa8c423e50409de9a2add12e1",
+      "byte_length": 2256
+    },
+    {
+      "path": "negative/dispatch-missing-mode.json",
+      "sha256": "8358188fc4982cb5dfb6669a777daf3ead5b1021c3297c5da10579740dfb2c1c",
+      "byte_length": 2242
+    },
+    {
+      "path": "negative/dispatch-mock-live.json",
+      "sha256": "f7516ec329bc0b1fded7dc2e7bfcfa6a62dd90caa16b1a2cfdeac760e9b16fd1",
+      "byte_length": 2260
+    },
+    {
+      "path": "negative/receipt-failed-without-error.json",
+      "sha256": "eb7b5003b78dd3703e4f07de8c08c677bce81f8b5ac1f3bc973d8f7939fc811f",
+      "byte_length": 3273
+    },
+    {
+      "path": "negative/validation-premature-acceptance.json",
+      "sha256": "8e9f55bb5c5cf630f733b5f33daed46ef8634c2e2d3086094984058c10404e1d",
+      "byte_length": 2072
+    },
+    {
+      "path": "positive/dispatch.mock.json",
+      "sha256": "0989501e612041db47c19add8f72bb5aad28990d75347d455626e01c43a9b6ec",
+      "byte_length": 2266
+    },
+    {
+      "path": "positive/receipt.mock.json",
+      "sha256": "d3f09eb884ed8c9b25634583e0e536b26efa39937e148153af2ae9e3e98535f1",
+      "byte_length": 3276
+    },
+    {
+      "path": "positive/validation-profile.character.json",
+      "sha256": "d0b8d5d9ae61b06bc96402994174f319780beebc3c132985b6c1f63ee2560f01",
+      "byte_length": 1156
+    },
+    {
+      "path": "positive/validation-report.mock.json",
+      "sha256": "50df804b9e24ffca2e86f48bd84db295ec2571c5bc36b1380309aa571757902a",
+      "byte_length": 2058
+    }
+  ]
+}

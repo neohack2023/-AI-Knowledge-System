@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aios.local/schemas/saf-n3d-0a/execution-receipt-spatial-v0.1.json",
+  "title": "ExecutionReceiptEnvelope v0.1 Spatial Compute Profile",
+  "description": "ExecutionReceiptEnvelope v0.1 with a bounded spatial_compute metadata extension. It records evidence and grants no authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["receipt_version","receipt_id","execution_id","trace_id","span_id","parent_span_id","scope_key","workflow_id","operation_name","operation_type","mode","status","started_at","completed_at","duration_ms","source_refs","authority_decisions","provider","model","token_usage","external_effect","input_digest","output_digest","errors","supersedes_receipt_id","metadata"],
+  "properties": {
+    "receipt_version": {"const": "0.1"},
+    "receipt_id": {"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9._:-]+$"},
+    "execution_id": {"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9._:-]+$"},
+    "trace_id": {"type":"string","pattern":"^[a-f0-9]{32}$"},
+    "span_id": {"type":"string","pattern":"^[a-f0-9]{16}$"},
+    "parent_span_id": {"oneOf":[{"type":"string","pattern":"^[a-f0-9]{16}$"},{"type":"null"}]},
+    "scope_key": {"type":"string","minLength":1},
+    "workflow_id": {"oneOf":[{"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9._:-]+$"},{"type":"null"}]},
+    "operation_name": {"type":"string","minLength":1},
+    "operation_type": {"enum":["SCOPE_RESOLUTION","RETRIEVAL","PACKET_ASSEMBLY","TOOL_CALL","WORKFLOW_TRANSITION","STONE_INTAKE","MASON_VALIDATION","AUTHORIZATION_CHECK","DESTINATION_WRITE","VERIFICATION","BENCHMARK","OTHER"]},
+    "mode": {"enum":["IDLE","SIMULATION","LIVE","REPLAY","BLOCKED","FAILED"]},
+    "status": {"enum":["QUEUED","RUNNING","WAITING","APPROVAL_REQUIRED","PAUSED","COMPLETED","BLOCKED","FAILED","CANCELLED"]},
+    "started_at": {"oneOf":[{"type":"string","format":"date-time"},{"type":"null"}]},
+    "completed_at": {"oneOf":[{"type":"string","format":"date-time"},{"type":"null"}]},
+    "duration_ms": {"oneOf":[{"type":"integer","minimum":0},{"type":"null"}]},
+    "source_refs": {"type":"array","items":{"type":"object","additionalProperties":false,"required":["source_type","source_id","source_uri","authority_role","content_digest"],"properties":{"source_type":{"enum":["NOTION","GOOGLE_DRIVE","GITHUB","WEB","USER_INPUT","RUNTIME","OTHER"]},"source_id":{"type":"string"},"source_uri":{"oneOf":[{"type":"string"},{"type":"null"}]},"authority_role":{"enum":["CANON","RUNTIME","EXECUTION","EVIDENCE","RESEARCH","ASSET","NONE"]},"content_digest":{"oneOf":[{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},{"type":"null"}]}}}},
+    "authority_decisions": {"type":"array","items":{"type":"object","additionalProperties":false,"required":["decision_id","claim_key","candidate_source_ids","selected_source_id","decision","reason_code","policy_ref"],"properties":{"decision_id":{"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9._:-]+$"},"claim_key":{"type":"string"},"candidate_source_ids":{"type":"array","items":{"type":"string"}},"selected_source_id":{"oneOf":[{"type":"string"},{"type":"null"}]},"decision":{"enum":["ACCEPTED","REJECTED","OVERRIDDEN","UNRESOLVED","NOT_APPLICABLE"]},"reason_code":{"type":"string"},"policy_ref":{"oneOf":[{"type":"string"},{"type":"null"}]}}}},
+    "provider": {"oneOf":[{"type":"string"},{"type":"null"}]},
+    "model": {"oneOf":[{"type":"string"},{"type":"null"}]},
+    "token_usage": {"oneOf":[{"type":"object","additionalProperties":false,"required":["input_tokens","output_tokens","total_tokens","availability"],"properties":{"input_tokens":{"oneOf":[{"type":"integer","minimum":0},{"type":"null"}]},"output_tokens":{"oneOf":[{"type":"integer","minimum":0},{"type":"null"}]},"total_tokens":{"oneOf":[{"type":"integer","minimum":0},{"type":"null"}]},"availability":{"enum":["OBSERVED","ESTIMATED","UNAVAILABLE"]}}},{"type":"null"}]},
+    "external_effect": {"type":"object","additionalProperties":false,"required":["effect_type","target_type","target_id","requested","authorized","performed","verified","authorization_ref","verification_ref"],"properties":{"effect_type":{"enum":["NONE","READ","CREATE","UPDATE","DELETE","MOVE","SEND","EXECUTE"]},"target_type":{"oneOf":[{"type":"string"},{"type":"null"}]},"target_id":{"oneOf":[{"type":"string"},{"type":"null"}]},"requested":{"type":"boolean"},"authorized":{"type":"boolean"},"performed":{"type":"boolean"},"verified":{"type":"boolean"},"authorization_ref":{"oneOf":[{"type":"string"},{"type":"null"}]},"verification_ref":{"oneOf":[{"type":"string"},{"type":"null"}]}}},
+    "input_digest": {"oneOf":[{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},{"type":"null"}]},
+    "output_digest": {"oneOf":[{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},{"type":"null"}]},
+    "errors": {"type":"array","items":{"type":"object","additionalProperties":false,"required":["error_code","error_message","retryable","contract_ref"],"properties":{"error_code":{"type":"string"},"error_message":{"type":"string"},"retryable":{"type":"boolean"},"contract_ref":{"oneOf":[{"type":"string"},{"type":"null"}]}}}},
+    "supersedes_receipt_id": {"oneOf":[{"type":"string","minLength":1,"maxLength":128,"pattern":"^[A-Za-z0-9._:-]+$"},{"type":"null"}]},
+    "metadata": {"type":"object","additionalProperties":true,"required":["schema_validation","canonicalization","availability_notes","spatial_compute"],"properties":{"schema_validation":{"enum":["PASS","FAIL","NOT_RUN"]},"canonicalization":{"enum":["RFC8785","AIOS_CANONICAL_JSON","NOT_APPLICABLE"]},"availability_notes":{"type":"array","items":{"type":"string"}},"spatial_compute":{"type":"object","additionalProperties":false,"required":["github_run_id","commit_sha","run_attempt","environment","emitted_local_artifacts","storage_state"],"properties":{"github_run_id":{"oneOf":[{"type":"integer","minimum":0},{"type":"null"}]},"commit_sha":{"type":"string","pattern":"^[a-f0-9]{40}$"},"run_attempt":{"type":"integer","minimum":1},"environment":{"type":"object","additionalProperties":false,"required":["runner_os","node_version","tool_versions"],"properties":{"runner_os":{"type":"string"},"node_version":{"type":"string"},"tool_versions":{"type":"object","additionalProperties":{"type":"string"}}}},"emitted_local_artifacts":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["logical_name","relative_path","media_type","byte_length","sha256_digest","location_type"],"properties":{"logical_name":{"type":"string","pattern":"^[A-Z0-9_]+$"},"relative_path":{"type":"string","pattern":"^(?!/)(?!.*\\.\\.).+$"},"media_type":{"type":"string"},"byte_length":{"type":"integer","minimum":0},"sha256_digest":{"type":"string","pattern":"^sha256:[a-f0-9]{64}$"},"location_type":{"const":"PROCESS_LOCAL"}}}},"storage_state":{"const":"NOT_STAGED"}}}}}
+  },
+  "allOf": [
+    {"if":{"properties":{"status":{"const":"FAILED"}}},"then":{"properties":{"errors":{"minItems":1}}}},
+    {"if":{"properties":{"status":{"const":"BLOCKED"}}},"then":{"properties":{"external_effect":{"properties":{"performed":{"const":false}}}}}},
+    {"if":{"properties":{"external_effect":{"properties":{"performed":{"const":true}}}}},"then":{"properties":{"external_effect":{"properties":{"authorized":{"const":true}}}}}}
+  ]
+}

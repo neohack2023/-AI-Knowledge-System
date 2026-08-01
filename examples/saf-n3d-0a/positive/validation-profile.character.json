@@ -1,0 +1,56 @@
+{
+  "contract": "SpatialValidationProfile/0.1",
+  "profile_id": "character-neural-draft-v0.1",
+  "version": "0.1",
+  "applies_to": {
+    "roles": [
+      "CHARACTER_BODY",
+      "COSTUME",
+      "WEAPON",
+      "ACCESSORY"
+    ],
+    "representations": [
+      "MESH_ASSET_DRAFT",
+      "RIGGED_CHARACTER_DRAFT"
+    ]
+  },
+  "geometry_rules": {
+    "units": "m",
+    "coordinate_system": "RIGHT_HANDED_Y_UP_NEGATIVE_Z_FORWARD",
+    "max_vertices": 2000000,
+    "max_faces": 4000000,
+    "max_components": 256,
+    "watertight_requirement": "COMPONENT_SPECIFIC",
+    "require_reimport": true
+  },
+  "material_rules": {
+    "uv_requirement": "COMPONENT_SPECIFIC",
+    "allowed_channels": [
+      "BASE_COLOR",
+      "NORMAL",
+      "ROUGHNESS",
+      "METALLIC",
+      "OCCLUSION",
+      "EMISSIVE",
+      "OPACITY"
+    ]
+  },
+  "rig_rules": {
+    "requirement": "LATER_STAGE",
+    "max_influences": 4
+  },
+  "human_review": {
+    "required": true,
+    "reason_codes": [
+      "IDENTITY_CRITICAL"
+    ]
+  },
+  "rights_rules": {
+    "accepted_states": [
+      "SYNTHETIC_FIXTURE",
+      "PRIVATE_RESEARCH",
+      "LICENSED",
+      "PUBLIC_DOMAIN"
+    ]
+  }
+}
