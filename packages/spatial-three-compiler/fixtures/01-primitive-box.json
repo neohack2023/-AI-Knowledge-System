@@ -1,0 +1,59 @@
+{
+  "contract": "SpatialAssetBlueprint/0.1",
+  "asset": {
+    "id": "fixture.primitive-box",
+    "name": "Primitive Box Fixture",
+    "revision": "1"
+  },
+  "coordinateSystem": {
+    "units": "m",
+    "upAxis": "Y",
+    "forwardAxis": "-Z",
+    "handedness": "right"
+  },
+  "materials": [
+    {
+      "id": "material.blue-steel",
+      "name": "Blue Steel",
+      "baseColor": "#2f6b88",
+      "metalness": 0.65,
+      "roughness": 0.28,
+      "emissive": "#000000",
+      "opacity": 1,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": false,
+      "extras": {
+        "role": "shell"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "box.root",
+      "name": "Root Box",
+      "type": "box",
+      "parentId": null,
+      "transform": {
+        "position": [0, 0.5, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": {
+        "width": 1,
+        "height": 1,
+        "depth": 1,
+        "widthSegments": 1,
+        "heightSegments": 1,
+        "depthSegments": 1
+      },
+      "materialId": "material.blue-steel",
+      "extras": {
+        "fixturePurpose": "single primitive"
+      }
+    }
+  ],
+  "extras": {
+    "fixture": true
+  }
+}

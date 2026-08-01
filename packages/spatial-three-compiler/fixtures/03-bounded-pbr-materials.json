@@ -1,0 +1,107 @@
+{
+  "contract": "SpatialAssetBlueprint/0.1",
+  "asset": {
+    "id": "fixture.bounded-pbr-materials",
+    "name": "Bounded PBR Materials Fixture",
+    "revision": "1"
+  },
+  "coordinateSystem": {
+    "units": "m",
+    "upAxis": "Y",
+    "forwardAxis": "-Z",
+    "handedness": "right"
+  },
+  "materials": [
+    {
+      "id": "material.masked",
+      "name": "Masked Surface",
+      "baseColor": "#4a9a62",
+      "metalness": 0,
+      "roughness": 0.72,
+      "emissive": "#001100",
+      "opacity": 1,
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.35,
+      "doubleSided": true,
+      "extras": {
+        "profile": "bounded-pbr"
+      }
+    },
+    {
+      "id": "material.translucent",
+      "name": "Translucent Surface",
+      "baseColor": "#8ab6d6",
+      "metalness": 0.05,
+      "roughness": 0.18,
+      "emissive": "#000814",
+      "opacity": 0.62,
+      "alphaMode": "BLEND",
+      "alphaCutoff": 0.5,
+      "doubleSided": false,
+      "extras": {
+        "profile": "bounded-pbr"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "materials.root",
+      "name": "Materials Root",
+      "type": "group",
+      "parentId": null,
+      "transform": {
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": null,
+      "materialId": null,
+      "extras": {}
+    },
+    {
+      "id": "materials.masked-plane",
+      "name": "Masked Plane",
+      "type": "plane",
+      "parentId": "materials.root",
+      "transform": {
+        "position": [-0.75, 0.75, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": {
+        "width": 1,
+        "height": 1.5,
+        "widthSegments": 2,
+        "heightSegments": 3
+      },
+      "materialId": "material.masked",
+      "extras": {
+        "role": "material-swatch"
+      }
+    },
+    {
+      "id": "materials.translucent-sphere",
+      "name": "Translucent Sphere",
+      "type": "sphere",
+      "parentId": "materials.root",
+      "transform": {
+        "position": [0.75, 0.75, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": {
+        "radius": 0.55,
+        "widthSegments": 24,
+        "heightSegments": 12
+      },
+      "materialId": "material.translucent",
+      "extras": {
+        "role": "material-swatch"
+      }
+    }
+  ],
+  "extras": {
+    "fixture": true,
+    "tests": ["pbr", "alpha-modes", "extras"]
+  }
+}

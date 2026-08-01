@@ -1,0 +1,131 @@
+{
+  "contract": "SpatialAssetBlueprint/0.1",
+  "asset": {
+    "id": "fixture.hierarchical-assembly",
+    "name": "Hierarchical Assembly Fixture",
+    "revision": "1"
+  },
+  "coordinateSystem": {
+    "units": "cm",
+    "upAxis": "Y",
+    "forwardAxis": "-Z",
+    "handedness": "right"
+  },
+  "materials": [
+    {
+      "id": "material.frame",
+      "name": "Frame",
+      "baseColor": "#6f747c",
+      "metalness": 0.8,
+      "roughness": 0.22,
+      "emissive": "#000000",
+      "opacity": 1,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": false,
+      "extras": {}
+    },
+    {
+      "id": "material.accent",
+      "name": "Accent",
+      "baseColor": "#d9822b",
+      "metalness": 0.1,
+      "roughness": 0.55,
+      "emissive": "#120500",
+      "opacity": 1,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": false,
+      "extras": {}
+    }
+  ],
+  "nodes": [
+    {
+      "id": "assembly.root",
+      "name": "Assembly Root",
+      "type": "group",
+      "parentId": null,
+      "transform": {
+        "position": [0, 0, 0],
+        "rotation": [0, 0.25, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": null,
+      "materialId": null,
+      "extras": {
+        "role": "assembly"
+      }
+    },
+    {
+      "id": "assembly.base",
+      "name": "Base",
+      "type": "cylinder",
+      "parentId": "assembly.root",
+      "transform": {
+        "position": [0, 5, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": {
+        "radiusTop": 12,
+        "radiusBottom": 15,
+        "height": 10,
+        "radialSegments": 24,
+        "heightSegments": 1,
+        "openEnded": false
+      },
+      "materialId": "material.frame",
+      "extras": {
+        "role": "base"
+      }
+    },
+    {
+      "id": "assembly.cap",
+      "name": "Cap",
+      "type": "cone",
+      "parentId": "assembly.root",
+      "transform": {
+        "position": [0, 20, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": {
+        "radius": 9,
+        "height": 18,
+        "radialSegments": 24,
+        "heightSegments": 1,
+        "openEnded": false
+      },
+      "materialId": "material.accent",
+      "extras": {
+        "role": "cap"
+      }
+    },
+    {
+      "id": "assembly.ring",
+      "name": "Ring",
+      "type": "torus",
+      "parentId": "assembly.cap",
+      "transform": {
+        "position": [0, -7, 0],
+        "rotation": [1.5707963267948966, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "geometry": {
+        "radius": 8,
+        "tube": 1.2,
+        "radialSegments": 12,
+        "tubularSegments": 36,
+        "arc": 6.283185307179586
+      },
+      "materialId": "material.frame",
+      "extras": {
+        "role": "retaining-ring"
+      }
+    }
+  ],
+  "extras": {
+    "fixture": true,
+    "tests": ["hierarchy", "transforms", "topological-order"]
+  }
+}

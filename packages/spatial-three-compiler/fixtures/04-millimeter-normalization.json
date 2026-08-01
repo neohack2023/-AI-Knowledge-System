@@ -1,0 +1,60 @@
+{
+  "contract": "SpatialAssetBlueprint/0.1",
+  "asset": {
+    "id": "fixture.millimeter-normalization",
+    "name": "Millimeter Normalization Fixture",
+    "revision": "1"
+  },
+  "coordinateSystem": {
+    "units": "mm",
+    "upAxis": "Y",
+    "forwardAxis": "-Z",
+    "handedness": "right"
+  },
+  "materials": [
+    {
+      "id": "material.fixture-gray",
+      "name": "Fixture Gray",
+      "baseColor": "#777777",
+      "metalness": 0.25,
+      "roughness": 0.65,
+      "emissive": "#000000",
+      "opacity": 1,
+      "alphaMode": "OPAQUE",
+      "alphaCutoff": 0.5,
+      "doubleSided": false,
+      "extras": {}
+    }
+  ],
+  "nodes": [
+    {
+      "id": "normalization.root",
+      "name": "Normalized Capsule",
+      "type": "capsule",
+      "parentId": null,
+      "transform": {
+        "position": [125, 500, -250],
+        "rotation": [0.1, 0.2, 0.3],
+        "scale": [1, 1.5, 0.75]
+      },
+      "geometry": {
+        "radius": 125,
+        "length": 750,
+        "capSegments": 6,
+        "radialSegments": 12
+      },
+      "materialId": "material.fixture-gray",
+      "extras": {
+        "expectedMeters": {
+          "position": [0.125, 0.5, -0.25],
+          "radius": 0.125,
+          "length": 0.75
+        }
+      }
+    }
+  ],
+  "extras": {
+    "fixture": true,
+    "tests": ["millimeters-to-meters", "stable-semantic-id"]
+  }
+}
