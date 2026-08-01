@@ -19,5 +19,5 @@ export async function compileSpatialAsset(input, options = {}) {
 }
 
 function runtimeNodeName(componentId) {
-  return `aios_${String(componentId).replace(/[^A-Za-z0-9_.-]/g, '_')}`;
+  return `aios_${String(componentId).replace(/[^A-Za-z0-9_]/g, '_')}`;
 }
