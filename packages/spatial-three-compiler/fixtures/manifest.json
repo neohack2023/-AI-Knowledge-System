@@ -1,0 +1,25 @@
+{
+  "contract": "FrozenFixtureManifest/0.1",
+  "fixtures": [
+    {
+      "file": "01-primitive-box.json",
+      "sha256": "bb5abf1919b36506f6e76e9327abe42edccb0600a3cad7ac67dc2c215bb87980",
+      "byteLength": 1205
+    },
+    {
+      "file": "02-hierarchical-assembly.json",
+      "sha256": "73732c6cf47abfd0da5b81338deb6fcce03cb7833711b7dd7e0fcd0cd4ef8a2e",
+      "byteLength": 2894
+    },
+    {
+      "file": "03-bounded-pbr-materials.json",
+      "sha256": "4ae1366e1a7b79e203a0d4c4af716fed761360625e33ed514135d93d0942a45f",
+      "byteLength": 2410
+    },
+    {
+      "file": "04-millimeter-normalization.json",
+      "sha256": "f187d206d559b8489f482b15ab3db560932c374bd19f6b0670978c6c3cd58fc0",
+      "byteLength": 1349
+    }
+  ]
+}
