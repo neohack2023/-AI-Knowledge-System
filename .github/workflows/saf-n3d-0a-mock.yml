@@ -1,0 +1,64 @@
+name: SAF-N3D-0A Contract Mock Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      dispatch_fixture:
+        description: Repository-relative synthetic dispatch fixture
+        required: true
+        default: examples/saf-n3d-0a/positive/dispatch.mock.json
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-mock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DISPATCH_FIXTURE: ${{ inputs.dispatch_fixture }}
+    steps:
+      - name: Checkout declared repository state
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enforce bounded fixture path
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$DISPATCH_FIXTURE" in
+            examples/saf-n3d-0a/positive/*.json) ;;
+            *) echo "Dispatch fixture must stay inside examples/saf-n3d-0a/positive/"; exit 1 ;;
+          esac
+          test -f "$DISPATCH_FIXTURE"
+          test ! -L "$DISPATCH_FIXTURE"
+
+      - name: Validate contracts and frozen fixtures
+        run: node scripts/saf-n3d-0a/validate-fixtures.mjs
+
+      - name: Build deterministic process-local mock package
+        env:
+          SAF_FIXED_TIME: '2026-08-01T20:00:00Z'
+        run: node scripts/saf-n3d-0a/build-mock-run.mjs "$DISPATCH_FIXTURE" outputs/saf-n3d-0a
+
+      - name: Re-validate generated package
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { parseGlb, readJson, validateReceipt, validateValidationReport } from './scripts/saf-n3d-0a/contracts.mjs';
+          validateReceipt(await readJson('outputs/saf-n3d-0a/execution-receipt.json'));
+          validateValidationReport(await readJson('outputs/saf-n3d-0a/validation-report.json'));
+          parseGlb(await readFile('outputs/saf-n3d-0a/minimal-triangle.glb'));
+          NODE
+
+      - name: Upload non-authoritative candidate package
+        uses: actions/upload-artifact@v4
+        with:
+          name: saf-n3d-0a-${{ github.run_id }}-${{ github.run_attempt }}
+          path: outputs/saf-n3d-0a/
+          if-no-files-found: error
+          retention-days: 1

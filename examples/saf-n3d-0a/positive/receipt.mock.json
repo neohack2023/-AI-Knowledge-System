@@ -1,0 +1,98 @@
+{
+  "receipt_version": "0.1",
+  "receipt_id": "rcpt-saf-n3d-0a-exec-saf-n3d-0a-mock-001",
+  "execution_id": "exec-saf-n3d-0a-mock-001",
+  "trace_id": "0123456789abcdef0123456789abcdef",
+  "span_id": "0123456789abcdef",
+  "parent_span_id": null,
+  "scope_key": "global-working-memory",
+  "workflow_id": "spatial-asset-foundry",
+  "operation_name": "saf_n3d_0a_mock_fixture_build",
+  "operation_type": "TOOL_CALL",
+  "mode": "SIMULATION",
+  "status": "COMPLETED",
+  "started_at": "2026-08-01T20:00:00Z",
+  "completed_at": "2026-08-01T20:00:00Z",
+  "duration_ms": 0,
+  "source_refs": [
+    {
+      "source_type": "GITHUB",
+      "source_id": "env-saf-n3d-0a-fixture-001",
+      "source_uri": "repo://examples/saf-n3d-0a/gltf/minimal-triangle.gltf.json",
+      "authority_role": "EVIDENCE",
+      "content_digest": "sha256:6c0d345e6bf0274be4c441b409f3ae86ef46d5e9b4b1bfe66896f0323db28a10"
+    }
+  ],
+  "authority_decisions": [
+    {
+      "decision_id": "decision-saf-n3d-0a-non-authoritative",
+      "claim_key": "durable_write_authority",
+      "candidate_source_ids": [],
+      "selected_source_id": null,
+      "decision": "REJECTED",
+      "reason_code": "SLICE_FORBIDS_DURABLE_WRITES",
+      "policy_ref": "auth-ref:saf-n3d-0a-mock"
+    }
+  ],
+  "provider": null,
+  "model": null,
+  "token_usage": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null,
+    "availability": "UNAVAILABLE"
+  },
+  "external_effect": {
+    "effect_type": "NONE",
+    "target_type": null,
+    "target_id": null,
+    "requested": false,
+    "authorized": false,
+    "performed": false,
+    "verified": false,
+    "authorization_ref": "auth-ref:saf-n3d-0a-mock",
+    "verification_ref": null
+  },
+  "input_digest": "sha256:cf9be967bb21b6910a90a51442e9ad24d52dd1787a28c83f0957bc1bb8497766",
+  "output_digest": "sha256:cfc7c1e527997f47c01b97b2910dc7a6a0a3de5187d57456536f6dc3c87fa439",
+  "errors": [],
+  "supersedes_receipt_id": null,
+  "metadata": {
+    "schema_validation": "PASS",
+    "canonicalization": "AIOS_CANONICAL_JSON",
+    "availability_notes": [
+      "No provider, token, network, Drive, callback, Notion, registry, or durable-write operation was available in this slice."
+    ],
+    "spatial_compute": {
+      "github_run_id": null,
+      "commit_sha": "1111111111111111111111111111111111111111",
+      "run_attempt": 1,
+      "environment": {
+        "runner_os": "linux",
+        "node_version": "v22.16.0",
+        "tool_versions": {
+          "saf-contracts": "0.1"
+        }
+      },
+      "emitted_local_artifacts": [
+        {
+          "logical_name": "MOCK_GLTF_BINARY",
+          "relative_path": "minimal-triangle.glb",
+          "media_type": "model/gltf-binary",
+          "byte_length": 720,
+          "sha256_digest": "sha256:17ce7bff2490650e0bd92c62ef1cda28d321a5d5bf10bbdbb5d0093151308885",
+          "location_type": "PROCESS_LOCAL"
+        },
+        {
+          "logical_name": "VALIDATION_REPORT",
+          "relative_path": "validation-report.json",
+          "media_type": "application/json",
+          "byte_length": 2058,
+          "sha256_digest": "sha256:50df804b9e24ffca2e86f48bd84db295ec2571c5bc36b1380309aa571757902a",
+          "location_type": "PROCESS_LOCAL"
+        }
+      ],
+      "storage_state": "NOT_STAGED"
+    }
+  }
+}

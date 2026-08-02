@@ -1,0 +1,64 @@
+{
+  "contract_version": "SAF-N3D-Dispatch/0.1",
+  "workflow_version": "saf-n3d-0a",
+  "mode": "LIVE",
+  "execution_profile": "MOCK_FIXTURE",
+  "validation_profile_id": "character-neural-draft-v0.1",
+  "scope_key": "global-working-memory",
+  "execution_id": "exec-saf-n3d-0a-mock-001",
+  "trace_id": "0123456789abcdef0123456789abcdef",
+  "span_id": "0123456789abcdef",
+  "parent_execution_id": null,
+  "workflow_id": "spatial-asset-foundry",
+  "repository": {
+    "full_name": "example/aios-spatial-fixtures",
+    "base_sha": "1111111111111111111111111111111111111111",
+    "working_branch": "agent/saf-n3d-0a-contracts-fixtures"
+  },
+  "candidate_package": {
+    "candidate_id": "candidate-saf-n3d-0a-triangle",
+    "global_role": "CHARACTER_BODY",
+    "representation_family": "MESH_ASSET_DRAFT",
+    "generation_method": "MOCK_FIXTURE",
+    "blueprint_digest": "sha256:b6266bae3b73558ea71728c795eda45f1a01a86b1913b8d4dd5b5bdfa3df4871",
+    "subtype_extensions": {
+      "fixture": "minimal-triangle",
+      "identity_critical": true
+    }
+  },
+  "sources": [
+    {
+      "source_type": "REPOSITORY_FIXTURE",
+      "logical_uri": "repo://examples/saf-n3d-0a/gltf/minimal-triangle.gltf.json",
+      "temporary_fetch_url": null,
+      "fetch_url_expires_at": null,
+      "digest": "sha256:6c0d345e6bf0274be4c441b409f3ae86ef46d5e9b4b1bfe66896f0323db28a10",
+      "provenance_envelope_id": "env-saf-n3d-0a-fixture-001"
+    }
+  ],
+  "authorization": {
+    "authorization_ref": "auth-ref:saf-n3d-0a-mock",
+    "issued_at": "2026-08-01T20:00:00Z",
+    "expires_at": "2027-08-01T20:00:00Z",
+    "issued_for_execution_id": "exec-saf-n3d-0a-mock-001",
+    "scope_key": "global-working-memory",
+    "repository_full_name": "example/aios-spatial-fixtures",
+    "base_sha": "1111111111111111111111111111111111111111",
+    "allowed_effects": [
+      "READ_SOURCE",
+      "EXECUTE_BUILD",
+      "CREATE_ACTIONS_ARTIFACT",
+      "EMIT_RECEIPT"
+    ],
+    "forbidden_effects": [
+      "MUTATE_NOTION",
+      "WRITE_GOOGLE_DRIVE",
+      "REGISTER_ASSET",
+      "PROMOTE_CANON",
+      "MERGE_DEFAULT_BRANCH",
+      "INVOKE_NEURAL_PROVIDER",
+      "SEND_CALLBACK"
+    ],
+    "authorization_digest": "sha256:8592670e7af8a2761f937efd408501a51ad46d9f8b4ca7a2bd47e3e24ed6b616"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "contract": "SAFNegativeFixtureManifest/0.1",
+  "fixtures": [
+    {
+      "file": "dispatch-missing-mode.json",
+      "validator_fixture": "dispatch.mock.json",
+      "expected_error_code": "MISSING_FIELD"
+    },
+    {
+      "file": "dispatch-auth-binding-mismatch.json",
+      "validator_fixture": "dispatch.mock.json",
+      "expected_error_code": "AUTHORIZATION_BINDING_MISMATCH"
+    },
+    {
+      "file": "dispatch-mock-live.json",
+      "validator_fixture": "dispatch.mock.json",
+      "expected_error_code": "MOCK_REQUIRES_SIMULATION"
+    },
+    {
+      "file": "receipt-failed-without-error.json",
+      "validator_fixture": "receipt.mock.json",
+      "expected_error_code": "FAILED_RECEIPT_REQUIRES_ERROR"
+    },
+    {
+      "file": "validation-premature-acceptance.json",
+      "validator_fixture": "validation-report.mock.json",
+      "expected_error_code": "PREMATURE_ACCEPTANCE"
+    }
+  ]
+}
