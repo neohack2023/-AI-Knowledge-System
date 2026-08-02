@@ -10,6 +10,10 @@ const MAX_ESTIMATED_VERTICES = 1_000_000;
 const MAX_ESTIMATED_INDICES = 6_000_000;
 
 export async function compileSpatialAsset(input, options = {}) {
+  return compileInternal(prepareSpatialInput(input), options);
+}
+
+export function prepareSpatialInput(input) {
   const prepared = structuredClone(input);
   preflightSpatialInput(prepared);
 
@@ -22,7 +26,7 @@ export async function compileSpatialAsset(input, options = {}) {
     }
   }
 
-  return compileInternal(prepared, options);
+  return prepared;
 }
 
 export function preflightSpatialInput(input) {
