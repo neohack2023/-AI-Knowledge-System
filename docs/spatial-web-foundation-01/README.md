@@ -4,12 +4,13 @@ Status: `CONTRACT_READY / NO_CANON_PROMOTION`
 Scope: `global-working-memory`
 Lane ID: `research:spatial-web-systems`
 Memory namespace: `memory:spatial-web-systems`
+Contract version: `0.2.0`
 
 ## Objective
 
 Establish a reusable research lane and governed memory contract for web applications that use three-dimensional graphics, real-time rendering, GPU compute, spatial interfaces, simulations, games, editors, configurators, and interactive visualization.
 
-This slice defines contracts only. It does not promote technical doctrine, mutate project canon, activate runtime handlers, perform provider calls, store binary assets, or authorize writes to authoritative project branches.
+The foundation remains Candidate. It does not promote technical doctrine, mutate project canon, activate runtime handlers, perform provider calls, store binary assets, or authorize writes to authoritative project branches.
 
 ## Authority boundaries
 
@@ -18,6 +19,7 @@ This slice defines contracts only. It does not promote technical doctrine, mutat
 - GitHub owns live repository implementation facts.
 - Research findings are `NON_AUTHORITATIVE` until separately processed through STONE and an authorized MASON transition.
 - A project-specific renderer, framework, asset, performance, or deployment decision remains inside that project's registered branch.
+- Live provider identifiers and cross-system receipts remain outside the public repository tree.
 
 ## Lane structure
 
@@ -71,10 +73,13 @@ SPATIAL_WEB_SYSTEMS/
 3. Spatial Memory Card schema: `schemas/spatial-web-contracts.schema.yaml`.
 4. Engine Profile schema: `schemas/spatial-web-contracts.schema.yaml`.
 5. Experiment Record schema: `schemas/spatial-web-contracts.schema.yaml`.
-6. Core retrieval packet: `packets/spatial-web-core-retrieval-packet.yaml`.
-7. Candidate skill specifications: `skills/spatial-web-candidate-skills.yaml`.
-8. Five fixture records: `fixtures/spatial-web-foundation-fixtures.yaml`.
-9. Promotion and sibling-isolation tests: `tests/spatial-web-promotion-isolation-tests.md`.
+6. Core retrieval packet: `docs/spatial-web-foundation-01/retrieval-packet.yaml`.
+7. Candidate skill specifications: `docs/spatial-web-foundation-01/candidate-skills.yaml`.
+8. Five fixture records: `docs/spatial-web-foundation-01/fixtures.yaml`.
+9. Promotion and sibling-isolation contract tests: `tests/spatial-web-promotion-isolation-tests.md`.
+10. Executable record validators: `server/spatial-web/validator.ts`.
+11. Deterministic packet assembler: `server/spatial-web/packet-assembler.ts`.
+12. Executable regression tests: `tests/spatial-web-contracts.test.ts`.
 
 ## Contract laws
 
@@ -86,6 +91,7 @@ SPATIAL_WEB_SYSTEMS/
 6. `CANDIDATE_SKILL != ACTIVE_CAPABILITY`.
 7. `TECHNICAL_PASS != CANON_PROMOTION`.
 8. `SOURCE != AUTHORITY != CONFIDENCE`.
+9. `RECEIPT_ID != VERIFIED_PROMOTION_AUTHORIZATION`.
 
 ## Retrieval levels
 
@@ -93,7 +99,28 @@ SPATIAL_WEB_SYSTEMS/
 - **L1 Operational:** rule or observation, conditions, exceptions, failure symptoms, evidence summary, and recommended next action.
 - **L2 Evidence:** source records, benchmarks, repository implementation, experiment receipts, and validation artifacts.
 
-Expansion is deterministic and monotonic. Opening L1 or L2 may reveal more detail, but cannot silently change scope, authority, epistemic type, promotion state, or destination rights.
+Expansion is deterministic and monotonic. Opening L1 or L2 may reveal more detail, but cannot silently change scope, authority, epistemic type, promotion state, or destination rights. L2 requires one of the explicitly registered expansion reasons.
+
+## Executable validation boundary
+
+The Candidate validator can:
+
+- validate research indexes, memory cards, engine profiles, and experiment records;
+- reject embedded data URIs, blob URLs, and raw base64 payloads;
+- require review triggers for version-sensitive records;
+- require independent MASON receipt resolution and exact binding before a memory card passes;
+- preserve explicit project scope for experiment evidence;
+- assemble deterministic L0/L1/L2 packet selections and fingerprints;
+- reject unrequested sibling scopes.
+
+It cannot:
+
+- retrieve from Notion or Drive;
+- write to any external destination;
+- execute STONE or MASON;
+- activate candidate skills;
+- register a runtime handler;
+- promote memory or canon.
 
 ## Explicit exclusions
 
