@@ -60,16 +60,18 @@ const validateDescriptor = (descriptor: SpatialReadAdapterDescriptor) => {
       "Read adapters cannot declare network, mutation, promotion, execution, secret, or side-effect access.",
     );
   }
-  if (!Array.isArray(descriptor.source_systems) || descriptor.source_systems.length === 0) {
+  const sourceSystems = descriptor.source_systems.map((source) => source.trim()).filter(Boolean);
+  if (sourceSystems.length === 0 || new Set(sourceSystems).size !== sourceSystems.length) {
     throw new SpatialReadAdapterContractError(
       "INVALID_ADAPTER_DESCRIPTOR",
       "descriptor.source_systems",
-      "At least one declared source system is required.",
+      "Declared source systems must be non-empty and unique.",
     );
   }
   const operations = new Set(descriptor.operations);
   if (
-    operations.size !== spatialReadOperations.length
+    descriptor.operations.length !== spatialReadOperations.length
+    || operations.size !== spatialReadOperations.length
     || spatialReadOperations.some((operation) => !operations.has(operation))
   ) {
     throw new SpatialReadAdapterContractError(
@@ -92,10 +94,39 @@ const recordIdentity = (
   }
 };
 
+const expectedRecordMetadata = (
+  kind: SpatialReadRecordKind,
+  record: ResearchIndexRecord | EngineProfileRecord | ExperimentRecord | MasonPromotionReceipt,
+) => {
+  switch (kind) {
+    case "RESEARCH_INDEX":
+      return {
+        authority_state: (record as ResearchIndexRecord).authority_state,
+        epistemic_type: (record as ResearchIndexRecord).epistemic_type,
+      };
+    case "ENGINE_PROFILE":
+      return {
+        authority_state: (record as EngineProfileRecord).authority_state,
+        epistemic_type: (record as EngineProfileRecord).epistemic_type,
+      };
+    case "EXPERIMENT_RECORD":
+      return {
+        authority_state: (record as ExperimentRecord).authority_state,
+        epistemic_type: (record as ExperimentRecord).epistemic_type,
+      };
+    case "MASON_PROMOTION_RECEIPT":
+      return {
+        authority_state: "AUTHORITATIVE" as const,
+        epistemic_type: "VERIFICATION" as const,
+      };
+  }
+};
+
 const validateEnvelope = <T extends ResearchIndexRecord | EngineProfileRecord | ExperimentRecord | MasonPromotionReceipt>(
   envelope: ReadSourceEnvelope<T>,
   expectedKind: SpatialReadRecordKind,
   path: string,
+  allowedSourceSystems: ReadonlySet<string>,
 ) => {
   if (envelope.record_kind !== expectedKind) {
     throw new SpatialReadAdapterContractError(
@@ -129,11 +160,26 @@ const validateEnvelope = <T extends ResearchIndexRecord | EngineProfileRecord | 
       "Envelope provenance requires a SHA-256 fingerprint and allowed durable source locator.",
     );
   }
-  if (!nonEmptyString(envelope.source_system) || Number.isNaN(Date.parse(envelope.captured_at))) {
+  if (
+    !nonEmptyString(envelope.source_system)
+    || !allowedSourceSystems.has(envelope.source_system)
+    || Number.isNaN(Date.parse(envelope.captured_at))
+  ) {
     throw new SpatialReadAdapterContractError(
       "INVALID_ADAPTER_DESCRIPTOR",
       path,
-      "Envelope source system and capture timestamp are required.",
+      "Envelope source system must be declared by the adapter and include a valid capture timestamp.",
+    );
+  }
+  const expectedMetadata = expectedRecordMetadata(expectedKind, envelope.record);
+  if (
+    envelope.authority_state !== expectedMetadata.authority_state
+    || envelope.epistemic_type !== expectedMetadata.epistemic_type
+  ) {
+    throw new SpatialReadAdapterContractError(
+      "ENVELOPE_KIND_MISMATCH",
+      path,
+      "Envelope authority and epistemic metadata must match the enclosed record class.",
     );
   }
   if (envelope.immutable !== true) {
@@ -149,10 +195,11 @@ const buildMap = <T extends ResearchIndexRecord | EngineProfileRecord | Experime
   records: readonly ReadSourceEnvelope<T>[],
   kind: SpatialReadRecordKind,
   path: string,
+  allowedSourceSystems: ReadonlySet<string>,
 ) => {
   const map = new Map<string, ReadSourceEnvelope<T>>();
   records.forEach((envelope, index) => {
-    validateEnvelope(envelope, kind, `${path}[${index}]`);
+    validateEnvelope(envelope, kind, `${path}[${index}]`, allowedSourceSystems);
     if (map.has(envelope.record_id)) {
       throw new SpatialReadAdapterContractError(
         "DUPLICATE_RECORD_ID",
@@ -188,10 +235,11 @@ export class ImmutableSpatialSnapshotReadAdapter implements SpatialReadPorts {
   constructor(snapshot: SpatialAdapterSnapshot) {
     validateDescriptor(snapshot.descriptor);
     this.descriptor = cloneFrozen(snapshot.descriptor) as SpatialReadAdapterDescriptor;
-    this.#researchRecords = buildMap(snapshot.research_records, "RESEARCH_INDEX", "research_records");
-    this.#engineProfiles = buildMap(snapshot.engine_profiles, "ENGINE_PROFILE", "engine_profiles");
-    this.#experimentRecords = buildMap(snapshot.experiment_records, "EXPERIMENT_RECORD", "experiment_records");
-    this.#masonReceipts = buildMap(snapshot.mason_receipts, "MASON_PROMOTION_RECEIPT", "mason_receipts");
+    const allowedSourceSystems = new Set(this.descriptor.source_systems);
+    this.#researchRecords = buildMap(snapshot.research_records, "RESEARCH_INDEX", "research_records", allowedSourceSystems);
+    this.#engineProfiles = buildMap(snapshot.engine_profiles, "ENGINE_PROFILE", "engine_profiles", allowedSourceSystems);
+    this.#experimentRecords = buildMap(snapshot.experiment_records, "EXPERIMENT_RECORD", "experiment_records", allowedSourceSystems);
+    this.#masonReceipts = buildMap(snapshot.mason_receipts, "MASON_PROMOTION_RECEIPT", "mason_receipts", allowedSourceSystems);
   }
 
   async readResearchById(id: string): Promise<SpatialReadResult<ResearchIndexRecord>> {
