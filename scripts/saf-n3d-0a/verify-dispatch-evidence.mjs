@@ -22,7 +22,7 @@ for (const source of dispatch.sources) {
   if (!resolved.startsWith(`${root}${path.sep}`)) throw new Error('SOURCE_ESCAPES_REPOSITORY');
   const stat = await lstat(resolved);
   if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('SOURCE_NOT_REGULAR_FILE');
-  const observed = `sha256:${sha256(await readFile(resolved))}`;
+  const observed = sha256(await readFile(resolved));
   if (observed !== source.digest) throw new Error(`SOURCE_DIGEST_MISMATCH:${relative}`);
 }
 
