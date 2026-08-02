@@ -2,11 +2,12 @@ export function evaluateSpatialValidation(profile, report) {
   const blockers = [];
   const warnings = [];
 
-  if (!profile.applies_to.roles.includes(report.components[0]?.role)) warnings.push('PROFILE_ROLE_REVIEW');
+  if (report.validation_profile_id !== profile.profile_id) blockers.push('VALIDATION_PROFILE_ID_MISMATCH');
   if (!profile.applies_to.representations.includes(report.representation_family)) blockers.push('PROFILE_REPRESENTATION_MISMATCH');
   if (report.components.length > profile.geometry_rules.max_components) blockers.push('MAX_COMPONENTS_EXCEEDED');
 
   for (const component of report.components) {
+    if (!profile.applies_to.roles.includes(component.role)) warnings.push(`PROFILE_ROLE_REVIEW:${component.component_id}`);
     if (component.units !== profile.geometry_rules.units) blockers.push(`UNITS_MISMATCH:${component.component_id}`);
     if (component.coordinate_system !== profile.geometry_rules.coordinate_system) blockers.push(`COORDINATE_SYSTEM_MISMATCH:${component.component_id}`);
     if (component.vertex_count > profile.geometry_rules.max_vertices) blockers.push(`MAX_VERTICES_EXCEEDED:${component.component_id}`);
@@ -28,6 +29,10 @@ export function evaluateSpatialValidation(profile, report) {
   if (uvRequirement === 'REQUIRED' && !report.materials.uv_present) blockers.push('UV_REQUIRED');
   if (report.materials.uv_overlap_result === 'FAIL') blockers.push('UV_OVERLAP_FAILED');
   if (report.materials.translation_loss.length > 0) warnings.push('MATERIAL_TRANSLATION_LOSS');
+  const allowedChannels = new Set(profile.material_rules.allowed_channels);
+  for (const channel of report.materials.channels_present) {
+    if (!allowedChannels.has(channel)) blockers.push(`MATERIAL_CHANNEL_NOT_ALLOWED:${channel}`);
+  }
 
   if (profile.rig_rules.requirement === 'REQUIRED' && report.rig.state !== 'PASS') blockers.push('RIG_REQUIRED');
   if (report.rig.state === 'FAIL') blockers.push('RIG_FAILED');
@@ -58,6 +63,9 @@ export function evaluateSpatialValidation(profile, report) {
 
 export function assertDerivedValidation(profile, report) {
   const derived = evaluateSpatialValidation(profile, report);
+  if (report.validation_profile_id !== profile.profile_id) {
+    throw new Error(`VALIDATION_PROFILE_ID_MISMATCH: report ${report.validation_profile_id}, profile ${profile.profile_id}`);
+  }
   if (report.technical_outcome !== derived.technical_outcome) {
     throw new Error(`TECHNICAL_OUTCOME_MISMATCH: declared ${report.technical_outcome}, derived ${derived.technical_outcome}`);
   }
