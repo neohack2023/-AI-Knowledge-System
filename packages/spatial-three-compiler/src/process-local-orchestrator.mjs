@@ -8,6 +8,7 @@ import {
 } from '../../../scripts/saf-n3d-0a/validation-contract.mjs';
 import { canonicalJson, normalizeBlueprint } from './core.mjs';
 import { compileSpatialAsset, prepareSpatialInput } from './index.mjs';
+import { projectScene } from './three-adapter.mjs';
 
 const REQUIRED_ALLOWED_EFFECTS = new Set([
   'READ_SOURCE',
@@ -83,6 +84,7 @@ export async function runProcessLocalSpatialOrchestration({
   });
   validateValidationReport(validationReport);
   assertReportBinding(dispatch, validationProfile, validationReport);
+  assertCompilerObservations(compiled, normalizedInput, validationReport);
 
   if (validationReport.acceptance.state !== 'PENDING') {
     throw new SpatialOrchestrationError('ORCHESTRATOR_CANNOT_ACCEPT', 'Process-local orchestration cannot assign candidate acceptance.');
@@ -175,6 +177,63 @@ function assertReportBinding(dispatch, validationProfile, validationReport) {
   }
 }
 
+function assertCompilerObservations(compiled, normalizedInput, validationReport) {
+  if (!compiled?.scene) {
+    throw new SpatialOrchestrationError('COMPILER_OBSERVATIONS_REQUIRED', 'Compiler result must include its process-local scene for independent observation.');
+  }
+
+  const projection = projectScene(compiled.scene, normalizedInput.blueprint.asset.id);
+  const observedComponents = projection.nodes.filter((node) => node.geometry !== null);
+  const reportedComponents = new Map(validationReport.components.map((component) => [component.component_id, component]));
+
+  if (reportedComponents.size !== validationReport.components.length ||
+      observedComponents.length !== validationReport.components.length) {
+    throw new SpatialOrchestrationError('COMPILER_OBSERVATION_MISMATCH', 'Reported component set does not match compiler-observed mesh components.');
+  }
+
+  for (const observed of observedComponents) {
+    const reported = reportedComponents.get(observed.id);
+    if (!reported) {
+      throw new SpatialOrchestrationError('COMPILER_OBSERVATION_MISMATCH', `Missing report component for compiler-observed ${observed.id}.`);
+    }
+
+    const observedFaces = observed.geometry.indexCount > 0
+      ? observed.geometry.indexCount / 3
+      : observed.geometry.positionCount / 3;
+    const observedDimensions = observed.geometry.bounds.max.map(
+      (maximum, index) => maximum - observed.geometry.bounds.min[index],
+    );
+
+    if (!Number.isInteger(observedFaces) ||
+        reported.vertex_count !== observed.geometry.positionCount ||
+        reported.face_count !== observedFaces ||
+        !vectorsClose(reported.dimensions, observedDimensions)) {
+      throw new SpatialOrchestrationError(
+        'COMPILER_OBSERVATION_MISMATCH',
+        `Geometry observations for ${observed.id} do not match the compiler scene projection.`,
+      );
+    }
+  }
+
+  if (!Array.isArray(compiled.validation) || !Array.isArray(compiled.roundTrip)) {
+    throw new SpatialOrchestrationError('COMPILER_OBSERVATIONS_REQUIRED', 'Compiler result must include validation and round-trip evidence.');
+  }
+
+  const observedExport = compiled.validation.every((entry) => entry.errorCount === 0) ? 'PASS' : 'FAIL';
+  const observedReimport = compiled.roundTrip.every((entry) => entry.equal === true) ? 'PASS' : 'FAIL';
+  const observedStructuralMatch = compiled.roundTrip.every((entry) => entry.equal === true);
+
+  if (validationReport.export_reimport.export_result !== observedExport ||
+      validationReport.export_reimport.reimport_result !== observedReimport ||
+      (validationReport.export_reimport.structural_digest_match !== undefined &&
+        validationReport.export_reimport.structural_digest_match !== observedStructuralMatch)) {
+    throw new SpatialOrchestrationError(
+      'COMPILER_OBSERVATION_MISMATCH',
+      'Reported export/reimport evidence does not match compiler validation and round-trip observations.',
+    );
+  }
+}
+
 function assertExecutionRevision(value) {
   if (!value || typeof value !== 'object') {
     throw new SpatialOrchestrationError('EXECUTION_REVISION_REQUIRED', 'Actual executing revision metadata is required.');
@@ -226,6 +285,7 @@ function buildReceipt({
       'NO_EXTERNAL_EFFECT',
       'NO_DURABLE_STAGING',
       'ACCEPTANCE_REMAINS_PENDING',
+      'COMPILER_OBSERVATIONS_BOUND',
       'EXECUTION_REVISION_SEPARATE_FROM_FIXTURE_SUBJECT',
     ],
     provider: null,
@@ -269,6 +329,11 @@ function buildReceipt({
       },
     },
   };
+}
+
+function vectorsClose(left, right) {
+  return Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+    left.every((value, index) => Math.abs(value - right[index]) <= 1e-9);
 }
 
 function trustedDate(value, code) {
