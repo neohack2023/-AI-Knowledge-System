@@ -14,10 +14,14 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
 const exampleRoot = path.join(repoRoot, 'examples/saf-n3d-0a');
 
 test('positive SAF-N3D-0A fixtures satisfy bounded contracts', async () => {
-  validateDispatch(await readJson(path.join(exampleRoot, 'positive/dispatch.mock.json')));
-  validateReceipt(await readJson(path.join(exampleRoot, 'positive/receipt.mock.json'));
-  validateValidationProfile(await readJson(path.join(exampleRoot, 'positive/validation-profile.character.json')));
-  validateValidationReport(await readJson(path.join(exampleRoot, 'positive/validation-report.mock.json')));
+  const dispatch = await readJson(path.join(exampleRoot, 'positive/dispatch.mock.json'));
+  const receipt = await readJson(path.join(exampleRoot, 'positive/receipt.mock.json'));
+  const profile = await readJson(path.join(exampleRoot, 'positive/validation-profile.character.json'));
+  const report = await readJson(path.join(exampleRoot, 'positive/validation-report.mock.json'));
+  validateDispatch(dispatch);
+  validateReceipt(receipt);
+  validateValidationProfile(profile);
+  validateValidationReport(report);
 });
 
 test('negative fixtures fail with their declared reason codes', async () => {
@@ -74,8 +78,10 @@ test('mock runner emits process-local artifacts, receipt, and validation without
       env: { ...process.env, SAF_FIXED_TIME: '2026-08-01T20:00:00Z' },
     });
     assert.equal(result.status, 0, result.stderr);
-    const receipt = validateReceipt(await readJson(path.join(temp, 'execution-receipt.json')));
-    const report = validateValidationReport(await readJson(path.join(temp, 'validation-report.json')));
+    const receiptValue = await readJson(path.join(temp, 'execution-receipt.json'));
+    const reportValue = await readJson(path.join(temp, 'validation-report.json'));
+    const receipt = validateReceipt(receiptValue);
+    const report = validateValidationReport(reportValue);
     const glb = await readFile(path.join(temp, 'minimal-triangle.glb'));
     parseGlb(glb);
     assert.equal(receipt.external_effect.effect_type, 'NONE');
