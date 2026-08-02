@@ -12,6 +12,8 @@ import {
 const root = path.resolve(import.meta.dirname, '..');
 const examples = path.join(root, 'examples/saf-n3d-0a/positive');
 const schemas = path.join(root, 'schemas/saf-n3d-0a');
+const validationReportSchema = await readJson(path.join(schemas, 'validation-report.schema.json'));
+const receiptSchema = await readJson(path.join(schemas, 'execution-receipt-spatial.schema.json'));
 
 test('published JSON Schemas execute against every positive fixture', async () => {
   const pairs = [
@@ -30,12 +32,19 @@ test('schema gate catches structure accepted by the handwritten semantic validat
   report.components[0].undeclared_field = true;
   validateValidationReport(report);
   assert.throws(
-    () => validateSchemaDocument(awaitableSchema, report),
+    () => validateSchemaDocument(validationReportSchema, report),
     (error) => error instanceof SchemaValidationError && error.keyword === 'additionalProperties',
   );
 });
 
-const awaitableSchema = await readJson(path.join(schemas, 'validation-report.schema.json'));
+test('schema-valued additionalProperties validates each undeclared value', async () => {
+  const receipt = structuredClone(await readJson(path.join(examples, 'receipt.mock.json')));
+  receipt.metadata.spatial_compute.environment.tool_versions['bad-tool'] = 42;
+  assert.throws(
+    () => validateSchemaDocument(receiptSchema, receipt),
+    (error) => error instanceof SchemaValidationError && error.keyword === 'type',
+  );
+});
 
 test('technical outcome is derived from profile observations', async () => {
   const profile = await readJson(path.join(examples, 'validation-profile.character.json'));
@@ -52,6 +61,23 @@ test('technical outcome is derived from profile observations', async () => {
   assert.equal(failed.technical_outcome, 'FAIL');
   assert.ok(failed.blockers.some((code) => code.startsWith('MAX_VERTICES_EXCEEDED')));
   assert.throws(() => assertDerivedValidation(profile, invalid), /TECHNICAL_OUTCOME_MISMATCH/);
+});
+
+test('validation profile identity and material channels are enforced', async () => {
+  const profile = await readJson(path.join(examples, 'validation-profile.character.json'));
+  const report = await readJson(path.join(examples, 'validation-report.mock.json'));
+
+  const wrongProfile = structuredClone(report);
+  wrongProfile.validation_profile_id = 'different-profile-v0.1';
+  assert.throws(() => assertDerivedValidation(profile, wrongProfile), /VALIDATION_PROFILE_ID_MISMATCH/);
+
+  const forbiddenChannel = structuredClone(report);
+  forbiddenChannel.materials.channels_present = ['BASE_COLOR'];
+  const restrictedProfile = structuredClone(profile);
+  restrictedProfile.material_rules.allowed_channels = [];
+  const derived = evaluateSpatialValidation(restrictedProfile, forbiddenChannel);
+  assert.equal(derived.technical_outcome, 'FAIL');
+  assert.ok(derived.blockers.includes('MATERIAL_CHANNEL_NOT_ALLOWED:BASE_COLOR'));
 });
 
 test('dispatch evidence verifier checks source bytes and authorization time', async () => {
@@ -85,7 +111,7 @@ test('dispatch evidence verifier checks source bytes and authorization time', as
   }
 });
 
-test('generated package verifier rejects self-declared outcome drift', async () => {
+test('generated package verifier rejects report bytes that drift from the receipt', async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'saf-package-'));
   try {
     const build = spawnSync(process.execPath, [
@@ -100,13 +126,13 @@ test('generated package verifier rejects self-declared outcome drift', async () 
     assert.equal(build.status, 0, build.stderr);
     const reportPath = path.join(temp, 'validation-report.json');
     const report = JSON.parse(await readFile(reportPath, 'utf8'));
-    report.technical_outcome = 'PASS';
+    report.human_review.evidence_refs.push('tampered-evidence');
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
     const verify = spawnSync(process.execPath, [
       path.join(root, 'scripts/saf-n3d-0a/verify-generated-package.mjs'), temp,
     ], { cwd: root, encoding: 'utf8' });
     assert.notEqual(verify.status, 0);
-    assert.match(verify.stderr, /TECHNICAL_OUTCOME_MISMATCH/);
+    assert.match(verify.stderr, /ARTIFACT_DIGEST_MISMATCH:VALIDATION_REPORT/);
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
