@@ -43,6 +43,11 @@ jobs:
       - name: Validate schemas, contracts, and frozen fixtures
         run: node scripts/saf-n3d-0a/validate-fixtures.mjs
 
+      - name: Verify authorization time and source evidence
+        env:
+          SAF_TRUSTED_NOW: '2026-08-02T00:00:00Z'
+        run: node scripts/saf-n3d-0a/verify-dispatch-evidence.mjs "$DISPATCH_FIXTURE"
+
       - name: Build deterministic process-local mock package
         env:
           SAF_FIXED_TIME: '2026-08-01T20:00:00Z'
