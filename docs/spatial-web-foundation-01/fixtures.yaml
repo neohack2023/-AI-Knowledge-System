@@ -1,0 +1,230 @@
+fixture_bundle: SPATIAL_WEB_FOUNDATION_01
+fixture_version: 0.2.0
+all_records_are_synthetic: true
+canon_status: NONE
+
+fixtures:
+  - fixture_id: fixture-01-research-index
+    fixture_type: research_index
+    expected_validation: PASS
+    record:
+      research_id: swr-renderer-selection-example
+      title: Renderer selection evidence packet for a browser configurator
+      summary: Synthetic candidate research record used to validate routing and non-promotion behavior.
+      research_track: ENGINE_COMPARISONS
+      scope_key: global-working-memory
+      applicable_project_scopes: [project:example-configurator]
+      lifecycle_state: RESEARCH_PENDING
+      authority_state: NON_AUTHORITATIVE
+      epistemic_type: CLAIM
+      disclosure:
+        l0: Compare eligible rendering stacks after application classification.
+        l1_ref: fixture://renderer-selection-operational
+        l2_refs: [fixture://source-a, fixture://source-b]
+      source_refs:
+        - source_system: FIXTURE
+          source_id: synthetic-renderer-source-a
+          source_version: '0.2'
+          source_fingerprint: sha256:fixture-source-a
+          source_url: null
+          retrieved_at: '2026-08-02T04:50:00Z'
+      version_context:
+        engine: null
+        engine_version: null
+        browser: null
+        browser_version: null
+        web_api: null
+        web_api_version: null
+        operating_system: null
+        gpu: null
+        backend: null
+      review_triggers:
+        - trigger_type: PROJECT_CONSTRAINT_CHANGE
+          condition: Re-evaluate when device, browser, team, or fidelity constraints change.
+          review_after: null
+      related_asset_refs: []
+      promotion_state: NOT_EVALUATED
+      promoted_memory_id: null
+
+  - fixture_id: fixture-02-versioned-research
+    fixture_type: research_index
+    expected_validation: PASS
+    record:
+      research_id: swr-webgpu-support-example
+      title: Version-sensitive WebGPU compatibility observation
+      summary: Synthetic observation proving that version-bound research requires explicit review triggers.
+      research_track: DEPLOYMENT_AND_COMPATIBILITY
+      scope_key: global-working-memory
+      applicable_project_scopes: [project:example-observatory]
+      lifecycle_state: CANDIDATE
+      authority_state: NON_AUTHORITATIVE
+      epistemic_type: OBSERVATION
+      disclosure:
+        l0: Compatibility observation bound to a recorded browser, GPU, and backend environment.
+        l1_ref: fixture://webgpu-compatibility-operational
+        l2_refs: [fixture://webgpu-experiment]
+      source_refs:
+        - source_system: FIXTURE
+          source_id: synthetic-webgpu-observation
+          source_version: '0.2'
+          source_fingerprint: sha256:fixture-webgpu
+          source_url: null
+          retrieved_at: '2026-08-02T04:50:00Z'
+      version_context:
+        engine: ExampleEngine
+        engine_version: 1.0.0-fixture
+        browser: ExampleBrowser
+        browser_version: 100.0-fixture
+        web_api: WebGPU
+        web_api_version: fixture-snapshot
+        operating_system: ExampleOS
+        gpu: ExampleGPU
+        backend: WebGPU
+      review_triggers:
+        - trigger_type: BROWSER_SUPPORT_CHANGE
+          condition: Browser support matrix or implementation behavior changes.
+          review_after: null
+        - trigger_type: ENGINE_MAJOR_VERSION_CHANGE
+          condition: ExampleEngine reaches a new major version.
+          review_after: null
+        - trigger_type: MANUAL_REVIEW_DATE
+          condition: Scheduled expiry for a compatibility observation.
+          review_after: '2026-11-01'
+      related_asset_refs: []
+      promotion_state: NOT_EVALUATED
+      promoted_memory_id: null
+
+  - fixture_id: fixture-03-engine-profile
+    fixture_type: engine_profile
+    expected_validation: PASS
+    record:
+      profile_id: swep-example-engine
+      engine_name: ExampleEngine
+      engine_version_range: 1.x-fixture
+      profile_version: 0.2.0
+      lifecycle_state: RESEARCH_PENDING
+      authority_state: NON_AUTHORITATIVE
+      epistemic_type: CLAIM
+      stack_type: ENGINE
+      capability_claims:
+        - claim: Supports a fixture WebGL backend.
+          evidence_state: UNVERIFIED
+          evidence_refs: [fixture://example-engine-claim-1]
+        - claim: Provides a fixture WebGPU pathway.
+          evidence_state: UNVERIFIED
+          evidence_refs: [fixture://example-engine-claim-2]
+      compatibility:
+        rendering_backends: [WebGL2-fixture, WebGPU-fixture]
+        browser_targets: [ExampleBrowser]
+        device_classes: [desktop-fixture, mobile-fixture]
+        fallbacks: [WebGL2-fixture]
+        known_constraints: [No capability claim is authoritative in this fixture.]
+      selection_signals:
+        favorable_when: [A project fixture explicitly requires the listed capabilities.]
+        unfavorable_when: [The project constraints have not been classified.]
+        requires_project_decision: true
+      global_preferred: false
+      evidence_refs: [fixture://example-engine-profile-source]
+      review_triggers:
+        - trigger_type: ENGINE_MAJOR_VERSION_CHANGE
+          condition: Rebuild the profile on a major-version change.
+          review_after: null
+        - trigger_type: SOURCE_SUPERSEDED
+          condition: Rebuild when the profile evidence is superseded.
+          review_after: null
+
+  - fixture_id: fixture-04-experiment-record
+    fixture_type: experiment_record
+    expected_validation: PASS
+    record:
+      experiment_id: swx-frame-time-fixture
+      hypothesis: A synthetic instancing configuration reduces fixture draw submissions under controlled conditions.
+      scope_key: global-working-memory
+      project_scope: project:example-observatory
+      execution_mode: SIMULATION
+      authority_state: NON_AUTHORITATIVE
+      epistemic_type: ACTION_RESULT
+      environment:
+        timestamp: '2026-08-02T04:50:00Z'
+        browser: ExampleBrowser
+        browser_version: 100.0-fixture
+        operating_system: ExampleOS
+        device_class: desktop-fixture
+        gpu: ExampleGPU
+        driver: fixture-driver
+        backend: WebGL2-fixture
+        engine: ExampleEngine
+        engine_version: 1.0.0-fixture
+        application_commit: fixture-commit
+      controlled_inputs:
+        scene_entities: 1000
+        fixture_mode: true
+      procedure:
+        - Load the deterministic synthetic scene.
+        - Run the non-instanced fixture pass.
+        - Run the instanced fixture pass.
+        - Record the synthetic action results.
+      observations:
+        - metric_or_event: draw_submission_count_before
+          value: 1000
+          unit: fixture-count
+          epistemic_type: ACTION_RESULT
+        - metric_or_event: draw_submission_count_after
+          value: 10
+          unit: fixture-count
+          epistemic_type: ACTION_RESULT
+      outcome: SUPPORTED
+      limitations:
+        - Synthetic fixture only.
+        - No real browser, GPU, engine, or project outcome is claimed.
+        - This record cannot produce a memory card.
+      artifact_refs: [execution:deterministic-scene, execution:synthetic-log]
+      execution_receipt_id: execution:receipt:swx-frame-time
+      follow_up:
+        - Repeat through a separately authorized real experiment before considering STONE intake.
+      promotion_state: NOT_EVALUATED
+
+  - fixture_id: fixture-05-forbidden-memory-promotion
+    fixture_type: spatial_memory_card
+    expected_validation: FAIL
+    expected_error_codes:
+      - MISSING_MASON_PROMOTION_RECEIPT
+      - UNAUTHORIZED_RESEARCH_TO_MEMORY_TRANSITION
+    record:
+      memory_id: swm-invalid-direct-promotion
+      title: Invalid direct promotion from one synthetic experiment
+      memory_class: PERFORMANCE_DOCTRINE
+      scope_key: global-working-memory
+      authority_state: AUTHORITATIVE
+      epistemic_type: DURABLE_FACT
+      applicability:
+        engines: [ExampleEngine]
+        backends: [WebGL2-fixture]
+        project_classes: [fixture]
+        trigger_conditions: [Any scene uses instancing.]
+        exclusions: []
+      rule:
+        statement: Always use instancing.
+        conditions: []
+        exceptions: []
+        failure_symptoms: []
+        recommended_action: Apply globally.
+      evidence_refs: [research:swr-frame-time-fixture]
+      confidence: 1.0
+      promotion_receipt_id: ''
+      promotion_receipt_binding:
+        mason_episode_id: ''
+        write_plan_id: ''
+        authorization_id: ''
+        scope_key: global-working-memory
+        destination: memory:spatial-web-systems
+        promotion_target_id: swm-invalid-direct-promotion
+        receipt_fingerprint: ''
+      supersedes: null
+      review_triggers:
+        - trigger_type: SOURCE_SUPERSEDED
+          condition: Invalid fixture retains a review trigger so receipt failure is tested directly.
+          review_after: null
+      l0_summary: Invalid fixture.
+      l1_operational_ref: null
+      l2_evidence_refs: [research:swr-frame-time-fixture]
