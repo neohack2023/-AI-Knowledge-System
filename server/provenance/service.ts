@@ -1,8 +1,9 @@
-import type {
-  ContextProvenanceEmission,
-  ContextProvenanceEnvelope,
-  GovernedWriteAuthorization,
-  ProvenanceExecutionBinding,
+import {
+  epistemicTypes,
+  type ContextProvenanceEmission,
+  type ContextProvenanceEnvelope,
+  type GovernedWriteAuthorization,
+  type ProvenanceExecutionBinding,
 } from "./types.ts";
 
 const nonEmpty = (value: string | null | undefined) => typeof value === "string" && value.trim().length > 0;
@@ -23,6 +24,7 @@ export class ContextProvenanceService {
       object_id: input.object_id,
       object_type: input.object_type,
       operation: input.operation,
+      epistemic_type: input.epistemic_type,
       scope_key: binding.scope_key,
 
       source_system: input.source_system,
@@ -86,6 +88,10 @@ export class ContextProvenanceService {
 
     for (const [field, value] of requiredStrings) {
       if (!nonEmpty(value)) issues.push(`${field} is required.`);
+    }
+
+    if (!epistemicTypes.includes(envelope.epistemic_type)) {
+      issues.push(`epistemic_type must be one of: ${epistemicTypes.join(", ")}.`);
     }
 
     if (envelope.confidence !== null && (envelope.confidence < 0 || envelope.confidence > 1)) {
