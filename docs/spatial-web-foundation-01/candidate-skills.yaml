@@ -1,4 +1,5 @@
 registry_slice: SPATIAL_WEB_FOUNDATION_01
+contract_version: 0.2.0
 status: Candidate
 scope_key: global-working-memory
 activation_authorized: false
@@ -25,223 +26,91 @@ skills:
   - skill_id: spatial-web.classify-use-case
     title: Classify Spatial Web Use Case
     responsibility: Determine whether three-dimensional rendering is required, beneficial, optional, or unnecessary before choosing a framework.
-    inputs:
-      - product_goal
-      - interaction_model
-      - scene_scale
-      - asset_scale
-      - device_targets
-      - browser_targets
-      - fidelity_requirements
-      - simulation_requirements
-      - existing_stack_constraints
-    outputs:
-      - use_3d: [REQUIRED, BENEFICIAL, OPTIONAL, UNNECESSARY]
-      - application_class
-      - renderer_candidates
-      - backend_requirements
-      - risk_flags
-      - next_skill
+    inputs: [product_goal, interaction_model, scene_scale, asset_scale, device_targets, browser_targets, fidelity_requirements, simulation_requirements, existing_stack_constraints]
+    outputs: [use_3d, application_class, renderer_candidates, backend_requirements, risk_flags, next_skill]
     promotion_state: Candidate
 
   - skill_id: spatial-web.select-rendering-architecture
     title: Select Rendering Architecture
     responsibility: Compare eligible rendering architectures against explicit project constraints without declaring a universal winner.
-    inputs:
-      - classified_use_case
-      - project_scope
-      - engine_profiles
-      - compatibility_targets
-      - team_constraints
-    outputs:
-      - ranked_candidates
-      - rejected_candidates
-      - decision_factors
-      - required_project_decision
-      - review_triggers
+    inputs: [classified_use_case, project_scope, engine_profiles, compatibility_targets, team_constraints]
+    outputs: [ranked_candidates, rejected_candidates, decision_factors, required_project_decision, review_triggers]
     promotion_state: Candidate
 
   - skill_id: spatial-web.build-compatibility-matrix
     title: Build Browser Compatibility Matrix
     responsibility: Produce a versioned browser, device, GPU, backend, and fallback matrix for a bounded project target.
-    inputs:
-      - browser_targets
-      - device_classes
-      - requested_web_apis
-      - rendering_backends
-      - engine_profile
-    outputs:
-      - supported_matrix
-      - degraded_matrix
-      - blocked_matrix
-      - fallback_requirements
-      - verification_plan
+    inputs: [browser_targets, device_classes, requested_web_apis, rendering_backends, engine_profile]
+    outputs: [supported_matrix, degraded_matrix, blocked_matrix, fallback_requirements, verification_plan]
     promotion_state: Candidate
 
   - skill_id: spatial-web.establish-performance-budget
     title: Establish Scene Performance Budget
     responsibility: Define measurable runtime budgets before production assets and effects are accepted.
-    inputs:
-      - device_targets
-      - scene_class
-      - interaction_requirements
-      - fidelity_requirements
-      - current_metrics
-    outputs:
-      - frame_time_budget
-      - memory_budget
-      - draw_call_budget
-      - texture_budget
-      - geometry_budget
-      - loading_budget
-      - measurement_conditions
+    inputs: [device_targets, scene_class, interaction_requirements, fidelity_requirements, current_metrics]
+    outputs: [frame_time_budget, memory_budget, draw_call_budget, texture_budget, geometry_budget, loading_budget, measurement_conditions]
     promotion_state: Candidate
 
   - skill_id: spatial-web.audit-asset-runtime
     title: Audit 3D Asset for Web Runtime
     responsibility: Evaluate a referenced asset for scale, coordinate system, topology, materials, textures, animation, compression, accessibility implications, and runtime cost.
-    inputs:
-      - asset_reference
-      - target_engine_profile
-      - project_performance_budget
-      - expected_interactions
-    outputs:
-      - technical_findings
-      - visual_readback_requirements
-      - optimization_actions
-      - blocking_issues
-      - accepted_asset_reference
+    inputs: [asset_reference, target_engine_profile, project_performance_budget, expected_interactions]
+    outputs: [technical_findings, visual_readback_requirements, optimization_actions, blocking_issues, accepted_asset_reference]
     promotion_state: Candidate
 
   - skill_id: spatial-web.inspect-gpu-resource-lifecycle
     title: Inspect GPU Resource Lifecycle
     responsibility: Identify ownership, creation, reuse, disposal, device-loss, context-loss, and route-transition risks for GPU-backed resources.
-    inputs:
-      - repository_scope
-      - renderer_profile
-      - resource_inventory
-      - lifecycle_events
-    outputs:
-      - ownership_map
-      - leak_risks
-      - unsafe_disposal_risks
-      - recovery_gaps
-      - verification_steps
+    inputs: [repository_scope, renderer_profile, resource_inventory, lifecycle_events]
+    outputs: [ownership_map, leak_risks, unsafe_disposal_risks, recovery_gaps, verification_steps]
     promotion_state: Candidate
 
   - skill_id: spatial-web.evaluate-shader-portability
     title: Evaluate Shader Portability
     responsibility: Assess shader language, backend, engine, browser, precision, feature, and fallback constraints.
-    inputs:
-      - shader_reference
-      - source_language
-      - target_backends
-      - target_engines
-      - browser_targets
-    outputs:
-      - portability_findings
-      - unsupported_features
-      - translation_requirements
-      - fallback_requirements
-      - test_matrix
+    inputs: [shader_reference, source_language, target_backends, target_engines, browser_targets]
+    outputs: [portability_findings, unsupported_features, translation_requirements, fallback_requirements, test_matrix]
     promotion_state: Candidate
 
   - skill_id: spatial-web.design-semantic-lod
     title: Design Semantic LOD Strategy
     responsibility: Reduce scene complexity according to user meaning, task priority, and device limits rather than distance alone.
-    inputs:
-      - scene_entities
-      - user_tasks
-      - camera_model
-      - device_targets
-      - accessibility_requirements
-    outputs:
-      - semantic_priority_classes
-      - geometry_lod_rules
-      - information_lod_rules
-      - interaction_lod_rules
-      - fallback_view_requirements
+    inputs: [scene_entities, user_tasks, camera_model, device_targets, accessibility_requirements]
+    outputs: [semantic_priority_classes, geometry_lod_rules, information_lod_rules, interaction_lod_rules, fallback_view_requirements]
     promotion_state: Candidate
 
   - skill_id: spatial-web.verify-interaction-accessibility
     title: Verify Spatial Interaction Accessibility
     responsibility: Check keyboard, focus, reduced-motion, text alternative, two-dimensional fallback, touch, controller, and readable-label behavior.
-    inputs:
-      - interaction_model
-      - scene_structure
-      - dom_overlay_structure
-      - accessibility_targets
-    outputs:
-      - violations
-      - equivalent_interaction_requirements
-      - reduced_motion_behavior
-      - fallback_view_requirements
-      - verification_receipt
+    inputs: [interaction_model, scene_structure, dom_overlay_structure, accessibility_targets]
+    outputs: [violations, equivalent_interaction_requirements, reduced_motion_behavior, fallback_view_requirements, verification_receipt]
     promotion_state: Candidate
 
   - skill_id: spatial-web.run-performance-profile
     title: Run Spatial Web Performance Profile
     responsibility: Execute or specify a bounded, reproducible profiling run with complete environment metadata.
-    inputs:
-      - project_scope
-      - test_scene
-      - browser_target
-      - device_target
-      - renderer_backend
-      - metrics
-    outputs:
-      - experiment_record
-      - observations
-      - limitations
-      - comparison_refs
-      - follow_up
+    inputs: [project_scope, test_scene, browser_target, device_target, renderer_backend, metrics]
+    outputs: [experiment_record, observations, limitations, comparison_refs, follow_up]
     promotion_state: Candidate
 
   - skill_id: spatial-web.build-visual-regression-fixture
     title: Build Visual Regression Fixture
     responsibility: Define deterministic camera, viewport, scene state, timing, assets, backend, and tolerance conditions for visual readback.
-    inputs:
-      - scene_reference
-      - target_states
-      - target_backends
-      - viewport_matrix
-    outputs:
-      - fixture_definition
-      - expected_artifact_refs
-      - tolerance_policy
-      - nondeterminism_risks
-      - readback_workflow
+    inputs: [scene_reference, target_states, target_backends, viewport_matrix]
+    outputs: [fixture_definition, expected_artifact_refs, tolerance_policy, nondeterminism_risks, readback_workflow]
     promotion_state: Candidate
 
   - skill_id: spatial-web.evaluate-3d-identity-drift
     title: Evaluate 3D Identity Drift
     responsibility: Compare generated or transformed spatial assets against registered visual and technical identity constraints.
-    inputs:
-      - candidate_asset_reference
-      - reference_asset_refs
-      - identity_constraints
-      - technical_constraints
-    outputs:
-      - drift_findings
-      - confidence
-      - blocking_differences
-      - accepted_differences
-      - next_action
+    inputs: [candidate_asset_reference, reference_asset_refs, identity_constraints, technical_constraints]
+    outputs: [drift_findings, confidence, blocking_differences, accepted_differences, next_action]
     promotion_state: Candidate
 
   - skill_id: spatial-web.assemble-context-packet
     title: Assemble Spatial Web Context Packet
     responsibility: Resolve scope and assemble the smallest valid L0, L1, and conditional L2 context packet.
-    inputs:
-      - user_intent
-      - registered_project_scope
-      - requested_engines
-      - requested_assets
-      - current_failure_signals
-    outputs:
-      - retrieval_packet
-      - selected_records
-      - rejected_sibling_records
-      - authority_decisions
-      - packet_fingerprint
+    inputs: [user_intent, registered_project_scope, requested_engines, requested_assets, current_failure_signals]
+    outputs: [retrieval_packet, selected_records, rejected_sibling_records, authority_decisions, packet_fingerprint]
+    executable_candidate: server/spatial-web/packet-assembler.ts
     promotion_state: Candidate

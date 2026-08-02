@@ -1,10 +1,11 @@
 packet_id: packet:spatial-web-core
-packet_version: 0.1.0
+packet_version: 0.2.0
 status: Candidate
 scope_key: global-working-memory
 purpose: Bootstrap or review a browser-based three-dimensional application using the smallest useful governed context packet.
 authority_state: NON_AUTHORITATIVE
 epistemic_type: ACTION_REQUEST
+executable_assembler: server/spatial-web/packet-assembler.ts
 
 entry_conditions:
   any:
@@ -23,22 +24,12 @@ scope_resolution:
 
 l0_always_load:
   token_target: 150
-  fields:
-    - lane identity and purpose
-    - project scope key
-    - application class
-    - requested renderer or engine if named
-    - authority state
-    - epistemic type
-    - current lifecycle state
-    - relevant trigger cards
-    - review-trigger summary
   records:
-    - research-index-signal
-    - renderer-selection-index
-    - performance-doctrine-index
     - asset-pipeline-index
     - compatibility-index
+    - performance-doctrine-index
+    - renderer-selection-index
+    - research-index-signal
 
 l1_conditional_load:
   token_target: 2000
@@ -78,12 +69,12 @@ l1_conditional_load:
 
 l2_evidence_load:
   token_target: bounded_by_task
-  allowed_when:
-    - implementation requires source-level detail
-    - a claim is disputed
-    - a version or backend changed
-    - an experiment must be reproduced
-    - a benchmark must be compared
+  allowed_reasons:
+    - IMPLEMENTATION_DETAIL_REQUIRED
+    - CLAIM_DISPUTED
+    - VERSION_OR_BACKEND_CHANGED
+    - EXPERIMENT_REPRODUCTION
+    - BENCHMARK_COMPARISON
   may_include:
     - source documentation references
     - repository files and commits
@@ -101,7 +92,9 @@ l2_evidence_load:
 routing_outputs:
   required:
     - resolved_scope_key
+    - project_scope
     - application_class
+    - disclosure_level
     - selected_l0_records
     - selected_l1_records
     - opened_l2_evidence
@@ -113,6 +106,7 @@ routing_outputs:
 invariants:
   - L0 to L1 to L2 expansion is deterministic for the same registered inputs and versions.
   - Expansion adds detail but cannot change scope, authority, epistemic type, or promotion state.
+  - L2 evidence cannot open without an explicit allowed reason.
   - Research records remain research records after retrieval.
   - Project decisions remain inside their registered project branch.
   - Missing authority metadata blocks promotion and destination-write planning.

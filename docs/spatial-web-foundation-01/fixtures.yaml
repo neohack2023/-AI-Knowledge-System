@@ -1,5 +1,5 @@
 fixture_bundle: SPATIAL_WEB_FOUNDATION_01
-fixture_version: 0.1.0
+fixture_version: 0.2.0
 all_records_are_synthetic: true
 canon_status: NONE
 
@@ -24,10 +24,10 @@ fixtures:
       source_refs:
         - source_system: FIXTURE
           source_id: synthetic-renderer-source-a
-          source_version: '0.1'
+          source_version: '0.2'
           source_fingerprint: sha256:fixture-source-a
           source_url: null
-          retrieved_at: '2026-08-02T04:38:00Z'
+          retrieved_at: '2026-08-02T04:50:00Z'
       version_context:
         engine: null
         engine_version: null
@@ -66,10 +66,10 @@ fixtures:
       source_refs:
         - source_system: FIXTURE
           source_id: synthetic-webgpu-observation
-          source_version: '0.1'
+          source_version: '0.2'
           source_fingerprint: sha256:fixture-webgpu
           source_url: null
-          retrieved_at: '2026-08-02T04:38:00Z'
+          retrieved_at: '2026-08-02T04:50:00Z'
       version_context:
         engine: ExampleEngine
         engine_version: 1.0.0-fixture
@@ -101,7 +101,7 @@ fixtures:
       profile_id: swep-example-engine
       engine_name: ExampleEngine
       engine_version_range: 1.x-fixture
-      profile_version: 0.1.0
+      profile_version: 0.2.0
       lifecycle_state: RESEARCH_PENDING
       authority_state: NON_AUTHORITATIVE
       epistemic_type: CLAIM
@@ -123,6 +123,7 @@ fixtures:
         favorable_when: [A project fixture explicitly requires the listed capabilities.]
         unfavorable_when: [The project constraints have not been classified.]
         requires_project_decision: true
+      global_preferred: false
       evidence_refs: [fixture://example-engine-profile-source]
       review_triggers:
         - trigger_type: ENGINE_MAJOR_VERSION_CHANGE
@@ -144,7 +145,7 @@ fixtures:
       authority_state: NON_AUTHORITATIVE
       epistemic_type: ACTION_RESULT
       environment:
-        timestamp: '2026-08-02T04:38:00Z'
+        timestamp: '2026-08-02T04:50:00Z'
         browser: ExampleBrowser
         browser_version: 100.0-fixture
         operating_system: ExampleOS
@@ -177,8 +178,8 @@ fixtures:
         - Synthetic fixture only.
         - No real browser, GPU, engine, or project outcome is claimed.
         - This record cannot produce a memory card.
-      artifact_refs: [fixture://deterministic-scene, fixture://execution-log]
-      execution_receipt_id: fixture-receipt-swx-frame-time
+      artifact_refs: [execution:deterministic-scene, execution:synthetic-log]
+      execution_receipt_id: execution:receipt:swx-frame-time
       follow_up:
         - Repeat through a separately authorized real experiment before considering STONE intake.
       promotion_state: NOT_EVALUATED
@@ -208,11 +209,22 @@ fixtures:
         exceptions: []
         failure_symptoms: []
         recommended_action: Apply globally.
-      evidence_refs: [swx-frame-time-fixture]
+      evidence_refs: [research:swr-frame-time-fixture]
       confidence: 1.0
       promotion_receipt_id: ''
+      promotion_receipt_binding:
+        mason_episode_id: ''
+        write_plan_id: ''
+        authorization_id: ''
+        scope_key: global-working-memory
+        destination: memory:spatial-web-systems
+        promotion_target_id: swm-invalid-direct-promotion
+        receipt_fingerprint: ''
       supersedes: null
-      review_triggers: []
+      review_triggers:
+        - trigger_type: SOURCE_SUPERSEDED
+          condition: Invalid fixture retains a review trigger so receipt failure is tested directly.
+          review_after: null
       l0_summary: Invalid fixture.
       l1_operational_ref: null
-      l2_evidence_refs: [swx-frame-time-fixture]
+      l2_evidence_refs: [research:swr-frame-time-fixture]
