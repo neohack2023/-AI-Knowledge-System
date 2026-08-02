@@ -1,0 +1,316 @@
+schema_bundle: spatial-web-contracts
+schema_version: 0.1.0
+status: Candidate
+scope_key: global-working-memory
+terminal_state: CONTRACT_READY_NO_CANON_PROMOTION
+
+shared_definitions:
+  authority_state:
+    enum: [AUTHORITATIVE, NON_AUTHORITATIVE, DISPUTED, SUPERSEDED]
+  epistemic_type:
+    enum: [CLAIM, OBSERVATION, ACTION_REQUEST, ACTION_RESULT, VERIFICATION, DURABLE_FACT]
+  lifecycle_state:
+    enum: [RESEARCH_PENDING, CANDIDATE, REVIEW, ACCEPTED, REJECTED, SUPERSEDED, ARCHIVED]
+  disclosure_level:
+    enum: [L0, L1, L2]
+  source_reference:
+    required: [source_system, source_id]
+    properties:
+      source_system: { type: string }
+      source_id: { type: string }
+      source_version: { type: [string, 'null'] }
+      source_fingerprint: { type: [string, 'null'] }
+      source_url: { type: [string, 'null'] }
+      retrieved_at: { type: [string, 'null'], format: date-time }
+  review_trigger:
+    required: [trigger_type, condition]
+    properties:
+      trigger_type:
+        enum:
+          - ENGINE_MAJOR_VERSION_CHANGE
+          - BROWSER_SUPPORT_CHANGE
+          - WEB_STANDARD_CHANGE
+          - GPU_BACKEND_CHANGE
+          - DEVICE_CLASS_CHANGE
+          - PERFORMANCE_BUDGET_CHANGE
+          - SECURITY_ADVISORY
+          - SOURCE_SUPERSEDED
+          - PROJECT_CONSTRAINT_CHANGE
+          - MANUAL_REVIEW_DATE
+      condition: { type: string }
+      review_after: { type: [string, 'null'], format: date }
+
+research_index_schema:
+  title: SpatialWebResearchIndex
+  purpose: Route research without converting it into memory.
+  required:
+    - research_id
+    - title
+    - research_track
+    - scope_key
+    - lifecycle_state
+    - authority_state
+    - epistemic_type
+    - disclosure
+    - source_refs
+    - promotion_state
+  properties:
+    research_id: { type: string, pattern: '^swr-[a-z0-9-]+$' }
+    title: { type: string }
+    summary: { type: string }
+    research_track:
+      enum:
+        - RENDERING_ARCHITECTURES
+        - ENGINES_AND_FRAMEWORKS
+        - SCENE_AND_DATA_ARCHITECTURE
+        - ASSETS_AND_PIPELINES
+        - SHADERS_AND_GPU_COMPUTE
+        - PERFORMANCE
+        - INTERACTION_AND_INTERFACE
+        - WEBXR_AND_SPATIAL_COMPUTING
+        - SECURITY_AND_PRIVACY
+        - TESTING_AND_OBSERVABILITY
+        - DEPLOYMENT_AND_COMPATIBILITY
+        - AI_ASSISTED_3D
+        - ENGINE_COMPARISONS
+        - DESIGN_PATTERNS
+        - FAILURE_ANALYSIS
+        - BENCHMARKS
+    scope_key: { const: global-working-memory }
+    applicable_project_scopes:
+      type: array
+      items: { type: string }
+      default: []
+    lifecycle_state: { $ref: '#/shared_definitions/lifecycle_state' }
+    authority_state: { const: NON_AUTHORITATIVE }
+    epistemic_type:
+      enum: [CLAIM, OBSERVATION, ACTION_RESULT, VERIFICATION]
+    disclosure:
+      required: [l0, l1_ref, l2_refs]
+      properties:
+        l0: { type: string }
+        l1_ref: { type: [string, 'null'] }
+        l2_refs:
+          type: array
+          items: { type: string }
+    source_refs:
+      type: array
+      minItems: 1
+      items: { $ref: '#/shared_definitions/source_reference' }
+    version_context:
+      properties:
+        engine: { type: [string, 'null'] }
+        engine_version: { type: [string, 'null'] }
+        browser: { type: [string, 'null'] }
+        browser_version: { type: [string, 'null'] }
+        web_api: { type: [string, 'null'] }
+        web_api_version: { type: [string, 'null'] }
+        operating_system: { type: [string, 'null'] }
+        gpu: { type: [string, 'null'] }
+        backend: { type: [string, 'null'] }
+    review_triggers:
+      type: array
+      items: { $ref: '#/shared_definitions/review_trigger' }
+    related_asset_refs:
+      type: array
+      items: { type: string }
+      description: References only. Binary asset content is forbidden.
+    promotion_state:
+      enum: [NOT_EVALUATED, STONE_CANDIDATE, STONE_REJECTED, MASON_PENDING, PROMOTED]
+      default: NOT_EVALUATED
+    promoted_memory_id:
+      type: [string, 'null']
+      default: null
+  invariants:
+    - authority_state must remain NON_AUTHORITATIVE in this slice.
+    - promoted_memory_id must be null unless a later authorized MASON receipt exists.
+    - related_asset_refs must contain identifiers or URLs, never embedded bytes or base64.
+
+spatial_memory_card_schema:
+  title: SpatialWebMemoryCard
+  purpose: Store only separately promoted, reusable, bounded learning.
+  required:
+    - memory_id
+    - title
+    - memory_class
+    - scope_key
+    - authority_state
+    - epistemic_type
+    - applicability
+    - rule
+    - evidence_refs
+    - confidence
+    - promotion_receipt_id
+    - review_triggers
+  properties:
+    memory_id: { type: string, pattern: '^swm-[a-z0-9-]+$' }
+    title: { type: string }
+    memory_class:
+      enum:
+        - ARCHITECTURE_PATTERN
+        - RENDERER_SELECTION_RULE
+        - PERFORMANCE_DOCTRINE
+        - ASSET_PIPELINE_RULE
+        - SHADER_GPU_RULE
+        - INTERACTION_RULE
+        - TESTING_PATTERN
+        - FAILURE_PATTERN
+        - COMPATIBILITY_RULE
+        - SECURITY_PRIVACY_RULE
+        - REUSABLE_WORKFLOW
+    scope_key: { const: global-working-memory }
+    authority_state:
+      enum: [AUTHORITATIVE, NON_AUTHORITATIVE, DISPUTED, SUPERSEDED]
+    epistemic_type: { const: DURABLE_FACT }
+    applicability:
+      required: [engines, backends, project_classes, trigger_conditions]
+      properties:
+        engines: { type: array, items: { type: string } }
+        backends: { type: array, items: { type: string } }
+        project_classes: { type: array, items: { type: string } }
+        trigger_conditions: { type: array, items: { type: string }, minItems: 1 }
+        exclusions: { type: array, items: { type: string } }
+    rule:
+      required: [statement, conditions, exceptions]
+      properties:
+        statement: { type: string }
+        conditions: { type: array, items: { type: string } }
+        exceptions: { type: array, items: { type: string } }
+        failure_symptoms: { type: array, items: { type: string } }
+        recommended_action: { type: string }
+    evidence_refs:
+      type: array
+      minItems: 1
+      items: { type: string }
+    confidence: { type: number, minimum: 0, maximum: 1 }
+    promotion_receipt_id: { type: string }
+    supersedes: { type: [string, 'null'] }
+    review_triggers:
+      type: array
+      minItems: 1
+      items: { $ref: '#/shared_definitions/review_trigger' }
+    l0_summary: { type: string }
+    l1_operational_ref: { type: [string, 'null'] }
+    l2_evidence_refs: { type: array, items: { type: string } }
+  invariants:
+    - Creation is forbidden without a separately authorized MASON promotion receipt.
+    - Project-specific decisions may be referenced but may not be copied into global memory as universal rules.
+    - Version-sensitive rules require at least one review trigger.
+
+engine_profile_schema:
+  title: SpatialWebEngineProfile
+  purpose: Describe an engine or rendering stack without declaring it globally preferred.
+  required:
+    - profile_id
+    - engine_name
+    - profile_version
+    - lifecycle_state
+    - authority_state
+    - epistemic_type
+    - capability_claims
+    - compatibility
+    - evidence_refs
+    - review_triggers
+  properties:
+    profile_id: { type: string, pattern: '^swep-[a-z0-9-]+$' }
+    engine_name: { type: string }
+    engine_version_range: { type: [string, 'null'] }
+    profile_version: { type: string }
+    lifecycle_state: { $ref: '#/shared_definitions/lifecycle_state' }
+    authority_state: { const: NON_AUTHORITATIVE }
+    epistemic_type: { enum: [CLAIM, OBSERVATION, VERIFICATION] }
+    stack_type:
+      enum: [ENGINE, FRAMEWORK, RENDERER, VISUALIZATION_LIBRARY, NATIVE_WEBGPU, CUSTOM_WEBGL, HYBRID]
+    capability_claims:
+      type: array
+      items:
+        required: [claim, evidence_state]
+        properties:
+          claim: { type: string }
+          evidence_state: { enum: [UNVERIFIED, SOURCE_BACKED, EXPERIMENT_BACKED, REPEATED_VALIDATION] }
+          evidence_refs: { type: array, items: { type: string } }
+    compatibility:
+      properties:
+        rendering_backends: { type: array, items: { type: string } }
+        browser_targets: { type: array, items: { type: string } }
+        device_classes: { type: array, items: { type: string } }
+        fallbacks: { type: array, items: { type: string } }
+        known_constraints: { type: array, items: { type: string } }
+    selection_signals:
+      properties:
+        favorable_when: { type: array, items: { type: string } }
+        unfavorable_when: { type: array, items: { type: string } }
+        requires_project_decision: { const: true }
+    evidence_refs: { type: array, items: { type: string }, minItems: 1 }
+    review_triggers:
+      type: array
+      minItems: 1
+      items: { $ref: '#/shared_definitions/review_trigger' }
+  invariants:
+    - Profiles cannot set global_preferred=true.
+    - A profile recommendation is an input to project decision-making, not project canon.
+
+experiment_record_schema:
+  title: SpatialWebExperimentRecord
+  purpose: Record bounded execution evidence without converting an outcome into doctrine.
+  required:
+    - experiment_id
+    - hypothesis
+    - scope_key
+    - project_scope
+    - execution_mode
+    - authority_state
+    - epistemic_type
+    - environment
+    - procedure
+    - observations
+    - outcome
+    - artifact_refs
+    - execution_receipt_id
+  properties:
+    experiment_id: { type: string, pattern: '^swx-[a-z0-9-]+$' }
+    hypothesis: { type: string }
+    scope_key: { const: global-working-memory }
+    project_scope: { type: string }
+    execution_mode: { enum: [SIMULATION, REPLAY, BOUNDED_LIVE] }
+    authority_state: { const: NON_AUTHORITATIVE }
+    epistemic_type: { enum: [ACTION_RESULT, OBSERVATION, VERIFICATION] }
+    environment:
+      required: [timestamp, browser, operating_system, device_class, gpu, backend]
+      properties:
+        timestamp: { type: string, format: date-time }
+        browser: { type: string }
+        browser_version: { type: [string, 'null'] }
+        operating_system: { type: string }
+        device_class: { type: string }
+        gpu: { type: string }
+        driver: { type: [string, 'null'] }
+        backend: { type: string }
+        engine: { type: [string, 'null'] }
+        engine_version: { type: [string, 'null'] }
+        application_commit: { type: [string, 'null'] }
+    controlled_inputs: { type: object }
+    procedure: { type: array, items: { type: string }, minItems: 1 }
+    observations:
+      type: array
+      items:
+        required: [metric_or_event, value, epistemic_type]
+        properties:
+          metric_or_event: { type: string }
+          value: {}
+          unit: { type: [string, 'null'] }
+          epistemic_type: { enum: [ACTION_RESULT, OBSERVATION, VERIFICATION] }
+    outcome:
+      enum: [SUPPORTED, NOT_SUPPORTED, INCONCLUSIVE, BLOCKED, FAILED]
+    limitations: { type: array, items: { type: string } }
+    artifact_refs:
+      type: array
+      items: { type: string }
+      description: References only. Assets remain in the Assets or Execution layer.
+    execution_receipt_id: { type: string }
+    follow_up: { type: array, items: { type: string } }
+    promotion_state: { const: NOT_EVALUATED }
+  invariants:
+    - One experiment cannot emit a SpatialWebMemoryCard.
+    - Project scope must remain explicit even when the research lane is global.
+    - Artifact fields accept references only, never embedded binary content.
