@@ -1,11 +1,19 @@
 import { createHash } from 'node:crypto';
 import { validateDispatch } from '../../../scripts/saf-n3d-0a/dispatch-contract.mjs';
+import { assertDerivedValidation } from '../../../scripts/saf-n3d-0a/evaluate-validation.mjs';
 import { validateReceipt } from '../../../scripts/saf-n3d-0a/receipt-contract.mjs';
 import {
   validateValidationProfile,
   validateValidationReport,
 } from '../../../scripts/saf-n3d-0a/validation-contract.mjs';
-import { compileSpatialAsset } from './index.mjs';
+import { canonicalJson, normalizeBlueprint } from './core.mjs';
+import { compileSpatialAsset, prepareSpatialInput } from './index.mjs';
+
+const REQUIRED_ALLOWED_EFFECTS = new Set([
+  'READ_SOURCE',
+  'EXECUTE_BUILD',
+  'EMIT_RECEIPT',
+]);
 
 const FORBIDDEN_EFFECTS = new Set([
   'MUTATE_NOTION',
@@ -30,12 +38,17 @@ export async function runProcessLocalSpatialOrchestration({
   validationProfile,
   blueprint,
   createValidationReport,
+  executionRevision,
   compiler = compileSpatialAsset,
   clock = () => new Date(),
 }) {
   validateDispatch(dispatch);
   validateValidationProfile(validationProfile);
+  assertExecutionRevision(executionRevision);
   assertProcessLocalBoundary(dispatch);
+
+  const startedAt = trustedDate(clock(), 'INVALID_TRUSTED_CLOCK');
+  assertCurrentAuthorization(dispatch.authorization, startedAt);
 
   if (dispatch.validation_profile_id !== validationProfile.profile_id) {
     throw new SpatialOrchestrationError('VALIDATION_PROFILE_MISMATCH', 'Dispatch and validation profile IDs must match.');
@@ -44,27 +57,64 @@ export async function runProcessLocalSpatialOrchestration({
     throw new SpatialOrchestrationError('REPORT_FACTORY_REQUIRED', 'A deterministic validation-report factory is required.');
   }
 
-  const startedAt = clock();
-  const compiled = await compiler(blueprint, { generatedAt: startedAt.toISOString() });
-  const validationReport = await createValidationReport({ dispatch, validationProfile, blueprint, compiled });
-  validateValidationReport(validationReport);
-
-  if (validationReport.execution_id !== dispatch.execution_id ||
-      validationReport.candidate_id !== dispatch.candidate_package.candidate_id ||
-      validationReport.validation_profile_id !== validationProfile.profile_id) {
-    throw new SpatialOrchestrationError('REPORT_BINDING_MISMATCH', 'Validation report is not bound to the dispatch and selected profile.');
+  const preparedBlueprint = prepareSpatialInput(blueprint);
+  const normalizedInput = normalizeBlueprint(preparedBlueprint);
+  const observedBlueprintDigest = `sha256:${normalizedInput.digest}`;
+  if (observedBlueprintDigest !== dispatch.candidate_package.blueprint_digest) {
+    throw new SpatialOrchestrationError(
+      'BLUEPRINT_DIGEST_MISMATCH',
+      `Dispatch declares ${dispatch.candidate_package.blueprint_digest}, observed ${observedBlueprintDigest}.`,
+    );
   }
+
+  const compiled = await compiler(blueprint, { generatedAt: startedAt.toISOString() });
+  if (compiled?.normalizedBlueprint?.digest !== normalizedInput.digest) {
+    throw new SpatialOrchestrationError(
+      'COMPILER_BLUEPRINT_DIGEST_MISMATCH',
+      'Compiler normalized blueprint digest does not match the independently prepared input digest.',
+    );
+  }
+
+  const validationReport = await createValidationReport({
+    dispatch,
+    validationProfile,
+    blueprint,
+    compiled,
+  });
+  validateValidationReport(validationReport);
+  assertReportBinding(dispatch, validationProfile, validationReport);
+
   if (validationReport.acceptance.state !== 'PENDING') {
     throw new SpatialOrchestrationError('ORCHESTRATOR_CANNOT_ACCEPT', 'Process-local orchestration cannot assign candidate acceptance.');
   }
 
-  const completedAt = clock();
-  const receipt = buildReceipt({ dispatch, compiled, validationReport, startedAt, completedAt });
+  let derivedValidation;
+  try {
+    derivedValidation = assertDerivedValidation(validationProfile, validationReport);
+  } catch (error) {
+    throw new SpatialOrchestrationError('DERIVED_VALIDATION_MISMATCH', error instanceof Error ? error.message : String(error));
+  }
+
+  const completedAt = trustedDate(clock(), 'INVALID_COMPLETION_CLOCK');
+  if (completedAt.getTime() < startedAt.getTime()) {
+    throw new SpatialOrchestrationError('CLOCK_MOVED_BACKWARDS', 'Completion time cannot precede start time.');
+  }
+
+  const receipt = buildReceipt({
+    dispatch,
+    compiled,
+    validationReport,
+    executionRevision,
+    observedBlueprintDigest,
+    startedAt,
+    completedAt,
+  });
   validateReceipt(receipt);
 
   return Object.freeze({
     compiled,
     validationReport: Object.freeze(validationReport),
+    derivedValidation: Object.freeze(derivedValidation),
     receipt: Object.freeze(receipt),
     authority: Object.freeze({
       execution_scope: 'PROCESS_LOCAL',
@@ -73,6 +123,11 @@ export async function runProcessLocalSpatialOrchestration({
       acceptance_state: 'PENDING',
     }),
   });
+}
+
+export function computeAuthorizationDigest(authorization) {
+  const { authorization_digest: ignored, ...unsignedAuthorization } = authorization;
+  return digestJson(unsignedAuthorization);
 }
 
 function assertProcessLocalBoundary(dispatch) {
@@ -89,7 +144,62 @@ function assertProcessLocalBoundary(dispatch) {
   }
 }
 
-function buildReceipt({ dispatch, compiled, validationReport, startedAt, completedAt }) {
+function assertCurrentAuthorization(authorization, trustedNow) {
+  if (computeAuthorizationDigest(authorization) !== authorization.authorization_digest) {
+    throw new SpatialOrchestrationError('AUTHORIZATION_DIGEST_MISMATCH', 'Authorization digest does not match its canonical unsigned payload.');
+  }
+
+  const issuedAt = Date.parse(authorization.issued_at);
+  const expiresAt = Date.parse(authorization.expires_at);
+  const now = trustedNow.getTime();
+  if (now < issuedAt) {
+    throw new SpatialOrchestrationError('AUTHORIZATION_NOT_YET_VALID', 'Authorization is not valid yet.');
+  }
+  if (now >= expiresAt) {
+    throw new SpatialOrchestrationError('AUTHORIZATION_EXPIRED', 'Authorization has expired.');
+  }
+
+  for (const effect of REQUIRED_ALLOWED_EFFECTS) {
+    if (!authorization.allowed_effects.includes(effect)) {
+      throw new SpatialOrchestrationError('REQUIRED_EFFECT_NOT_AUTHORIZED', `Authorization must allow ${effect}.`);
+    }
+  }
+}
+
+function assertReportBinding(dispatch, validationProfile, validationReport) {
+  if (validationReport.execution_id !== dispatch.execution_id ||
+      validationReport.candidate_id !== dispatch.candidate_package.candidate_id ||
+      validationReport.validation_profile_id !== validationProfile.profile_id ||
+      validationReport.representation_family !== dispatch.candidate_package.representation_family) {
+    throw new SpatialOrchestrationError('REPORT_BINDING_MISMATCH', 'Validation report is not bound to the dispatch, representation, and selected profile.');
+  }
+}
+
+function assertExecutionRevision(value) {
+  if (!value || typeof value !== 'object') {
+    throw new SpatialOrchestrationError('EXECUTION_REVISION_REQUIRED', 'Actual executing revision metadata is required.');
+  }
+  if (!/^[a-f0-9]{40}$/.test(value.commit_sha ?? '')) {
+    throw new SpatialOrchestrationError('INVALID_EXECUTION_COMMIT_SHA', 'executionRevision.commit_sha must be a 40-character lowercase Git SHA.');
+  }
+  if (value.github_run_id !== null && value.github_run_id !== undefined &&
+      (!Number.isInteger(value.github_run_id) || value.github_run_id < 0)) {
+    throw new SpatialOrchestrationError('INVALID_GITHUB_RUN_ID', 'executionRevision.github_run_id must be null or a non-negative integer.');
+  }
+  if (!Number.isInteger(value.run_attempt) || value.run_attempt < 1) {
+    throw new SpatialOrchestrationError('INVALID_RUN_ATTEMPT', 'executionRevision.run_attempt must be a positive integer.');
+  }
+}
+
+function buildReceipt({
+  dispatch,
+  compiled,
+  validationReport,
+  executionRevision,
+  observedBlueprintDigest,
+  startedAt,
+  completedAt,
+}) {
   const outputDigest = digestJson({
     compiler_receipt: compiled.receipt,
     validation_report: validationReport,
@@ -109,13 +219,14 @@ function buildReceipt({ dispatch, compiled, validationReport, startedAt, complet
     status: 'COMPLETED',
     started_at: startedAt.toISOString(),
     completed_at: completedAt.toISOString(),
-    duration_ms: Math.max(0, completedAt.getTime() - startedAt.getTime()),
+    duration_ms: completedAt.getTime() - startedAt.getTime(),
     source_refs: dispatch.sources.map((source) => source.logical_uri),
     authority_decisions: [
       'PROCESS_LOCAL_ONLY',
       'NO_EXTERNAL_EFFECT',
       'NO_DURABLE_STAGING',
       'ACCEPTANCE_REMAINS_PENDING',
+      'EXECUTION_REVISION_SEPARATE_FROM_FIXTURE_SUBJECT',
     ],
     provider: null,
     model: null,
@@ -131,19 +242,28 @@ function buildReceipt({ dispatch, compiled, validationReport, startedAt, complet
       authorization_ref: dispatch.authorization.authorization_ref,
       verification_ref: null,
     },
-    input_digest: dispatch.candidate_package.blueprint_digest,
-    output_digest: `sha256:${outputDigest}`,
+    input_digest: observedBlueprintDigest,
+    output_digest: outputDigest,
     errors: [],
     supersedes_receipt_id: null,
     metadata: {
       schema_validation: 'PASS',
       canonicalization: 'AIOS_CANONICAL_JSON',
-      availability_notes: ['Process-local orchestration only; no destination writes or provider execution.'],
+      availability_notes: [
+        'Process-local orchestration only; no destination writes or provider execution.',
+        'spatial_compute.commit_sha identifies executing code; environment.fixture_subject_base_sha identifies the fixture subject.',
+      ],
       spatial_compute: {
-        github_run_id: null,
-        commit_sha: dispatch.repository.base_sha,
-        run_attempt: 1,
-        environment: { runtime: 'node', isolation: 'process-local' },
+        github_run_id: executionRevision.github_run_id ?? null,
+        commit_sha: executionRevision.commit_sha,
+        run_attempt: executionRevision.run_attempt,
+        environment: {
+          runtime: 'node',
+          isolation: 'process-local',
+          fixture_subject_repository: dispatch.repository.full_name,
+          fixture_subject_base_sha: dispatch.repository.base_sha,
+          fixture_subject_branch: dispatch.repository.working_branch,
+        },
         emitted_local_artifacts: [],
         storage_state: 'NOT_STAGED',
       },
@@ -151,6 +271,14 @@ function buildReceipt({ dispatch, compiled, validationReport, startedAt, complet
   };
 }
 
+function trustedDate(value, code) {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    throw new SpatialOrchestrationError(code, 'Trusted clock returned an invalid date.');
+  }
+  return date;
+}
+
 function digestJson(value) {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  return `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 }
