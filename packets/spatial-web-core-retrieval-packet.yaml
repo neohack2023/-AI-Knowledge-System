@@ -1,0 +1,118 @@
+packet_id: packet:spatial-web-core
+packet_version: 0.1.0
+status: Candidate
+scope_key: global-working-memory
+purpose: Bootstrap or review a browser-based three-dimensional application using the smallest useful governed context packet.
+authority_state: NON_AUTHORITATIVE
+epistemic_type: ACTION_REQUEST
+
+entry_conditions:
+  any:
+    - request mentions a browser-based 3D application
+    - request mentions Three.js, React Three Fiber, Babylon.js, PlayCanvas, Cesium, deck.gl, WebGL, WebGPU, WGSL, GLSL, WebXR, glTF, or GLB
+    - request requires a 3D editor, configurator, simulation, game, spatial interface, or interactive 3D visualization
+    - request reports browser rendering, GPU resource, asset-loading, shader, frame-time, or device-compatibility problems
+
+scope_resolution:
+  required: true
+  rules:
+    - Resolve the registered project scope before loading project-specific context.
+    - Keep global research separate from project decisions.
+    - Reject sibling project canon unless explicitly requested and authorized.
+    - Preserve the exact source authority of every retrieved object.
+
+l0_always_load:
+  token_target: 150
+  fields:
+    - lane identity and purpose
+    - project scope key
+    - application class
+    - requested renderer or engine if named
+    - authority state
+    - epistemic type
+    - current lifecycle state
+    - relevant trigger cards
+    - review-trigger summary
+  records:
+    - research-index-signal
+    - renderer-selection-index
+    - performance-doctrine-index
+    - asset-pipeline-index
+    - compatibility-index
+
+l1_conditional_load:
+  token_target: 2000
+  expansion_rules:
+    - when: engine or framework is named
+      load:
+        - matching engine profile
+        - engine-specific failure patterns
+        - engine-specific version review triggers
+    - when: native WebGPU or WGSL is requested
+      load:
+        - WebGPU capability profile
+        - fallback and compatibility policy
+        - shader portability rules
+        - adapter and device loss workflow
+    - when: GLB or glTF assets are involved
+      load:
+        - asset runtime audit workflow
+        - coordinate, scale, material, animation, and compression checks
+        - asset budget and provenance rules
+    - when: performance is the problem
+      load:
+        - performance diagnosis workflow
+        - frame-time and memory measurement contract
+        - device and browser environment requirements
+    - when: a 3D graph or observatory is requested
+      load:
+        - semantic LOD rules
+        - layout and picking guidance
+        - label and DOM-overlay guidance
+        - reduced-motion and two-dimensional fallback requirements
+    - when: AI-generated models or shaders are involved
+      load:
+        - generated-asset validation workflow
+        - generated-code verification workflow
+        - provenance and licensing checks
+
+l2_evidence_load:
+  token_target: bounded_by_task
+  allowed_when:
+    - implementation requires source-level detail
+    - a claim is disputed
+    - a version or backend changed
+    - an experiment must be reproduced
+    - a benchmark must be compared
+  may_include:
+    - source documentation references
+    - repository files and commits
+    - experiment records
+    - execution receipts
+    - benchmark artifacts
+    - visual regression evidence
+  forbidden:
+    - authority escalation
+    - promotion-state mutation
+    - binary asset embedding
+    - sibling canon injection
+    - unrequested full-lane dump
+
+routing_outputs:
+  required:
+    - resolved_scope_key
+    - application_class
+    - selected_l0_records
+    - selected_l1_records
+    - opened_l2_evidence
+    - rejected_sibling_scopes
+    - authority_decisions
+    - unresolved_conflicts
+    - packet_fingerprint
+
+invariants:
+  - L0 to L1 to L2 expansion is deterministic for the same registered inputs and versions.
+  - Expansion adds detail but cannot change scope, authority, epistemic type, or promotion state.
+  - Research records remain research records after retrieval.
+  - Project decisions remain inside their registered project branch.
+  - Missing authority metadata blocks promotion and destination-write planning.
