@@ -1,4 +1,5 @@
 import { CapabilityDiscoveryError, CapabilityDiscoveryService } from "./service.ts";
+import type { CapabilityRegistryMetadata } from "./service.ts";
 import type {
   CapabilityDiscoveryInput,
   CapabilityDiscoverySnapshot,
@@ -16,6 +17,14 @@ export class CapabilityDiscoveryRuntime {
 
   listCapabilities() {
     return this.service.listSummaries();
+  }
+
+  registryVersion() {
+    return this.service.registryVersion();
+  }
+
+  registrySource() {
+    return this.service.registrySource();
   }
 
   async registryFingerprint() {
@@ -41,6 +50,8 @@ export class CapabilityDiscoveryRuntime {
       intent_class: envelope.intent_class,
       scope_key: envelope.scope_key,
       mode: envelope.mode,
+      registry_version: envelope.registry_version,
+      registry_fingerprint: envelope.registry_fingerprint,
     });
     for (const candidate of envelope.eligible_candidates) {
       this.emit(snapshot, "capability.candidate.returned", {
@@ -185,4 +196,5 @@ export class CapabilityDiscoveryRuntime {
 
 export const createCapabilityDiscoveryRuntime = (
   definitions: readonly RuntimeCapabilityDefinition[],
-) => new CapabilityDiscoveryRuntime(new CapabilityDiscoveryService(() => definitions));
+  metadata?: CapabilityRegistryMetadata,
+) => new CapabilityDiscoveryRuntime(new CapabilityDiscoveryService(() => definitions, metadata));

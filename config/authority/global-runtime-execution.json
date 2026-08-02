@@ -1,0 +1,11 @@
+{
+  "schema_name": "AuthorityBinding",
+  "schema_version": "1.0",
+  "binding_id": "authority:global-runtime:execution",
+  "scope_key": "global-runtime",
+  "authority_domain": "server-runtime-execution-state",
+  "authority_role": "GITHUB_EXECUTION_TRUTH",
+  "read_from": ["REPOSITORY_RUNTIME"],
+  "write_authorized": false,
+  "status": "ACTIVE"
+}

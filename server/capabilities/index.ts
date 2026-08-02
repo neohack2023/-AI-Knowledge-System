@@ -1,9 +1,5 @@
-import { nativeRuntimeCapabilityRegistry } from "./registry.ts";
-import { createCapabilityDiscoveryRuntime } from "./runtime.ts";
+import { portableAiosRuntime } from "../runtime/portable.ts";
 
-const capabilityGlobal = globalThis as typeof globalThis & {
-  __aiKnowledgeCapabilityRuntime?: ReturnType<typeof createCapabilityDiscoveryRuntime>;
-};
+export { portableAiosRuntime } from "../runtime/portable.ts";
 
-export const capabilityDiscoveryRuntime = capabilityGlobal.__aiKnowledgeCapabilityRuntime ??=
-  createCapabilityDiscoveryRuntime(nativeRuntimeCapabilityRegistry);
+export const capabilityDiscoveryRuntime = portableAiosRuntime.capabilityDiscovery;

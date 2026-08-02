@@ -1,0 +1,52 @@
+{
+  "schema_name": "RuntimeCapabilityDefinition",
+  "schema_version": "1.0",
+  "capability_id": "cap:internal-runtime-diagnostic",
+  "name": "Internal Runtime Diagnostic",
+  "description": "Runs the native server diagnostic workflow without external provider access.",
+  "workflow_id": "internal-runtime-diagnostic",
+  "version": "1.2.0",
+  "status": "ACTIVE",
+  "discoverable": true,
+  "intent_classes": ["runtime-diagnostic", "system-health-check"],
+  "positive_examples": ["run an internal runtime diagnostic"],
+  "negative_examples": ["write project canon"],
+  "overlap_group": "runtime-diagnostics",
+  "precedence_priority": 100,
+  "preferred_over": [],
+  "scope_allowlist": ["*"],
+  "scope_denylist": [],
+  "authority_domains": ["server-runtime-execution-state"],
+  "input_schema_ref": "aios://capabilities/internal-runtime-diagnostic/input/1.2.0",
+  "output_schema_ref": "aios://capabilities/internal-runtime-diagnostic/output/1.2.0",
+  "input_schema": {
+    "$id": "aios://capabilities/internal-runtime-diagnostic/input/1.2.0",
+    "type": "object",
+    "additionalProperties": true
+  },
+  "output_schema": {
+    "$id": "aios://capabilities/internal-runtime-diagnostic/output/1.2.0",
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "validated": { "type": "boolean" }
+    }
+  },
+  "expected_schema_fingerprint": "sha256:77378d6648bfb17e402e30bb5516cec546ad5e6a07228aeebe85906fd111cda6",
+  "handler_ref": "workflow:internal-runtime-diagnostic",
+  "trust_level": "INTERNAL_NATIVE",
+  "data_access": "EXECUTION_LOCAL",
+  "reversibility": "FULLY_REVERSIBLE",
+  "blast_radius": "PROCESS_LOCAL",
+  "autonomy_band": "A0",
+  "approval_required": false,
+  "materialization_requires_approval": false,
+  "execution_modes": ["LIVE"],
+  "health": {
+    "status": "VERIFIED",
+    "checked_at": "2026-07-26T00:00:00.000Z",
+    "expires_at": null,
+    "verification_source": "registered native handler"
+  },
+  "source_authority": "GITHUB_EXECUTION_TRUTH"
+}

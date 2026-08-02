@@ -27,7 +27,46 @@ jobs:
         run: npm ci
 
       - name: Build and test
-        run: npm test
+        run: |
+          mkdir -p outputs
+          set -o pipefail
+          npm test 2>&1 | tee outputs/build-and-test.log
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-and-test-diagnostics
+          path: outputs/build-and-test.log
+          if-no-files-found: warn
+
+  registry-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate, resolve, compose, and compile registry
+        run: |
+          mkdir -p outputs
+          node --experimental-transform-types --test tests/registry-compiler.test.mjs tests/phase1-scope-router.test.ts tests/phase1-portable-runtime.test.ts > outputs/registry-tests.tap 2>&1
+          node scripts/registry/cli.mjs compile --out outputs/registry
+
+      - name: Upload registry diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-registry-diagnostics
+          path: |
+            outputs/registry-tests.tap
+            outputs/registry/
+          if-no-files-found: warn
 
   public-release-boundary:
     runs-on: ubuntu-latest

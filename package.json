@@ -13,6 +13,8 @@
     "test": "npm run build && node --experimental-transform-types --test tests/*.test.mjs tests/*.test.ts && npm run test:spatial-compiler && npm run check:public-release",
     "test:spatial-compiler": "npm --prefix packages/spatial-three-compiler ci --ignore-scripts && npm --prefix packages/spatial-three-compiler test",
     "check:public-release": "node scripts/public-release/check.mjs --manifest public-release-manifest.yaml --report outputs/public-release-report.json",
+    "registry:validate": "node scripts/registry/cli.mjs validate",
+    "registry:compile": "node scripts/registry/cli.mjs compile",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
