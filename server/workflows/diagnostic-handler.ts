@@ -27,7 +27,7 @@ const requiredString = (record: Record<string, unknown>, key: string) => (
 
 export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
   readonly workflow_id = "internal-runtime-diagnostic";
-  readonly version = "1.2.0";
+  readonly version = "1.3.0";
   readonly allowed_scope_keys = ["*"] as const;
   readonly supports_pause = true;
   readonly supports_cancel = true;
@@ -40,6 +40,7 @@ export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
       object_id: `workflow-input:${execution.execution_id}`,
       object_type: "workflow_execution_input",
       operation: "RETRIEVAL",
+      epistemic_type: "CLAIM",
       source_system: "TRANSIENT_CONTEXT",
       source_id: "workflow_execution.input",
       source_version: null,
@@ -81,6 +82,7 @@ export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
         object_id: `diagnostic-digest:${execution.execution_id}`,
         object_type: "derived_execution_evidence",
         operation: "TRANSFORMATION",
+        epistemic_type: "ACTION_RESULT",
         source_system: "WORKFLOW_KERNEL",
         source_id: "internal-runtime-diagnostic/compute",
         source_version: this.version,
@@ -174,6 +176,7 @@ export class InternalDiagnosticWorkflowHandler implements WorkflowHandler {
           object_id: `governed-write-probe:${execution.execution_id}`,
           object_type: "process_local_write_receipt",
           operation: "GOVERNED_WRITE",
+          epistemic_type: "ACTION_RESULT",
           source_system: "WORKFLOW_KERNEL",
           source_id: "WorkflowExecution.output/governed_write_probe",
           source_version: this.version,
