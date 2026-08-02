@@ -19,10 +19,13 @@ jobs:
       DISPATCH_FIXTURE: ${{ inputs.dispatch_fixture }}
     steps:
       - name: Checkout declared repository state
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 1
 
       - name: Use Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
 
@@ -37,23 +40,21 @@ jobs:
           test -f "$DISPATCH_FIXTURE"
           test ! -L "$DISPATCH_FIXTURE"
 
-      - name: Validate contracts and frozen fixtures
+      - name: Validate schemas, contracts, and frozen fixtures
         run: node scripts/saf-n3d-0a/validate-fixtures.mjs
+
+      - name: Verify authorization time and source evidence
+        env:
+          SAF_TRUSTED_NOW: '2026-08-02T00:00:00Z'
+        run: node scripts/saf-n3d-0a/verify-dispatch-evidence.mjs "$DISPATCH_FIXTURE"
 
       - name: Build deterministic process-local mock package
         env:
           SAF_FIXED_TIME: '2026-08-01T20:00:00Z'
         run: node scripts/saf-n3d-0a/build-mock-run.mjs "$DISPATCH_FIXTURE" outputs/saf-n3d-0a
 
-      - name: Re-validate generated package
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFile } from 'node:fs/promises';
-          import { parseGlb, readJson, validateReceipt, validateValidationReport } from './scripts/saf-n3d-0a/contracts.mjs';
-          validateReceipt(await readJson('outputs/saf-n3d-0a/execution-receipt.json'));
-          validateValidationReport(await readJson('outputs/saf-n3d-0a/validation-report.json'));
-          parseGlb(await readFile('outputs/saf-n3d-0a/minimal-triangle.glb'));
-          NODE
+      - name: Verify derived outcome and artifact evidence
+        run: node scripts/saf-n3d-0a/verify-generated-package.mjs outputs/saf-n3d-0a
 
       - name: Upload non-authoritative candidate package
         uses: actions/upload-artifact@v4
