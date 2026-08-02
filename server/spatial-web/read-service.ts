@@ -25,6 +25,7 @@ export const spatialReadServiceIssueCodes = [
   "ENVELOPE_SCOPE_MISMATCH",
   "RECORD_VALIDATION_FAILED",
   "RECEIPT_NOT_FOUND",
+  "UNVALIDATED_EVIDENCE_REFERENCE",
   "PACKET_INPUT_REJECTED",
 ] as const;
 export type SpatialReadServiceIssueCode = (typeof spatialReadServiceIssueCodes)[number];
@@ -97,6 +98,35 @@ const assertScope = <T>(
 );
 
 const uniqueSorted = (values: readonly string[]) => [...new Set(values)].sort();
+
+const collectValidatedEvidenceRefs = (
+  researchRecords: readonly ReadSourceEnvelope<ResearchIndexRecord>[],
+  engineProfiles: readonly ReadSourceEnvelope<EngineProfileRecord>[],
+  experimentRecords: readonly ReadSourceEnvelope<ExperimentRecord>[],
+) => {
+  const refs = new Set<string>();
+  for (const envelope of researchRecords) {
+    refs.add(envelope.source_locator);
+    envelope.record.disclosure.l2_refs.forEach((reference) => refs.add(reference));
+    envelope.record.related_asset_refs?.forEach((reference) => refs.add(reference));
+    envelope.record.source_refs.forEach((source) => {
+      if (source.source_url) refs.add(source.source_url);
+    });
+  }
+  for (const envelope of engineProfiles) {
+    refs.add(envelope.source_locator);
+    envelope.record.evidence_refs.forEach((reference) => refs.add(reference));
+    envelope.record.capability_claims.forEach((claim) => {
+      claim.evidence_refs?.forEach((reference) => refs.add(reference));
+    });
+  }
+  for (const envelope of experimentRecords) {
+    refs.add(envelope.source_locator);
+    envelope.record.artifact_refs.forEach((reference) => refs.add(reference));
+    refs.add(envelope.record.execution_receipt_id);
+  }
+  return refs;
+};
 
 export class SpatialReadValidationService {
   readonly #ports: SpatialReadPorts;
@@ -208,13 +238,24 @@ export class SpatialReadValidationService {
       else experimentRecords.push(result.envelope);
     }
 
+    const validatedEvidenceRefs = collectValidatedEvidenceRefs(researchRecords, engineProfiles, experimentRecords);
+    for (const [index, reference] of (request.packet_request.requested_evidence_refs ?? []).entries()) {
+      if (!validatedEvidenceRefs.has(reference)) {
+        issues.push({
+          code: "UNVALIDATED_EVIDENCE_REFERENCE",
+          path: `packet_request.requested_evidence_refs[${index}]`,
+          message: `Evidence reference ${reference} is not reachable from a validated source record.`,
+        });
+      }
+    }
+
     if (issues.length > 0) {
       return {
         status: "REJECTED",
         issues: [{
           code: "PACKET_INPUT_REJECTED",
           path: "packet_request",
-          message: "At least one requested source record failed retrieval or validation.",
+          message: "At least one requested source record or evidence reference failed retrieval or validation.",
         }, ...issues],
       };
     }
