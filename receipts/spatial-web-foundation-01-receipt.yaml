@@ -1,8 +1,9 @@
 receipt_id: receipt:spatial-web-foundation-01:2026-08-02
 slice_id: SPATIAL_WEB_FOUNDATION_01
-recorded_at: '2026-08-02T04:46:00Z'
+recorded_at: '2026-08-02T04:48:00Z'
 scope_key: global-working-memory
 terminal_state: CONTRACT_READY_NO_CANON_PROMOTION
+incident_state: GITHUB_MAIN_WRITE_BOUNDARY_INCIDENT_CONTENT_REMEDIATED
 status: Candidate
 
 objective: Establish the research lane and memory contracts without promoting unverified technical doctrine.
@@ -24,40 +25,66 @@ authority_snapshot:
   github:
     role: live repository implementation facts
     repository: neohack2023/-AI-Knowledge-System
-    base_branch: main
-    base_sha: a65bc61c65e7c5edafb0afb22e6d42aff89704fd
+    pre_slice_base_sha: a65bc61c65e7c5edafb0afb22e6d42aff89704fd
     candidate_branch: agent/spatial-web-foundation-01-contracts
-    draft_pull_request: https://github.com/neohack2023/-AI-Knowledge-System/pull/29
-    main_modified: false
+    pull_request: https://github.com/neohack2023/-AI-Knowledge-System/pull/29
+    automatic_merge_commit: 5a94c57ac4a461b93ad1fac5b4e9475989f93eb7
+    restored_main_head: 0774b643a34a3f2888e154ad33dacc60182c2f2c
+    main_history_modified: true
+    main_net_file_difference_from_pre_slice_base: 0
+    contract_files_remaining_on_main: 0
     merge_authorized: false
+
+incident:
+  type: WRITE_BOUNDARY_VIOLATION
+  system: GitHub
+  summary: PR 29 merged automatically before the requested candidate review hold could be enforced.
+  detected_by: post-write PR readback
+  affected_paths:
+    - docs/spatial-web-foundation-01/README.md
+    - fixtures/spatial-web-foundation-fixtures.yaml
+    - packets/spatial-web-core-retrieval-packet.yaml
+    - receipts/spatial-web-foundation-01-receipt.yaml
+    - schemas/spatial-web-contracts.schema.yaml
+    - skills/spatial-web-candidate-skills.yaml
+    - tests/spatial-web-promotion-isolation-tests.md
+  remediation:
+    - removed only the seven files introduced by PR 29 from main
+    - preserved all pre-existing repository files
+    - compared pre-slice base to restored main
+    - confirmed compare result files is an empty list
+  residual_effect:
+    - repository history contains the merge and seven compensating deletion commits
+    - candidate branch still contains the contract artifacts
+    - no spatial-web contract content remains on main
 
 outputs:
   - id: lane-specification
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: docs/spatial-web-foundation-01/README.md
   - id: research-index-schema
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: schemas/spatial-web-contracts.schema.yaml
   - id: spatial-memory-card-schema
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: schemas/spatial-web-contracts.schema.yaml
   - id: engine-profile-schema
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: schemas/spatial-web-contracts.schema.yaml
   - id: experiment-record-schema
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: schemas/spatial-web-contracts.schema.yaml
   - id: core-retrieval-packet
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: packets/spatial-web-core-retrieval-packet.yaml
   - id: candidate-skill-specifications
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: skills/spatial-web-candidate-skills.yaml
   - id: five-fixture-records
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: fixtures/spatial-web-foundation-fixtures.yaml
   - id: promotion-and-sibling-isolation-tests
-    state: COMPLETE
+    state: COMPLETE_ON_CANDIDATE_BRANCH
     path: tests/spatial-web-promotion-isolation-tests.md
 
 verification:
@@ -66,27 +93,27 @@ verification:
   project_decisions_remain_project_local: PASS_BY_CONTRACT
   version_sensitive_claims_require_review_triggers: PASS_BY_CONTRACT
   deterministic_l0_l1_l2_expansion: PASS_BY_CONTRACT
-  no_durable_authoritative_source_write: PASS
+  no_durable_authoritative_notion_write: PASS
+  no_durable_authoritative_drive_write: PASS
+  github_main_write_boundary: VIOLATED_THEN_CONTENT_REMEDIATED
+  github_main_content_equivalence: PASS
   no_canon_promotion: PASS
   no_active_skill_or_workflow_promotion: PASS
   no_runtime_activation: PASS
   no_sibling_canon_mutation: PASS
 
 write_scope:
-  allowed:
+  intended:
     - isolated GitHub candidate branch
     - non-authoritative Drive research scaffold
     - non-authoritative Drive candidate-memory contract scaffold
     - non-authoritative Drive execution scaffold
     - Notion implementation cockpit page
-  forbidden_and_untouched:
-    - GitHub main
-    - authoritative Notion canon
-    - active skill registry
-    - project hard-memory branches
-    - Drive operations ledger
-    - production destinations
-    - runtime registry
+  actual_additional_history:
+    - automatic merge commit on main
+    - seven compensating deletion commits on main
+  forbidden_content_remaining:
+    - none
 
 notes:
   - Contract validation specifications are present; executable validators are not implemented in this slice.
