@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canonicalJson, normalizeBlueprint } from '../src/core.mjs';
 import { prepareSpatialInput } from '../src/index.mjs';
+import { buildScene } from '../src/three-adapter.mjs';
 import {
   runProcessLocalSpatialOrchestration,
   SpatialOrchestrationError,
@@ -182,7 +183,7 @@ function reportFor(dispatch, overrides = {}) {
       topology_family: 'TRIANGLE_MESH',
       units: 'm',
       coordinate_system: 'RIGHT_HANDED_Y_UP_NEGATIVE_Z_FORWARD',
-      bounds: { min: [-0.5, 0, -0.5], max: [0.5, 1, 0.5] },
+      bounds: { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] },
       dimensions: [1, 1, 1],
       vertex_count: 24,
       face_count: 12,
@@ -228,12 +229,23 @@ function reportFor(dispatch, overrides = {}) {
 }
 
 async function fakeCompiler(input) {
+  const normalizedBlueprint = normalizeBlueprint(prepareSpatialInput(input));
+  const { scene } = buildScene(normalizedBlueprint);
   return {
-    normalizedBlueprint: normalizeBlueprint(prepareSpatialInput(input)),
+    normalizedBlueprint,
+    scene,
     receipt: {
       contract: 'ThreeCompilerReceipt/0.1',
       status: 'PASS',
     },
+    validation: [
+      { format: 'gltf', errorCount: 0 },
+      { format: 'glb', errorCount: 0 },
+    ],
+    roundTrip: [
+      { format: 'gltf', equal: true },
+      { format: 'glb', equal: true },
+    ],
     outputs: {},
   };
 }
@@ -260,7 +272,7 @@ function run(overrides = {}) {
   });
 }
 
-test('orchestrates compile, derived validation, and receipt without granting authority', async () => {
+test('orchestrates compile, compiler-observation binding, derived validation, and receipt without granting authority', async () => {
   const dispatch = makeDispatch();
   const result = await run({ dispatch });
 
@@ -273,6 +285,7 @@ test('orchestrates compile, derived validation, and receipt without granting aut
   assert.equal(result.receipt.metadata.spatial_compute.environment.fixture_subject_base_sha, BASE_SHA);
   assert.equal(result.validationReport.acceptance.state, 'PENDING');
   assert.equal(result.derivedValidation.technical_outcome, 'PASS');
+  assert.ok(result.receipt.authority_decisions.includes('COMPILER_OBSERVATIONS_BOUND'));
   assert.deepEqual(result.authority, {
     execution_scope: 'PROCESS_LOCAL',
     external_effect: 'NONE',
@@ -347,20 +360,34 @@ test('rejects missing required effects and a tampered authorization digest', asy
   );
 });
 
-test('rejects a report whose declared outcome conflicts with profile-derived blockers', async () => {
+test('rejects caller-reported geometry that differs from compiler observations', async () => {
   const dispatch = makeDispatch();
-  const invalidReport = reportFor(dispatch, {
+  const forgedReport = reportFor(dispatch, {
     components: [{
       ...reportFor(dispatch).components[0],
-      vertex_count: 1001,
+      vertex_count: 8,
     }],
-    technical_outcome: 'PASS',
   });
 
   await assert.rejects(
     run({
       dispatch,
-      createValidationReport: () => invalidReport,
+      createValidationReport: () => forgedReport,
+    }),
+    (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
+  );
+});
+
+test('rejects a declared outcome that conflicts with the selected profile after observations are bound', async () => {
+  const dispatch = makeDispatch();
+  const restrictiveProfile = structuredClone(validationProfile);
+  restrictiveProfile.geometry_rules.max_vertices = 20;
+
+  await assert.rejects(
+    run({
+      dispatch,
+      validationProfile: restrictiveProfile,
+      createValidationReport: () => reportFor(dispatch),
     }),
     (error) => error instanceof SpatialOrchestrationError &&
       error.code === 'DERIVED_VALIDATION_MISMATCH' &&
