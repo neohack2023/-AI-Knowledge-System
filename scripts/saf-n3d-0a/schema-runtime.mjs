@@ -79,12 +79,15 @@ function validateNode(schema, value, path, root) {
 
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     for (const key of schema.required ?? []) if (!(key in value)) fail(`${path}.${key}`, 'required', 'required property is missing');
-    for (const [key, child] of Object.entries(schema.properties ?? {})) {
+    const declared = schema.properties ?? {};
+    for (const [key, child] of Object.entries(declared)) {
       if (key in value) validateNode(child, value[key], `${path}.${key}`, root);
     }
+    const additionalKeys = Object.keys(value).filter((key) => !(key in declared));
     if (schema.additionalProperties === false) {
-      const allowed = new Set(Object.keys(schema.properties ?? {}));
-      for (const key of Object.keys(value)) if (!allowed.has(key)) fail(`${path}.${key}`, 'additionalProperties', 'unexpected property');
+      for (const key of additionalKeys) fail(`${path}.${key}`, 'additionalProperties', 'unexpected property');
+    } else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+      for (const key of additionalKeys) validateNode(schema.additionalProperties, value[key], `${path}.${key}`, root);
     }
   }
 }
