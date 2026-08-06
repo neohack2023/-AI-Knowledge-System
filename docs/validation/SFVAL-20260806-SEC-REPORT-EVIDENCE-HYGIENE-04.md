@@ -22,10 +22,12 @@ The handler does not fetch URLs, open targets, parse live credentials, perform O
 
 ## Replay fixtures
 
-1. `cure53-odk.sanitized.json`
+The fixture module `tests/fixtures/security-report-evidence-hygiene.ts` exports two sanitized extraction envelopes:
+
+1. `cure53OdkInput`
    - Source class: `public_release_with_residual_identifiers`
    - Expected replay: thirteen baseline check records
-2. `ros-ushahidi.sanitized.json`
+2. `rosUshahidiInput`
    - Source class: `public_redacted_report_with_critical_residual_secrets`
    - Expected replay: thirteen baseline check records
 
@@ -33,7 +35,7 @@ The fixtures contain no source secrets. They preserve only bounded observations 
 
 ## Baseline comparison
 
-The test suite compares the canonical projection `{check_id -> state + finding_code}` for each replay with `cross-run-baseline.json`. It also verifies:
+The test suite compares the canonical projection `{check_id -> state + finding_code}` for each replay with the exported `crossRunBaseline`. It also verifies:
 
 - identical ordered check families across both reports
 - no control drift
