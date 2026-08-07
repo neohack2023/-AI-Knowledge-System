@@ -96,10 +96,12 @@ test("incorrect safe word is rejected before any planning output", async () => {
 });
 
 test("LIVE mode is blocked independently of the supplied safe word", async () => {
-  const input = boundedInput("not-evaluated-in-live-mode") as AuthorizedLateralMovementGateInput & { mode: string };
-  input.mode = "LIVE";
+  const input = {
+    ...boundedInput("not-evaluated-in-live-mode"),
+    mode: "LIVE",
+  } as unknown as AuthorizedLateralMovementGateInput;
   await assert.rejects(
-    runAuthorizedLateralMovementGate(input as AuthorizedLateralMovementGateInput, fixedNow),
+    runAuthorizedLateralMovementGate(input, fixedNow),
     /QUARANTINED_SIMULATION_ONLY/,
   );
 });
