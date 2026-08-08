@@ -91,6 +91,31 @@ const capabilityDiscoveryOutputSchema = {
   },
 } as const;
 
+const repositoryContextRetrievalInputSchema = {
+  $id: "aios://capabilities/repository-context-retrieval/input/1.0.0",
+  type: "object",
+  additionalProperties: false,
+  required: ["request_text", "requested_scope"],
+  properties: {
+    request_text: { type: "string", minLength: 1 },
+    requested_scope: { type: "string", minLength: 1 },
+  },
+} as const;
+
+const repositoryContextRetrievalOutputSchema = {
+  $id: "aios://capabilities/repository-context-retrieval/output/1.0.0",
+  type: "object",
+  additionalProperties: true,
+  required: ["trace_id", "status", "packet", "result", "receipt"],
+  properties: {
+    trace_id: { type: "string", minLength: 1 },
+    status: { enum: ["COMPLETED", "FAILED"] },
+    packet: { type: ["object", "null"] },
+    result: { type: ["object", "null"] },
+    receipt: { type: ["object", "null"] },
+  },
+} as const;
+
 export const internalRuntimeDiagnosticCapability: RuntimeCapabilityDefinition = {
   schema_name: "RuntimeCapabilityDefinition",
   schema_version: "1.0",
@@ -180,6 +205,52 @@ export const capabilityDiscoveryCapability: RuntimeCapabilityDefinition = {
     checked_at: "2026-07-26T13:00:00.000Z",
     expires_at: null,
     verification_source: "native API discover action; CI required before merge",
+  },
+  source_authority: "GITHUB_EXECUTION_TRUTH",
+};
+
+export const repositoryContextRetrievalCapability: RuntimeCapabilityDefinition = {
+  schema_name: "RuntimeCapabilityDefinition",
+  schema_version: "1.0",
+  capability_id: "cap:repository-context-retrieval",
+  name: "Repository Context Retrieval",
+  description: "Resolves the global AIOS scope, retrieves current repository execution facts, assembles a bounded context packet, and emits a performance receipt.",
+  workflow_id: "repository-context-query",
+  version: "1.0.0",
+  status: "ACTIVE",
+  discoverable: true,
+  intent_classes: ["repository-context-retrieval", "aios-runtime-query", "runtime-observability"],
+  positive_examples: [
+    "show the current AIOS runtime components",
+    "retrieve repository execution facts for AI_MEMORY_OS",
+    "run the observable context packet route",
+  ],
+  negative_examples: ["write project canon", "update external memory", "execute a repository mutation"],
+  overlap_group: "context-retrieval",
+  precedence_priority: 110,
+  preferred_over: [],
+  scope_allowlist: ["global-working-memory"],
+  scope_denylist: [],
+  authority_domains: ["github-repository-execution-truth"],
+  input_schema_ref: "aios://capabilities/repository-context-retrieval/input/1.0.0",
+  output_schema_ref: "aios://capabilities/repository-context-retrieval/output/1.0.0",
+  input_schema: repositoryContextRetrievalInputSchema,
+  output_schema: repositoryContextRetrievalOutputSchema,
+  expected_schema_fingerprint: "sha256:40dc729827ce5d9f62e0da2fd5a00662602cc8abe0090a9fabfee15a1e1c3c16",
+  handler_ref: "api:/api/aios-runtime",
+  trust_level: "INTERNAL_NATIVE",
+  data_access: "EXECUTION_LOCAL",
+  reversibility: "FULLY_REVERSIBLE",
+  blast_radius: "PROCESS_LOCAL",
+  autonomy_band: "A0",
+  approval_required: false,
+  materialization_requires_approval: false,
+  execution_modes: ["LIVE"],
+  health: {
+    status: "VERIFIED",
+    checked_at: "2026-08-08T00:00:00.000Z",
+    expires_at: null,
+    verification_source: "native API route + repository-backed source adapter + CI",
   },
   source_authority: "GITHUB_EXECUTION_TRUTH",
 };

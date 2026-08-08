@@ -107,12 +107,14 @@ test("discovery preserves exact scope and records eligible and rejected candidat
     candidate.capability_id === "cap:capability-discovery"
     && candidate.reason_codes.includes("REQUESTED_CAPABILITY_MISMATCH")
   )));
-  assert.deepEqual(discovered.body.events.map((event) => event.event_type), [
-    "capability.discovery.started",
-    "capability.candidate.returned",
-    "capability.candidate.rejected",
-    "capability.discovery.completed",
-  ]);
+  const eventTypes = discovered.body.events.map((event) => event.event_type);
+  assert.equal(eventTypes[0], "capability.discovery.started");
+  assert.equal(eventTypes.at(-1), "capability.discovery.completed");
+  assert.equal(eventTypes.filter((eventType) => eventType === "capability.candidate.returned").length, 1);
+  assert.equal(
+    eventTypes.filter((eventType) => eventType === "capability.candidate.rejected").length,
+    discovered.body.envelope.rejected_candidates.length,
+  );
 });
 
 test("explicit capability IDs constrain candidates but do not bypass intent boundaries", async () => {
