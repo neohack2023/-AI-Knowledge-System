@@ -32,7 +32,13 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Experimental replay failed.";
     const code = message.split(":", 1)[0] || "EXPERIMENTAL_REPLAY_FAILED";
-    const status = ["EXPERIMENTAL_SIMULATION_ONLY", "SCOPE_NOT_ALLOWED", "SANITIZED_EXTRACT_REQUIRED", "SENSITIVE_INPUT_BLOCKED"].includes(code)
+    const status = [
+      "EXPERIMENTAL_SIMULATION_ONLY",
+      "SCOPE_NOT_ALLOWED",
+      "SENSITIVE_INPUT_BLOCKED",
+      "UNSAFE_SOURCE_POINTER",
+      "EXTRACTION_DIGEST_MISMATCH",
+    ].includes(code)
       ? 409
       : 400;
     return json({ error: { code, message } }, status);

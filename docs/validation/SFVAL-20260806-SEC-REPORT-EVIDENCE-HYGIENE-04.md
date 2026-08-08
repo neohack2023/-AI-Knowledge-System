@@ -18,7 +18,7 @@ Experimental read-only registry lane plus a SIMULATION-only PDF/document extract
 - External effects: none
 - Persistence: process-local output only
 
-The handler does not fetch URLs, open targets, parse live credentials, perform OCR, alter reports, or claim that a source was sanitized merely because it is public. PDF extraction remains an upstream read-only adapter boundary. This slice validates the normalized sanitized extraction envelope and its evidence pointers.
+The handler does not fetch URLs, open targets, parse live credentials, perform OCR, or alter reports. It snapshots the normalized envelope, validates every typed constant and bounded field at runtime, independently applies sanitization policy `1.0`, and verifies the canonical extraction digest before emitting records. It claims only that the supplied bounded extraction passed that policy; it does not claim the upstream source is sanitized merely because it is public. PDF extraction remains an upstream read-only adapter boundary.
 
 ## Replay fixtures
 

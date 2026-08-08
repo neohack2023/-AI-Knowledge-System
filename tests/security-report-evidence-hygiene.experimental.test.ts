@@ -19,6 +19,12 @@ import {
 
 const fixedNow = () => "2026-08-06T23:42:00.000Z";
 
+type MutableInput = Record<string, unknown> & {
+  document: Record<string, unknown> & {
+    observations: Array<Record<string, unknown>>;
+  };
+};
+
 test("experimental registry exposes one read-only SIMULATION-only capability", () => {
   assert.equal(experimentalReadOnlyCapabilityRegistry.length, 1);
   assert.equal(securityReportEvidenceHygieneExperimentalEntry.lifecycle_status, "EXPERIMENTAL");
@@ -39,6 +45,9 @@ test("replay of Cure53 ODK sanitized extraction matches the accepted baseline pr
   assert.equal(output.network_accessed, false);
   assert.equal(output.credential_use, false);
   assert.equal(output.scope_isolation, "PASS");
+  assert.equal(output.extraction_digest_verified, true);
+  assert.equal(output.sanitization_verification, "POLICY_VALIDATED");
+  assert.equal(output.sanitization_policy_version, "1.0");
 });
 
 test("replay of ROS Ushahidi sanitized extraction matches the accepted baseline projection", async () => {
@@ -91,5 +100,59 @@ test("handler rejects LIVE execution and raw secret material before emitting rec
   await assert.rejects(
     runSecurityReportEvidenceHygieneSimulation(unsafeInput, fixedNow),
     /SENSITIVE_INPUT_BLOCKED/,
+  );
+});
+
+test("handler validates typed constants at runtime", async () => {
+  const mutations: Array<[string, (input: MutableInput) => void, RegExp]> = [
+    ["schema name", (input) => { input.schema_name = "OtherInput"; }, /INPUT_SCHEMA_NAME_MISMATCH/],
+    ["schema version", (input) => { input.schema_version = "2.0"; }, /INPUT_SCHEMA_VERSION_MISMATCH/],
+    ["candidate", (input) => { input.candidate_id = "skill-candidate:other"; }, /EXPERIMENTAL_CAPABILITY_MISMATCH/],
+    ["baseline", (input) => { input.baseline_id = "SFVAL-OTHER"; }, /BASELINE_NOT_ACCEPTED/],
+    ["media type", (input) => { input.document.media_type = "text/html"; }, /MEDIA_TYPE_NOT_ALLOWED/],
+    ["state", (input) => { input.document.observations[0].state = "UNKNOWN"; }, /UNKNOWN_STATE/],
+    ["confidence", (input) => { input.document.observations[0].confidence = "CERTAIN"; }, /UNKNOWN_CONFIDENCE/],
+  ];
+
+  for (const [name, mutate, expected] of mutations) {
+    const input = structuredClone(cure53OdkInput) as unknown as MutableInput;
+    mutate(input);
+    await assert.rejects(
+      runSecurityReportEvidenceHygieneSimulation(input as SecurityReportEvidenceHygieneSimulationInput, fixedNow),
+      expected,
+      name,
+    );
+  }
+});
+
+test("handler derives sanitization status and rejects caller assertions, identifiers, and unsafe source pointers", async () => {
+  const assertedSanitization = structuredClone(cure53OdkInput) as unknown as MutableInput;
+  assertedSanitization.document.sanitized_extract = true;
+  await assert.rejects(
+    runSecurityReportEvidenceHygieneSimulation(assertedSanitization as SecurityReportEvidenceHygieneSimulationInput, fixedNow),
+    /INVALID_DOCUMENT_FIELDS/,
+  );
+
+  const personalIdentifier = structuredClone(cure53OdkInput);
+  personalIdentifier.document.observations[0].observed.push("analyst@example.com");
+  await assert.rejects(
+    runSecurityReportEvidenceHygieneSimulation(personalIdentifier, fixedNow),
+    /SENSITIVE_INPUT_BLOCKED/,
+  );
+
+  const unsafePointer = structuredClone(cure53OdkInput);
+  unsafePointer.document.source_pointer = "https://example.com/report.pdf?token=not-public";
+  await assert.rejects(
+    runSecurityReportEvidenceHygieneSimulation(unsafePointer, fixedNow),
+    /UNSAFE_SOURCE_POINTER/,
+  );
+});
+
+test("handler verifies the extraction digest before emitting records", async () => {
+  const altered = structuredClone(cure53OdkInput);
+  altered.document.observations[0].observed[0] = "different bounded observation";
+  await assert.rejects(
+    runSecurityReportEvidenceHygieneSimulation(altered, fixedNow),
+    /EXTRACTION_DIGEST_MISMATCH/,
   );
 });

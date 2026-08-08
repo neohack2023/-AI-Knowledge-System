@@ -28,6 +28,20 @@ export const securityReportEvidenceHygieneStates = [
   "NONE",
 ] as const;
 
+const inputSchemaName = "SecurityReportEvidenceHygieneSimulationInput" as const;
+const inputSchemaVersion = "1.0" as const;
+const simulationMode = "SIMULATION" as const;
+const allowedScopeKey = "global-working-memory" as const;
+const experimentalCandidateId = "skill-candidate:validate-security-report-evidence-hygiene:v0.2" as const;
+const acceptedBaselineId = "SFVAL-20260806-SEC-REPORT-EVIDENCE-HYGIENE-03" as const;
+const sanitizationPolicyVersion = "1.0" as const;
+const allowedMediaTypes = [
+  "application/pdf",
+  "text/plain",
+  "application/vnd.google-apps.document",
+] as const;
+const allowedConfidences = ["HIGH", "MEDIUM", "LOW"] as const;
+
 export type SecurityReportEvidenceHygieneState =
   (typeof securityReportEvidenceHygieneStates)[number];
 
@@ -48,7 +62,6 @@ export type SanitizedSecurityReportDocumentEnvelope = {
   media_type: "application/pdf" | "text/plain" | "application/vnd.google-apps.document";
   source_pointer: string;
   source_classification: string;
-  sanitized_extract: true;
   extraction_digest: string;
   observations: SanitizedSecurityReportObservation[];
 };
@@ -72,7 +85,7 @@ export type SecurityReportEvidenceHygieneObservabilityRecord = {
   observed: string[];
   missing: string[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
-  source_fact_class: "SANITIZED_SOURCE_OBSERVATION";
+  source_fact_class: "POLICY_VALIDATED_SOURCE_OBSERVATION";
 };
 
 export type SecurityReportEvidenceHygieneEvent = {
@@ -96,6 +109,9 @@ export type SecurityReportEvidenceHygieneSimulationOutput = {
   document_id: string;
   source_classification: string;
   input_digest: string;
+  extraction_digest_verified: true;
+  sanitization_verification: "POLICY_VALIDATED";
+  sanitization_policy_version: "1.0";
   observability_records: SecurityReportEvidenceHygieneObservabilityRecord[];
   events: SecurityReportEvidenceHygieneEvent[];
   scope_isolation: "PASS";
@@ -139,7 +155,6 @@ export const securityReportEvidenceHygieneInputSchema = {
         "media_type",
         "source_pointer",
         "source_classification",
-        "sanitized_extract",
         "extraction_digest",
         "observations",
       ],
@@ -152,7 +167,6 @@ export const securityReportEvidenceHygieneInputSchema = {
         },
         source_pointer: { type: "string", minLength: 1 },
         source_classification: { type: "string", minLength: 1 },
-        sanitized_extract: { const: true },
         extraction_digest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
         observations: {
           type: "array",
@@ -203,6 +217,9 @@ export const securityReportEvidenceHygieneOutputSchema = {
     "document_id",
     "source_classification",
     "input_digest",
+    "extraction_digest_verified",
+    "sanitization_verification",
+    "sanitization_policy_version",
     "observability_records",
     "events",
     "scope_isolation",
@@ -226,6 +243,9 @@ export const securityReportEvidenceHygieneOutputSchema = {
     document_id: { type: "string" },
     source_classification: { type: "string" },
     input_digest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+    extraction_digest_verified: { const: true },
+    sanitization_verification: { const: "POLICY_VALIDATED" },
+    sanitization_policy_version: { const: "1.0" },
     observability_records: { type: "array", minItems: 13, maxItems: 13 },
     events: { type: "array", minItems: 15 },
     scope_isolation: { const: "PASS" },
@@ -256,31 +276,120 @@ const sha256 = async (value: unknown) => {
   return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 };
 
+const unsafeMaterialPatterns = [
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i,
+  /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/,
+  /\bgh[opusr]_[A-Za-z0-9]{20,}\b/,
+  /\bsk-[A-Za-z0-9_-]{20,}\b/,
+  /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/,
+  /Bearer\s+[A-Za-z0-9._~+/=-]{20,}/i,
+  /(?:api[_-]?key|secret|token|password|passwd|pwd)\s*[:=]\s*["']?[^<\s][^\s,"'}]{7,}/i,
+  /(?:session|xsrf|csrf|cookie)\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{20,}/i,
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+] as const;
+
 const hasUnsafeSecretMaterial = (value: unknown) => {
   const serialized = JSON.stringify(value);
-  return [
-    /Bearer\s+[A-Za-z0-9._~+/=-]{20,}/i,
-    /(?:password|passwd|pwd)\s*[:=]\s*["']?[^<\s][^\s,"'}]{7,}/i,
-    /(?:session|xsrf|csrf|cookie)\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{20,}/i,
-  ].some((pattern) => pattern.test(serialized));
+  return unsafeMaterialPatterns.some((pattern) => pattern.test(serialized));
 };
 
-const validateInput = (input: SecurityReportEvidenceHygieneSimulationInput) => {
-  if (input.mode !== "SIMULATION") throw new Error("EXPERIMENTAL_SIMULATION_ONLY");
-  if (input.scope_key !== "global-working-memory") throw new Error("SCOPE_NOT_ALLOWED");
-  if (input.document.sanitized_extract !== true) throw new Error("SANITIZED_EXTRACT_REQUIRED");
-  if (hasUnsafeSecretMaterial(input)) throw new Error("SENSITIVE_INPUT_BLOCKED");
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
+const assertExactKeys = (value: Record<string, unknown>, expected: readonly string[], code: string) => {
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
+    throw new Error(`${code}:${actual.join(",")}`);
+  }
+};
+
+const assertNonEmptyString = (value: unknown, code: string, maximum = 1_000): asserts value is string => {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > maximum || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) {
+    throw new Error(code);
+  }
+};
+
+const assertStringArray = (value: unknown, code: string) => {
+  if (!Array.isArray(value) || value.length > 50) throw new Error(code);
+  value.forEach((item) => assertNonEmptyString(item, code));
+};
+
+const extractionProjection = (document: SanitizedSecurityReportDocumentEnvelope) => ({
+  document_id: document.document_id,
+  provider: document.provider,
+  engagement: document.engagement,
+  media_type: document.media_type,
+  source_pointer: document.source_pointer,
+  source_classification: document.source_classification,
+  observations: document.observations,
+});
+
+export const calculateSecurityReportExtractionDigest = (
+  document: SanitizedSecurityReportDocumentEnvelope,
+) => sha256(extractionProjection(document));
+
+const validateInputShape = (input: unknown): asserts input is SecurityReportEvidenceHygieneSimulationInput => {
+  if (!isRecord(input)) throw new Error("INVALID_INPUT_OBJECT");
+  assertExactKeys(input, [
+    "schema_name", "schema_version", "execution_id", "mode", "scope_key", "candidate_id", "baseline_id", "document",
+  ], "INVALID_INPUT_FIELDS");
+  if (input.schema_name !== inputSchemaName) throw new Error("INPUT_SCHEMA_NAME_MISMATCH");
+  if (input.schema_version !== inputSchemaVersion) throw new Error("INPUT_SCHEMA_VERSION_MISMATCH");
+  assertNonEmptyString(input.execution_id, "INVALID_EXECUTION_ID", 200);
+  if (input.mode !== simulationMode) throw new Error("EXPERIMENTAL_SIMULATION_ONLY");
+  if (input.scope_key !== allowedScopeKey) throw new Error("SCOPE_NOT_ALLOWED");
+  if (input.candidate_id !== experimentalCandidateId) throw new Error("EXPERIMENTAL_CAPABILITY_MISMATCH");
+  if (input.baseline_id !== acceptedBaselineId) throw new Error("BASELINE_NOT_ACCEPTED");
+  if (!isRecord(input.document)) throw new Error("INVALID_DOCUMENT_OBJECT");
+  assertExactKeys(input.document, [
+    "document_id", "provider", "engagement", "media_type", "source_pointer", "source_classification", "extraction_digest", "observations",
+  ], "INVALID_DOCUMENT_FIELDS");
+  assertNonEmptyString(input.document.document_id, "INVALID_DOCUMENT_ID", 200);
+  assertNonEmptyString(input.document.provider, "INVALID_PROVIDER", 200);
+  assertNonEmptyString(input.document.engagement, "INVALID_ENGAGEMENT", 500);
+  if (!(allowedMediaTypes as readonly unknown[]).includes(input.document.media_type)) throw new Error("MEDIA_TYPE_NOT_ALLOWED");
+  assertNonEmptyString(input.document.source_pointer, "INVALID_SOURCE_POINTER", 2_000);
+  assertNonEmptyString(input.document.source_classification, "INVALID_SOURCE_CLASSIFICATION", 200);
+  if (typeof input.document.extraction_digest !== "string" || !/^sha256:[a-f0-9]{64}$/.test(input.document.extraction_digest)) {
+    throw new Error("INVALID_EXTRACTION_DIGEST");
+  }
+  if (!Array.isArray(input.document.observations) || input.document.observations.length !== securityReportEvidenceHygieneCheckIds.length) {
+    throw new Error("INVALID_OBSERVATION_COUNT");
+  }
+
+  let sourceUrl: URL;
+  try {
+    sourceUrl = new URL(input.document.source_pointer);
+  } catch {
+    throw new Error("INVALID_SOURCE_POINTER");
+  }
+  if (sourceUrl.protocol !== "https:" || sourceUrl.username || sourceUrl.password || sourceUrl.search || sourceUrl.hash) {
+    throw new Error("UNSAFE_SOURCE_POINTER");
+  }
 
   const seen = new Set<SecurityReportEvidenceHygieneCheckId>();
   for (const observation of input.document.observations) {
-    if (!securityReportEvidenceHygieneCheckIds.includes(observation.check_id)) {
+    if (!isRecord(observation)) throw new Error("INVALID_OBSERVATION_OBJECT");
+    assertExactKeys(observation, [
+      "check_id", "state", "finding_code", "evidence_pointers", "observed", "missing", "confidence",
+    ], "INVALID_OBSERVATION_FIELDS");
+    if (!(securityReportEvidenceHygieneCheckIds as readonly unknown[]).includes(observation.check_id)) {
       throw new Error(`UNKNOWN_CHECK:${observation.check_id}`);
     }
     if (seen.has(observation.check_id)) throw new Error(`DUPLICATE_CHECK:${observation.check_id}`);
     seen.add(observation.check_id);
+    if (!(securityReportEvidenceHygieneStates as readonly unknown[]).includes(observation.state)) throw new Error("UNKNOWN_STATE");
+    assertNonEmptyString(observation.finding_code, "INVALID_FINDING_CODE", 200);
+    assertStringArray(observation.evidence_pointers, "INVALID_EVIDENCE_POINTERS");
+    assertStringArray(observation.observed, "INVALID_OBSERVED_VALUES");
+    assertStringArray(observation.missing, "INVALID_MISSING_VALUES");
+    if (!(allowedConfidences as readonly unknown[]).includes(observation.confidence)) throw new Error("UNKNOWN_CONFIDENCE");
   }
   const missing = securityReportEvidenceHygieneCheckIds.filter((checkId) => !seen.has(checkId));
   if (missing.length) throw new Error(`MISSING_CHECKS:${missing.join(",")}`);
+
+  if (hasUnsafeSecretMaterial(extractionProjection(input.document))) throw new Error("SENSITIVE_INPUT_BLOCKED");
 };
 
 export const observabilityProjection = (
@@ -296,15 +405,18 @@ export const runSecurityReportEvidenceHygieneSimulation = async (
   input: SecurityReportEvidenceHygieneSimulationInput,
   now: () => string = () => new Date().toISOString(),
 ): Promise<SecurityReportEvidenceHygieneSimulationOutput> => {
-  validateInput(input);
-  const inputDigest = await sha256(input);
+  const snapshot: unknown = structuredClone(input);
+  validateInputShape(snapshot);
+  const expectedExtractionDigest = await calculateSecurityReportExtractionDigest(snapshot.document);
+  if (snapshot.document.extraction_digest !== expectedExtractionDigest) throw new Error("EXTRACTION_DIGEST_MISMATCH");
+  const inputDigest = await sha256(snapshot);
   const emittedAt = now();
   let sequence = 0;
   const events: SecurityReportEvidenceHygieneEvent[] = [];
   const emit = (eventType: string, data: Record<string, unknown>) => {
     sequence += 1;
     events.push({
-      event_id: `${input.execution_id}:${sequence}`,
+      event_id: `${snapshot.execution_id}:${sequence}`,
       sequence,
       event_type: eventType,
       emitted_at: emittedAt,
@@ -313,25 +425,27 @@ export const runSecurityReportEvidenceHygieneSimulation = async (
   };
 
   emit("skill.experimental.execution.started", {
-    candidate_id: input.candidate_id,
+    candidate_id: snapshot.candidate_id,
     lifecycle_lane: "EXPERIMENTAL_READ_ONLY",
-    mode: input.mode,
-    scope_key: input.scope_key,
+    mode: snapshot.mode,
+    scope_key: snapshot.scope_key,
   });
   emit("document.read_only.bound", {
-    document_id: input.document.document_id,
-    media_type: input.document.media_type,
-    source_classification: input.document.source_classification,
-    sanitized_extract: true,
+    document_id: snapshot.document.document_id,
+    media_type: snapshot.document.media_type,
+    source_classification: snapshot.document.source_classification,
+    extraction_digest_verified: true,
+    sanitization_verification: "POLICY_VALIDATED",
+    sanitization_policy_version: sanitizationPolicyVersion,
     network_accessed: false,
   });
 
-  const byCheck = new Map(input.document.observations.map((observation) => [observation.check_id, observation]));
+  const byCheck = new Map(snapshot.document.observations.map((observation) => [observation.check_id, observation]));
   const records = securityReportEvidenceHygieneCheckIds.map((checkId) => {
     const observation = byCheck.get(checkId)!;
     const record: SecurityReportEvidenceHygieneObservabilityRecord = {
       ...structuredClone(observation),
-      source_fact_class: "SANITIZED_SOURCE_OBSERVATION",
+      source_fact_class: "POLICY_VALIDATED_SOURCE_OBSERVATION",
     };
     emit("skill.observability.check.completed", {
       check_id: record.check_id,
@@ -345,7 +459,7 @@ export const runSecurityReportEvidenceHygieneSimulation = async (
   });
 
   emit("skill.experimental.execution.completed", {
-    candidate_id: input.candidate_id,
+    candidate_id: snapshot.candidate_id,
     result: "REPLAY_COMPLETED",
     checks_emitted: records.length,
     source_mutation: false,
@@ -357,16 +471,19 @@ export const runSecurityReportEvidenceHygieneSimulation = async (
   return {
     schema_name: "SecurityReportEvidenceHygieneSimulationOutput",
     schema_version: "1.0",
-    execution_id: input.execution_id,
-    candidate_id: input.candidate_id,
-    baseline_id: input.baseline_id,
+    execution_id: snapshot.execution_id,
+    candidate_id: snapshot.candidate_id,
+    baseline_id: snapshot.baseline_id,
     mode: "SIMULATION",
     lifecycle_lane: "EXPERIMENTAL_READ_ONLY",
     handler_id: "handler:security-report-evidence-hygiene:1.0.0",
     handler_version: "1.0.0",
-    document_id: input.document.document_id,
-    source_classification: input.document.source_classification,
+    document_id: snapshot.document.document_id,
+    source_classification: snapshot.document.source_classification,
     input_digest: inputDigest,
+    extraction_digest_verified: true,
+    sanitization_verification: "POLICY_VALIDATED",
+    sanitization_policy_version: sanitizationPolicyVersion,
     observability_records: records,
     events,
     scope_isolation: "PASS",

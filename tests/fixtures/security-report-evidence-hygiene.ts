@@ -44,7 +44,6 @@ const makeInput = (
     media_type: "application/pdf",
     source_pointer,
     source_classification,
-    sanitized_extract: true,
     extraction_digest,
     observations,
   },
@@ -56,7 +55,7 @@ export const cure53OdkInput = makeInput(
   "ODK Mobile Apps, Server & Threat Model",
   "https://cure53.de/pentest-report_ODK.pdf",
   "public_release_with_residual_identifiers",
-  "sha256:3ab592cc2f138b56c1f9dbb7589d6d74917e15b1fd15aa8ac421ad588a8a66b5",
+  "sha256:ac86d97b585487173db3cfcd3706ad5a8d0c44e8ce74429249d44021981a2bb5",
   [
     observation("engagement_identity", "PASS", "ENGAGEMENT_IDENTITY_PRESENT", ["report:cover", "report:engagement-overview"], ["provider, subject, date, and engagement context declared"]),
     observation("declared_scope", "PASS", "DECLARED_SCOPE_PRESENT", ["report:scope"], ["application, server, and threat-model work packages declared"]),
@@ -80,7 +79,7 @@ export const rosUshahidiInput = makeInput(
   "Open Technology Fund / Ushahidi platform",
   "https://public.opentech.fund/documents/report_otf-ushahidi-pentest.pdf",
   "public_redacted_report_with_critical_residual_secrets",
-  "sha256:bb967f557fa538083a1cf1fb8122b90bc66b92f2c696e0714c4f99f7aeb243d8",
+  "sha256:b806695b5f018b739b07de9538c4bc3270d5edaa63088bf9798a4a94192e6602",
   [
     observation("engagement_identity", "PASS", "ENGAGEMENT_IDENTITY_PRESENT", ["report:cover", "report:version-history"], ["client, assessor, targets, version, authors, reviewers, approval, and timeline declared"]),
     observation("declared_scope", "PASS", "DECLARED_SCOPE_PRESENT", ["report:scope"], ["API, platform client, playbooks, and mobile interface declared"]),
