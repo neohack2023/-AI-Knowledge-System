@@ -38,7 +38,7 @@ export async function runProcessLocalSpatialOrchestration({
   dispatch,
   validationProfile,
   blueprint,
-  createValidationReport,
+  validationReport,
   executionRevision,
   observeExecutionRevision,
   compiler = compileSpatialAsset,
@@ -47,6 +47,7 @@ export async function runProcessLocalSpatialOrchestration({
   const trustedDispatch = immutableSnapshot(dispatch);
   const trustedValidationProfile = immutableSnapshot(validationProfile);
   const trustedBlueprint = immutableSnapshot(blueprint);
+  const trustedValidationReport = immutableSnapshot(validationReport);
   const declaredExecutionRevision = immutableSnapshot(executionRevision);
 
   validateDispatch(trustedDispatch);
@@ -62,10 +63,6 @@ export async function runProcessLocalSpatialOrchestration({
   if (trustedDispatch.validation_profile_id !== trustedValidationProfile.profile_id) {
     throw new SpatialOrchestrationError('VALIDATION_PROFILE_MISMATCH', 'Dispatch and validation profile IDs must match.');
   }
-  if (typeof createValidationReport !== 'function') {
-    throw new SpatialOrchestrationError('REPORT_FACTORY_REQUIRED', 'A deterministic validation-report factory is required.');
-  }
-
   const preparedBlueprint = prepareSpatialInput(trustedBlueprint);
   const normalizedInput = normalizeBlueprint(preparedBlueprint);
   const observedBlueprintDigest = `sha256:${normalizedInput.digest}`;
@@ -85,28 +82,17 @@ export async function runProcessLocalSpatialOrchestration({
   }
 
   const compilerEvidence = captureCompilerEvidence(compiled, normalizedInput);
-  const validationReport = immutableSnapshot(await createValidationReport(immutableSnapshot({
-    dispatch: trustedDispatch,
-    validationProfile: trustedValidationProfile,
-    blueprint: trustedBlueprint,
-    compiled: compilerEvidence.reportFactoryProjection,
-    effectBoundary: {
-      execution_scope: 'PROCESS_LOCAL',
-      external_effect: 'NONE',
-      granted_capabilities: [],
-    },
-  })));
-  validateValidationReport(validationReport);
-  assertReportBinding(trustedDispatch, trustedValidationProfile, validationReport);
-  assertCompilerObservations(compilerEvidence, validationReport);
+  validateValidationReport(trustedValidationReport);
+  assertReportBinding(trustedDispatch, trustedValidationProfile, trustedValidationReport);
+  assertCompilerObservations(compilerEvidence, trustedValidationReport);
 
-  if (validationReport.acceptance.state !== 'PENDING') {
+  if (trustedValidationReport.acceptance.state !== 'PENDING') {
     throw new SpatialOrchestrationError('ORCHESTRATOR_CANNOT_ACCEPT', 'Process-local orchestration cannot assign candidate acceptance.');
   }
 
   let derivedValidation;
   try {
-    derivedValidation = assertDerivedValidation(trustedValidationProfile, validationReport);
+    derivedValidation = assertDerivedValidation(trustedValidationProfile, trustedValidationReport);
   } catch (error) {
     throw new SpatialOrchestrationError('DERIVED_VALIDATION_MISMATCH', error instanceof Error ? error.message : String(error));
   }
@@ -120,7 +106,7 @@ export async function runProcessLocalSpatialOrchestration({
   const receipt = buildReceipt({
     dispatch: trustedDispatch,
     compilerEvidence,
-    validationReport,
+    validationReport: trustedValidationReport,
     executionRevision: observedExecutionRevision,
     observedBlueprintDigest,
     startedAt,
@@ -129,8 +115,8 @@ export async function runProcessLocalSpatialOrchestration({
   validateReceipt(receipt);
 
   return Object.freeze({
-    compiled: compilerEvidence.reportFactoryProjection,
-    validationReport: Object.freeze(validationReport),
+    compiled: compilerEvidence.publicProjection,
+    validationReport: trustedValidationReport,
     derivedValidation: Object.freeze(derivedValidation),
     receipt: Object.freeze(receipt),
     authority: Object.freeze({
@@ -243,7 +229,7 @@ function captureCompilerEvidence(compiled, normalizedInput) {
   };
   return Object.freeze({
     ...evidence,
-    reportFactoryProjection: immutableSnapshot(evidence),
+    publicProjection: immutableSnapshot(evidence),
   });
 }
 
@@ -503,7 +489,7 @@ function buildReceipt({
       'NO_DURABLE_STAGING',
       'ACCEPTANCE_REMAINS_PENDING',
       'COMPILER_OBSERVATIONS_BOUND',
-      'REPORT_FACTORY_INPUTS_IMMUTABLE',
+      'DECLARATIVE_REPORT_INPUT_ONLY',
       'AUTHORIZATION_RECHECKED_BEFORE_RECEIPT',
       'EXECUTION_REVISION_SEPARATE_FROM_FIXTURE_SUBJECT',
       'EXECUTION_REVISION_INDEPENDENTLY_OBSERVED',

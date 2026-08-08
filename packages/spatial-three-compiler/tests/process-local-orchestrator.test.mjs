@@ -266,7 +266,7 @@ function run(overrides = {}) {
     validationProfile,
     blueprint,
     compiler: fakeCompiler,
-    createValidationReport: () => reportFor(dispatch),
+    validationReport: reportFor(dispatch),
     executionRevision,
     observeExecutionRevision: () => executionRevision,
     clock: fixedClock(),
@@ -389,49 +389,44 @@ test('rejects caller-reported geometry that differs from compiler observations',
   await assert.rejects(
     run({
       dispatch,
-      createValidationReport: () => forgedReport,
+      validationReport: forgedReport,
     }),
     (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
   );
 });
 
-test('isolates the report factory from mutable trusted state and compiler objects', async () => {
+test('snapshots declarative inputs before trusted compiler execution', async () => {
   const dispatch = makeDispatch();
   const originalExecutionId = dispatch.execution_id;
   const report = reportFor(dispatch);
-  let liveCompilerResult;
+  const suppliedProfile = structuredClone(validationProfile);
+  const suppliedBlueprint = structuredClone(blueprint);
   const result = await run({
     dispatch,
+    validationProfile: suppliedProfile,
+    blueprint: suppliedBlueprint,
+    validationReport: report,
     compiler: async (input) => {
-      liveCompilerResult = await fakeCompiler(input);
-      return liveCompilerResult;
-    },
-    createValidationReport: (context) => {
-      assert.equal(Object.isFrozen(context), true);
-      assert.equal(Object.isFrozen(context.dispatch.authorization), true);
-      assert.equal(Object.isFrozen(context.compiled.components[0]), true);
-      assert.deepEqual(context.effectBoundary, {
-        execution_scope: 'PROCESS_LOCAL',
-        external_effect: 'NONE',
-        granted_capabilities: [],
-      });
-      assert.throws(() => {
-        context.dispatch.execution_id = 'forged-execution';
-      }, TypeError);
-      assert.throws(() => {
-        context.compiled.components[0].vertex_count = 8;
-      }, TypeError);
-      assert.equal(context.compiled.scene, undefined);
+      const compiled = await fakeCompiler(input);
       dispatch.execution_id = 'forged-execution';
-      liveCompilerResult.validation.length = 0;
-      liveCompilerResult.scene.clear();
-      return report;
+      report.execution_id = 'forged-execution';
+      suppliedProfile.geometry_rules.max_vertices = 1;
+      suppliedBlueprint.asset.id = 'forged-blueprint';
+      setTimeout(() => {
+        compiled.validation.length = 0;
+        compiled.scene.clear();
+      }, 0);
+      return compiled;
     },
   });
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(result.receipt.execution_id, originalExecutionId);
+  assert.equal(result.validationReport.execution_id, originalExecutionId);
   assert.equal(result.compiled.validation.length, 2);
   assert.equal(result.compiled.components.length, 1);
+  assert.equal(Object.isFrozen(result.validationReport), true);
+  assert.equal(Object.isFrozen(result.compiled.components[0]), true);
   assert.equal(result.receipt.metadata.spatial_compute.commit_sha, EXECUTION_SHA);
 });
 
@@ -466,7 +461,7 @@ test('requires and binds the reported structural match observation', async () =>
   delete report.export_reimport.structural_digest_match;
 
   await assert.rejects(
-    run({ dispatch, createValidationReport: () => report }),
+    run({ dispatch, validationReport: report }),
     (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
   );
 });
@@ -498,7 +493,7 @@ test('derives watertightness from compiler geometry before profile evaluation', 
         });
         return compiled;
       },
-      createValidationReport: () => forgedReport,
+      validationReport: forgedReport,
     }),
     (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
   );
@@ -513,7 +508,7 @@ test('rejects a declared outcome that conflicts with the selected profile after 
     run({
       dispatch,
       validationProfile: restrictiveProfile,
-      createValidationReport: () => reportFor(dispatch),
+      validationReport: reportFor(dispatch),
     }),
     (error) => error instanceof SpatialOrchestrationError &&
       error.code === 'DERIVED_VALIDATION_MISMATCH' &&
@@ -526,7 +521,7 @@ test('rejects a validation report for a different representation family', async 
   await assert.rejects(
     run({
       dispatch,
-      createValidationReport: () => reportFor(dispatch, {
+      validationReport: reportFor(dispatch, {
         representation_family: 'MESH_ASSET_DRAFT',
       }),
     }),
@@ -539,7 +534,7 @@ test('rejects any attempt to self-accept the candidate', async () => {
   await assert.rejects(
     run({
       dispatch,
-      createValidationReport: () => reportFor(dispatch, {
+      validationReport: reportFor(dispatch, {
         acceptance: {
           state: 'ACCEPTED_AS_CANDIDATE',
           assigned_destination: 'CANDIDATE_ASSET_PACKAGE',
@@ -587,11 +582,11 @@ test('canonicalizes semantically identical report payloads before receipt hashin
 
   const left = await run({
     dispatch,
-    createValidationReport: () => normal,
+    validationReport: normal,
   });
   const right = await run({
     dispatch,
-    createValidationReport: () => reordered,
+    validationReport: reordered,
   });
 
   assert.equal(left.receipt.output_digest, right.receipt.output_digest);
