@@ -51,6 +51,44 @@ test("unknown binding strengths fail closed", () => {
   assert.match(issues[0], /binding_strength must be one of/);
 });
 
+test("runtime validation enforces the contract identity and version", () => {
+  const entry = {
+    ...informationalEntry(),
+    schema_name: "ContextPacketEntry",
+    schema_version: "2.0",
+  };
+
+  const issues = validateTrustedContextPacketEntry(entry);
+  assert.ok(issues.some((issue) => issue.includes("schema_name")));
+  assert.ok(issues.some((issue) => issue.includes("schema_version")));
+});
+
+test("malformed binding basis collections fail closed without native exceptions", () => {
+  for (const binding_basis_refs of [null, "workflow:memory-audit", { ref: "workflow:memory-audit" }]) {
+    const entry = {
+      ...informationalEntry(),
+      binding_basis_refs,
+    };
+
+    assert.doesNotThrow(() => validateTrustedContextPacketEntry(entry));
+    assert.ok(
+      validateTrustedContextPacketEntry(entry).some((issue) => issue.includes("must be an array")),
+    );
+  }
+});
+
+test("binding basis references reject non-string values and normalized duplicates", () => {
+  const entry = {
+    ...informationalEntry(),
+    binding_strength: "WORKFLOW_RULE",
+    binding_basis_refs: ["workflow:memory-audit", 42, " workflow:memory-audit "],
+  };
+
+  const issues = validateTrustedContextPacketEntry(entry);
+  assert.ok(issues.some((issue) => issue.includes("non-empty string references")));
+  assert.ok(issues.some((issue) => issue.includes("duplicate references")));
+});
+
 test("only governance gates are execution-blocking in the contract", () => {
   assert.equal(packetBindingSemantics.GOVERNANCE_GATE.blocks_execution, true);
   assert.equal(packetBindingSemantics.AUTHORITY_FACT.blocks_execution, false);
@@ -65,6 +103,6 @@ test("binding basis references reject blanks and duplicates", () => {
   };
 
   const issues = validateTrustedContextPacketEntry(entry);
-  assert.ok(issues.some((issue) => issue.includes("empty references")));
+  assert.ok(issues.some((issue) => issue.includes("non-empty string references")));
   assert.ok(issues.some((issue) => issue.includes("duplicate references")));
 });

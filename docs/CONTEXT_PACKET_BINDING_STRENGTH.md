@@ -49,7 +49,7 @@ GOVERNANCE_GATE
 }
 ```
 
-Every non-informational entry requires at least one explicit basis reference. Blank and duplicate references fail validation. Unknown binding strengths fail closed with `CONTEXT_PACKET_BINDING_INVALID`.
+Every non-informational entry requires at least one explicit basis reference. Runtime validation enforces the schema identity and version before interpreting the entry. The basis collection must be an array of non-empty strings; blank, non-string, and normalized duplicate references fail validation. Unknown binding strengths fail closed with `CONTEXT_PACKET_BINDING_INVALID`.
 
 ## Boundary
 

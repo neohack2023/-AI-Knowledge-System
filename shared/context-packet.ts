@@ -56,8 +56,12 @@ export type TrustedContextPacketEntry = {
   binding_basis_refs: string[];
 };
 
-const nonEmpty = (value: string | null | undefined) => (
+const nonEmpty = (value: unknown): value is string => (
   typeof value === "string" && value.trim().length > 0
+);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === "object" && value !== null && !Array.isArray(value)
 );
 
 export class ContextPacketValidationError extends Error {
@@ -66,10 +70,22 @@ export class ContextPacketValidationError extends Error {
   }
 }
 
-export const validateTrustedContextPacketEntry = (entry: TrustedContextPacketEntry): string[] => {
+export const validateTrustedContextPacketEntry = (entry: unknown): string[] => {
   const issues: string[] = [];
 
-  const requiredStrings: Array<[string, string | null | undefined]> = [
+  if (!isRecord(entry)) {
+    return ["entry must be an object."];
+  }
+
+  if (entry.schema_name !== "TrustedContextPacketEntry") {
+    issues.push('schema_name must be "TrustedContextPacketEntry".');
+  }
+
+  if (entry.schema_version !== "1.0") {
+    issues.push('schema_version must be "1.0".');
+  }
+
+  const requiredStrings: Array<[string, unknown]> = [
     ["entry_id", entry.entry_id],
     ["object_id", entry.object_id],
     ["provenance_envelope_id", entry.provenance_envelope_id],
@@ -79,27 +95,43 @@ export const validateTrustedContextPacketEntry = (entry: TrustedContextPacketEnt
     if (!nonEmpty(value)) issues.push(`${field} is required.`);
   }
 
-  if (!packetBindingStrengths.includes(entry.binding_strength)) {
+  const bindingStrength = entry.binding_strength;
+  const validBindingStrength = packetBindingStrengths.includes(
+    bindingStrength as PacketBindingStrength,
+  );
+
+  if (!validBindingStrength) {
     issues.push(`binding_strength must be one of: ${packetBindingStrengths.join(", ")}.`);
-    return issues;
   }
 
-  if (entry.binding_basis_refs.some((reference) => !nonEmpty(reference))) {
-    issues.push("binding_basis_refs must not contain empty references.");
-  }
+  const bindingBasisRefs = entry.binding_basis_refs;
+  if (!Array.isArray(bindingBasisRefs)) {
+    issues.push("binding_basis_refs must be an array of non-empty strings.");
+  } else {
+    if (bindingBasisRefs.some((reference) => !nonEmpty(reference))) {
+      issues.push("binding_basis_refs must contain only non-empty string references.");
+    }
 
-  if (new Set(entry.binding_basis_refs).size !== entry.binding_basis_refs.length) {
-    issues.push("binding_basis_refs must not contain duplicate references.");
-  }
+    const normalizedReferences = bindingBasisRefs
+      .filter(nonEmpty)
+      .map((reference) => reference.trim());
+    if (new Set(normalizedReferences).size !== normalizedReferences.length) {
+      issues.push("binding_basis_refs must not contain duplicate references.");
+    }
 
-  if (packetBindingSemantics[entry.binding_strength].requires_basis && entry.binding_basis_refs.length === 0) {
-    issues.push(`${entry.binding_strength} requires at least one binding_basis_ref.`);
+    if (
+      validBindingStrength
+      && packetBindingSemantics[bindingStrength as PacketBindingStrength].requires_basis
+      && bindingBasisRefs.length === 0
+    ) {
+      issues.push(`${bindingStrength} requires at least one binding_basis_ref.`);
+    }
   }
 
   return issues;
 };
 
-export const assertTrustedContextPacketEntry = (entry: TrustedContextPacketEntry) => {
+export const assertTrustedContextPacketEntry = (entry: unknown) => {
   const issues = validateTrustedContextPacketEntry(entry);
   if (issues.length) {
     throw new ContextPacketValidationError("CONTEXT_PACKET_BINDING_INVALID", issues);
