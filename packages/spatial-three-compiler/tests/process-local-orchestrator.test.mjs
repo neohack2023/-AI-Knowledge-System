@@ -106,6 +106,10 @@ const executionRevision = {
   run_attempt: 1,
 };
 
+process.env.GITHUB_SHA = executionRevision.commit_sha;
+process.env.GITHUB_RUN_ID = String(executionRevision.github_run_id);
+process.env.GITHUB_RUN_ATTEMPT = String(executionRevision.run_attempt);
+
 function makeDispatch(mutator = null) {
   const value = {
     contract_version: 'SAF-N3D-Dispatch/0.1',
@@ -267,8 +271,6 @@ function run(overrides = {}) {
     blueprint,
     compiler: fakeCompiler,
     validationReport: reportFor(dispatch),
-    executionRevision,
-    observeExecutionRevision: () => executionRevision,
     clock: fixedClock(),
     ...overrides,
   });
@@ -557,22 +559,38 @@ test('rejects neural-provider or external-source dispatches', async () => {
 });
 
 test('requires the actual executing revision instead of copying the fixture subject SHA', async () => {
-  await assert.rejects(
-    run({ executionRevision: undefined }),
-    (error) => error instanceof SpatialOrchestrationError && error.code === 'EXECUTION_REVISION_REQUIRED',
-  );
+  const previous = process.env.GITHUB_SHA;
+  delete process.env.GITHUB_SHA;
+  try {
+    await assert.rejects(
+      run(),
+      (error) => error instanceof SpatialOrchestrationError && error.code === 'EXECUTION_REVISION_REQUIRED',
+    );
+  } finally {
+    process.env.GITHUB_SHA = previous;
+  }
 });
 
-test('rejects a declared execution revision that differs from the trusted runtime observation', async () => {
-  await assert.rejects(
-    run({
-      observeExecutionRevision: () => ({
-        ...executionRevision,
-        commit_sha: 'e'.repeat(40),
-      }),
-    }),
-    (error) => error instanceof SpatialOrchestrationError && error.code === 'EXECUTION_REVISION_MISMATCH',
-  );
+test('rejects malformed trusted runner revision metadata', async () => {
+  const previousSha = process.env.GITHUB_SHA;
+  const previousAttempt = process.env.GITHUB_RUN_ATTEMPT;
+  try {
+    process.env.GITHUB_SHA = 'not-a-git-sha';
+    await assert.rejects(
+      run(),
+      (error) => error instanceof SpatialOrchestrationError && error.code === 'INVALID_EXECUTION_COMMIT_SHA',
+    );
+
+    process.env.GITHUB_SHA = previousSha;
+    process.env.GITHUB_RUN_ATTEMPT = 'zero';
+    await assert.rejects(
+      run(),
+      (error) => error instanceof SpatialOrchestrationError && error.code === 'INVALID_RUN_ATTEMPT',
+    );
+  } finally {
+    process.env.GITHUB_SHA = previousSha;
+    process.env.GITHUB_RUN_ATTEMPT = previousAttempt;
+  }
 });
 
 test('canonicalizes semantically identical report payloads before receipt hashing', async () => {

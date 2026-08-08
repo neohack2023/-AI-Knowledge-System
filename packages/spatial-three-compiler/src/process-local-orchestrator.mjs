@@ -39,8 +39,6 @@ export async function runProcessLocalSpatialOrchestration({
   validationProfile,
   blueprint,
   validationReport,
-  executionRevision,
-  observeExecutionRevision,
   compiler = compileSpatialAsset,
   clock = () => new Date(),
 }) {
@@ -48,14 +46,11 @@ export async function runProcessLocalSpatialOrchestration({
   const trustedValidationProfile = immutableSnapshot(validationProfile);
   const trustedBlueprint = immutableSnapshot(blueprint);
   const trustedValidationReport = immutableSnapshot(validationReport);
-  const declaredExecutionRevision = immutableSnapshot(executionRevision);
 
   validateDispatch(trustedDispatch);
   validateValidationProfile(trustedValidationProfile);
-  assertExecutionRevision(declaredExecutionRevision);
   assertProcessLocalBoundary(trustedDispatch);
-  const observedExecutionRevision = await observeTrustedExecutionRevision(observeExecutionRevision);
-  assertMatchingExecutionRevision(declaredExecutionRevision, observedExecutionRevision);
+  const observedExecutionRevision = observeRuntimeExecutionRevision();
 
   const startedAt = trustedDate(clock(), 'INVALID_TRUSTED_CLOCK');
   assertCurrentAuthorization(trustedDispatch.authorization, startedAt);
@@ -430,27 +425,29 @@ function assertExecutionRevision(value) {
   }
 }
 
-async function observeTrustedExecutionRevision(observer) {
-  if (typeof observer !== 'function') {
-    throw new SpatialOrchestrationError(
-      'EXECUTION_REVISION_OBSERVER_REQUIRED',
-      'A trusted runner/runtime execution-revision observer is required.',
-    );
+function observeRuntimeExecutionRevision() {
+  if (!process.env.GITHUB_SHA) {
+    throw new SpatialOrchestrationError('EXECUTION_REVISION_REQUIRED', 'Trusted GITHUB_SHA runner metadata is required.');
   }
-  const observed = immutableSnapshot(await observer());
+  const observed = immutableSnapshot({
+    commit_sha: process.env.GITHUB_SHA,
+    github_run_id: parseOptionalRuntimeInteger(process.env.GITHUB_RUN_ID, 'INVALID_GITHUB_RUN_ID'),
+    run_attempt: parseRequiredRuntimeInteger(process.env.GITHUB_RUN_ATTEMPT, 'INVALID_RUN_ATTEMPT'),
+  });
   assertExecutionRevision(observed);
   return observed;
 }
 
-function assertMatchingExecutionRevision(declared, observed) {
-  if (declared.commit_sha !== observed.commit_sha ||
-      (declared.github_run_id ?? null) !== (observed.github_run_id ?? null) ||
-      declared.run_attempt !== observed.run_attempt) {
-    throw new SpatialOrchestrationError(
-      'EXECUTION_REVISION_MISMATCH',
-      'Declared execution revision does not match the independently observed runner/runtime revision.',
-    );
+function parseOptionalRuntimeInteger(value, code) {
+  if (value === undefined || value === '') return null;
+  return parseRequiredRuntimeInteger(value, code);
+}
+
+function parseRequiredRuntimeInteger(value, code) {
+  if (!/^[0-9]+$/.test(value ?? '')) {
+    throw new SpatialOrchestrationError(code, 'Runner/runtime revision metadata must be a non-negative integer string.');
   }
+  return Number.parseInt(value, 10);
 }
 
 function buildReceipt({
