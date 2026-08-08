@@ -1,6 +1,16 @@
 export const provenanceOperations = ["RETRIEVAL", "TRANSFORMATION", "GOVERNED_WRITE"] as const;
 export type ProvenanceOperation = (typeof provenanceOperations)[number];
 
+export const epistemicTypes = [
+  "CLAIM",
+  "OBSERVATION",
+  "ACTION_REQUEST",
+  "ACTION_RESULT",
+  "VERIFICATION",
+  "DURABLE_FACT",
+] as const;
+export type EpistemicType = (typeof epistemicTypes)[number];
+
 export const provenanceAuthorityStates = [
   "AUTHORITATIVE",
   "NON_AUTHORITATIVE",
@@ -28,6 +38,7 @@ export type ContextProvenanceEnvelope = {
   object_id: string;
   object_type: string;
   operation: ProvenanceOperation;
+  epistemic_type: EpistemicType;
   scope_key: string;
 
   source_system: string;
@@ -69,6 +80,7 @@ export type ContextProvenanceEmission = {
   object_id: string;
   object_type: string;
   operation: ProvenanceOperation;
+  epistemic_type: EpistemicType;
 
   source_system: string;
   source_id: string;
