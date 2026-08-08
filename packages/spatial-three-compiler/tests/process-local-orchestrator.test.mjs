@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { PlaneGeometry } from 'three';
 import { canonicalJson, normalizeBlueprint } from '../src/core.mjs';
 import { prepareSpatialInput } from '../src/index.mjs';
 import { buildScene } from '../src/three-adapter.mjs';
@@ -195,7 +196,7 @@ function reportFor(dispatch, overrides = {}) {
       self_intersections: null,
       watertight_requirement: 'NOT_REQUIRED',
       watertight_observed: true,
-      watertight_result: 'NOT_APPLICABLE',
+      watertight_result: 'PASS',
     }],
     export_reimport: {
       export_result: 'PASS',
@@ -267,6 +268,7 @@ function run(overrides = {}) {
     compiler: fakeCompiler,
     createValidationReport: () => reportFor(dispatch),
     executionRevision,
+    observeExecutionRevision: () => executionRevision,
     clock: fixedClock(),
     ...overrides,
   });
@@ -343,6 +345,21 @@ test('rejects expired authorization before invoking the compiler', async () => {
   assert.equal(compilerCalls, 0);
 });
 
+test('rechecks authorization at completion before emitting a receipt', async () => {
+  const dispatch = makeDispatch((value) => {
+    value.authorization.expires_at = '2026-08-02T01:00:00.005Z';
+  });
+  const values = [
+    new Date('2026-08-02T01:00:00.000Z'),
+    new Date('2026-08-02T01:00:00.010Z'),
+  ];
+
+  await assert.rejects(
+    run({ dispatch, clock: () => values.shift() }),
+    (error) => error instanceof SpatialOrchestrationError && error.code === 'AUTHORIZATION_EXPIRED',
+  );
+});
+
 test('rejects missing required effects and a tampered authorization digest', async () => {
   const missingEffect = makeDispatch((value) => {
     value.authorization.allowed_effects = ['READ_SOURCE', 'EMIT_RECEIPT'];
@@ -372,6 +389,115 @@ test('rejects caller-reported geometry that differs from compiler observations',
   await assert.rejects(
     run({
       dispatch,
+      createValidationReport: () => forgedReport,
+    }),
+    (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
+  );
+});
+
+test('isolates the report factory from mutable trusted state and compiler objects', async () => {
+  const dispatch = makeDispatch();
+  const originalExecutionId = dispatch.execution_id;
+  const report = reportFor(dispatch);
+  let liveCompilerResult;
+  const result = await run({
+    dispatch,
+    compiler: async (input) => {
+      liveCompilerResult = await fakeCompiler(input);
+      return liveCompilerResult;
+    },
+    createValidationReport: (context) => {
+      assert.equal(Object.isFrozen(context), true);
+      assert.equal(Object.isFrozen(context.dispatch.authorization), true);
+      assert.equal(Object.isFrozen(context.compiled.components[0]), true);
+      assert.deepEqual(context.effectBoundary, {
+        execution_scope: 'PROCESS_LOCAL',
+        external_effect: 'NONE',
+        granted_capabilities: [],
+      });
+      assert.throws(() => {
+        context.dispatch.execution_id = 'forged-execution';
+      }, TypeError);
+      assert.throws(() => {
+        context.compiled.components[0].vertex_count = 8;
+      }, TypeError);
+      assert.equal(context.compiled.scene, undefined);
+      dispatch.execution_id = 'forged-execution';
+      liveCompilerResult.validation.length = 0;
+      liveCompilerResult.scene.clear();
+      return report;
+    },
+  });
+
+  assert.equal(result.receipt.execution_id, originalExecutionId);
+  assert.equal(result.compiled.validation.length, 2);
+  assert.equal(result.compiled.components.length, 1);
+  assert.equal(result.receipt.metadata.spatial_compute.commit_sha, EXECUTION_SHA);
+});
+
+test('rejects incomplete, duplicate, or malformed compiler evidence', async () => {
+  for (const compiler of [
+    async (input) => ({ ...(await fakeCompiler(input)), validation: [] }),
+    async (input) => ({
+      ...(await fakeCompiler(input)),
+      validation: [
+        { format: 'gltf', errorCount: 0 },
+        { format: 'gltf', errorCount: 0 },
+      ],
+    }),
+    async (input) => ({
+      ...(await fakeCompiler(input)),
+      roundTrip: [
+        { format: 'gltf', equal: true },
+        { format: 'glb', equal: 'yes' },
+      ],
+    }),
+  ]) {
+    await assert.rejects(
+      run({ compiler }),
+      (error) => error instanceof SpatialOrchestrationError && error.code === 'INCOMPLETE_COMPILER_EVIDENCE',
+    );
+  }
+});
+
+test('requires and binds the reported structural match observation', async () => {
+  const dispatch = makeDispatch();
+  const report = reportFor(dispatch);
+  delete report.export_reimport.structural_digest_match;
+
+  await assert.rejects(
+    run({ dispatch, createValidationReport: () => report }),
+    (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
+  );
+});
+
+test('derives watertightness from compiler geometry before profile evaluation', async () => {
+  const dispatch = makeDispatch();
+  const requiredProfile = structuredClone(validationProfile);
+  requiredProfile.geometry_rules.watertight_requirement = 'REQUIRED';
+  const forgedReport = reportFor(dispatch, {
+    components: [{
+      ...reportFor(dispatch).components[0],
+      bounds: { min: [-0.5, -0.5, 0], max: [0.5, 0.5, 0] },
+      dimensions: [1, 1, 0],
+      vertex_count: 4,
+      face_count: 2,
+      watertight_requirement: 'REQUIRED',
+      watertight_result: 'PASS',
+    }],
+  });
+
+  await assert.rejects(
+    run({
+      dispatch,
+      validationProfile: requiredProfile,
+      compiler: async (input) => {
+        const compiled = await fakeCompiler(input);
+        compiled.scene.traverse((object) => {
+          if (object.isMesh) object.geometry = new PlaneGeometry(1, 1, 1, 1);
+        });
+        return compiled;
+      },
       createValidationReport: () => forgedReport,
     }),
     (error) => error instanceof SpatialOrchestrationError && error.code === 'COMPILER_OBSERVATION_MISMATCH',
@@ -439,6 +565,18 @@ test('requires the actual executing revision instead of copying the fixture subj
   await assert.rejects(
     run({ executionRevision: undefined }),
     (error) => error instanceof SpatialOrchestrationError && error.code === 'EXECUTION_REVISION_REQUIRED',
+  );
+});
+
+test('rejects a declared execution revision that differs from the trusted runtime observation', async () => {
+  await assert.rejects(
+    run({
+      observeExecutionRevision: () => ({
+        ...executionRevision,
+        commit_sha: 'e'.repeat(40),
+      }),
+    }),
+    (error) => error instanceof SpatialOrchestrationError && error.code === 'EXECUTION_REVISION_MISMATCH',
   );
 });
 
