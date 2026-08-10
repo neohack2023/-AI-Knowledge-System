@@ -8,6 +8,7 @@ import { ContextProvenanceService, ProvenanceValidationError } from "../provenan
 import type {
   ContextProvenanceEmission,
   ContextProvenanceEnvelope,
+  ContextProvenanceEnvelopeReadProjection,
   GovernedWriteAuthorization,
 } from "../provenance/types.ts";
 import type {
@@ -114,6 +115,80 @@ export class WorkflowExecutionKernel {
 
   getExecution(executionId: string): ExecutionSnapshot {
     return this.snapshot(executionId);
+  }
+
+  getProvenanceEnvelope(
+    executionId: string,
+    provenanceEnvelopeId: string,
+    expectedScopeKey?: string,
+  ): ContextProvenanceEnvelopeReadProjection {
+    if (!executionId.trim() || !provenanceEnvelopeId.trim()) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_READ_INVALID_REQUEST",
+        "execution_id and provenance_envelope_id are required.",
+        400,
+      );
+    }
+
+    const execution = this.requireExecution(executionId);
+    if (expectedScopeKey !== undefined && expectedScopeKey !== execution.scope_key) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_SCOPE_MISMATCH",
+        "Requested scope does not match the workflow execution scope.",
+        409,
+      );
+    }
+
+    const envelope = (this.provenance.get(executionId) ?? [])
+      .find((candidate) => candidate.envelope_id === provenanceEnvelopeId);
+    if (!envelope) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_ENVELOPE_NOT_FOUND",
+        "Context provenance envelope was not found in the specified execution.",
+        404,
+      );
+    }
+
+    if (envelope.used_by_execution_id !== executionId) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_EXECUTION_BINDING_MISMATCH",
+        "Context provenance envelope is not bound to the requested execution.",
+        409,
+      );
+    }
+    if (envelope.scope_key !== execution.scope_key) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_SCOPE_MISMATCH",
+        "Context provenance envelope scope does not match the workflow execution scope.",
+        409,
+      );
+    }
+
+    const issues = this.provenanceService.validate(envelope);
+    if (issues.length > 0) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_ENVELOPE_INVALID",
+        "Stored context provenance envelope failed current validation.",
+        409,
+      );
+    }
+
+    return {
+      schema_name: "ContextProvenanceEnvelopeReadProjection",
+      schema_version: "0.1",
+      envelope_id: envelope.envelope_id,
+      object_id: envelope.object_id,
+      object_type: envelope.object_type,
+      operation: envelope.operation,
+      scope_key: envelope.scope_key,
+      authority_owner: envelope.authority_owner,
+      authority_domain: envelope.authority_domain,
+      authority_state: envelope.authority_state,
+      authority_conflict_state: envelope.authority_conflict_state,
+      used_by_execution_id: envelope.used_by_execution_id,
+      workflow_id: envelope.workflow_id,
+      validity: "VALID",
+    };
   }
 
   async start(executionId: string): Promise<ExecutionSnapshot> {
