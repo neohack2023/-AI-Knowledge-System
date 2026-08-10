@@ -8,6 +8,7 @@ import { ContextProvenanceService, ProvenanceValidationError } from "../provenan
 import type {
   ContextProvenanceEmission,
   ContextProvenanceEnvelope,
+  ContextProvenanceEnvelopeReadProjection,
   GovernedWriteAuthorization,
 } from "../provenance/types.ts";
 import type {
@@ -24,6 +25,12 @@ import type {
 const terminalStatuses = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 const controllableStatuses = new Set(["QUEUED", "RUNNING", "WAITING", "APPROVAL_REQUIRED", "PAUSED"]);
 
+type ProvenanceReadPolicyEvaluator = (input: {
+  execution_id: string;
+  scope_key: string;
+  access_policy_refs: string[];
+}) => boolean;
+
 export class WorkflowKernelError extends Error {
   constructor(readonly code: string, message: string, readonly httpStatus = 400) {
     super(message);
@@ -37,7 +44,10 @@ export class WorkflowExecutionKernel {
   private readonly handlers = new Map<string, WorkflowHandler>();
   private readonly provenanceService = new ContextProvenanceService();
 
-  constructor(handlers: WorkflowHandler[] = [new InternalDiagnosticWorkflowHandler()]) {
+  constructor(
+    handlers: WorkflowHandler[] = [new InternalDiagnosticWorkflowHandler()],
+    private readonly provenanceReadPolicyEvaluator?: ProvenanceReadPolicyEvaluator,
+  ) {
     handlers.forEach((handler) => this.handlers.set(handler.workflow_id, handler));
   }
 
@@ -114,6 +124,98 @@ export class WorkflowExecutionKernel {
 
   getExecution(executionId: string): ExecutionSnapshot {
     return this.snapshot(executionId);
+  }
+
+  getProvenanceEnvelope(
+    executionId: string,
+    provenanceEnvelopeId: string,
+    expectedScopeKey?: string,
+  ): ContextProvenanceEnvelopeReadProjection {
+    if (!executionId.trim() || !provenanceEnvelopeId.trim()) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_READ_INVALID_REQUEST",
+        "execution_id and provenance_envelope_id are required.",
+        400,
+      );
+    }
+
+    const execution = this.requireExecution(executionId);
+    if (expectedScopeKey !== undefined && expectedScopeKey !== execution.scope_key) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_SCOPE_MISMATCH",
+        "Requested scope does not match the workflow execution scope.",
+        409,
+      );
+    }
+
+    const envelope = (this.provenance.get(executionId) ?? [])
+      .find((candidate) => candidate.envelope_id === provenanceEnvelopeId);
+    if (!envelope) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_ENVELOPE_NOT_FOUND",
+        "Context provenance envelope was not found in the specified execution.",
+        404,
+      );
+    }
+
+    if (envelope.used_by_execution_id !== executionId) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_EXECUTION_BINDING_MISMATCH",
+        "Context provenance envelope is not bound to the requested execution.",
+        409,
+      );
+    }
+    if (envelope.scope_key !== execution.scope_key) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_SCOPE_MISMATCH",
+        "Context provenance envelope scope does not match the workflow execution scope.",
+        409,
+      );
+    }
+
+    const issues = this.provenanceService.validate(envelope);
+    if (issues.length > 0) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_ENVELOPE_INVALID",
+        "Stored context provenance envelope failed current validation.",
+        409,
+      );
+    }
+
+    if (this.provenanceReadPolicyEvaluator && !this.provenanceReadPolicyEvaluator({
+      execution_id: executionId,
+      scope_key: execution.scope_key,
+      access_policy_refs: [...envelope.access_policy_refs],
+    })) {
+      throw new WorkflowKernelError(
+        "PROVENANCE_READ_POLICY_DENIED",
+        "Active provenance read policy denied this metadata lookup.",
+        403,
+      );
+    }
+
+    return {
+      schema_name: "ContextProvenanceEnvelopeReadProjection",
+      schema_version: "0.1",
+      envelope_id: envelope.envelope_id,
+      object_id: envelope.object_id,
+      object_type: envelope.object_type,
+      operation: envelope.operation,
+      scope_key: envelope.scope_key,
+      authority_owner: envelope.authority_owner,
+      authority_domain: envelope.authority_domain,
+      authority_state: envelope.authority_state,
+      authority_conflict_state: envelope.authority_conflict_state,
+      access_policy_refs: [...envelope.access_policy_refs],
+      write_policy_refs: [...envelope.write_policy_refs],
+      source_fingerprint: envelope.source_fingerprint,
+      object_fingerprint: envelope.object_fingerprint,
+      retrieved_at: envelope.retrieved_at,
+      validated_at: envelope.validated_at,
+      used_by_execution_id: envelope.used_by_execution_id,
+      workflow_id: envelope.workflow_id,
+      validity: "VALID",
+    };
   }
 
   async start(executionId: string): Promise<ExecutionSnapshot> {
