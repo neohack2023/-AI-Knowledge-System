@@ -30,7 +30,23 @@ const requestedBy = (request: Request) => {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const executionId = url.searchParams.get("execution_id");
+  const provenanceEnvelopeId = url.searchParams.get("provenance_envelope_id");
+  const expectedScopeKey = url.searchParams.get("scope_key") ?? undefined;
   try {
+    if (provenanceEnvelopeId) {
+      if (!executionId) {
+        throw new WorkflowKernelError(
+          "PROVENANCE_READ_INVALID_REQUEST",
+          "execution_id is required when provenance_envelope_id is supplied.",
+          400,
+        );
+      }
+      return json(workflowExecutionKernel.getProvenanceEnvelope(
+        executionId,
+        provenanceEnvelopeId,
+        expectedScopeKey,
+      ));
+    }
     if (executionId) return json(workflowExecutionKernel.getExecution(executionId));
     return json({
       live_workflows: workflowExecutionKernel.listLiveWorkflows(),
@@ -40,6 +56,8 @@ export async function GET(request: Request) {
       capability_discovery_contract: "CapabilityDiscoveryEnvelope/1.0",
       capability_materialization_contract: "MaterializedCapability/1.0",
       capability_execution_authority: "NONE",
+      provenance_read_contract: "ContextProvenanceEnvelopeReadProjection/0.1",
+      provenance_read_policy_evaluator: "UNWIRED",
     });
   } catch (error) {
     return handleError(error);
