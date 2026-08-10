@@ -76,6 +76,29 @@ export type ContextProvenanceEnvelope = {
   validated_at: string;
 };
 
+export type ContextProvenanceEnvelopeReadProjection = {
+  schema_name: "ContextProvenanceEnvelopeReadProjection";
+  schema_version: "0.1";
+  envelope_id: string;
+  object_id: string;
+  object_type: string;
+  operation: ProvenanceOperation;
+  scope_key: string;
+  authority_owner: string;
+  authority_domain: string;
+  authority_state: ProvenanceAuthorityState;
+  authority_conflict_state: ProvenanceConflictState;
+  access_policy_refs: string[];
+  write_policy_refs: string[];
+  source_fingerprint: string;
+  object_fingerprint: string;
+  retrieved_at: string | null;
+  validated_at: string;
+  used_by_execution_id: string;
+  workflow_id: string;
+  validity: "VALID";
+};
+
 export type ContextProvenanceEmission = {
   object_id: string;
   object_type: string;
