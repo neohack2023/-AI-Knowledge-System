@@ -88,12 +88,6 @@ export type ContextProvenanceEnvelopeReadProjection = {
   authority_domain: string;
   authority_state: ProvenanceAuthorityState;
   authority_conflict_state: ProvenanceConflictState;
-  access_policy_refs: string[];
-  write_policy_refs: string[];
-  source_fingerprint: string;
-  object_fingerprint: string;
-  retrieved_at: string | null;
-  validated_at: string;
   used_by_execution_id: string;
   workflow_id: string;
   validity: "VALID";
