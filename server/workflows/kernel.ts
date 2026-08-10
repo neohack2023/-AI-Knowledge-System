@@ -25,12 +25,6 @@ import type {
 const terminalStatuses = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 const controllableStatuses = new Set(["QUEUED", "RUNNING", "WAITING", "APPROVAL_REQUIRED", "PAUSED"]);
 
-type ProvenanceReadPolicyEvaluator = (input: {
-  execution_id: string;
-  scope_key: string;
-  access_policy_refs: string[];
-}) => boolean;
-
 export class WorkflowKernelError extends Error {
   constructor(readonly code: string, message: string, readonly httpStatus = 400) {
     super(message);
@@ -44,10 +38,7 @@ export class WorkflowExecutionKernel {
   private readonly handlers = new Map<string, WorkflowHandler>();
   private readonly provenanceService = new ContextProvenanceService();
 
-  constructor(
-    handlers: WorkflowHandler[] = [new InternalDiagnosticWorkflowHandler()],
-    private readonly provenanceReadPolicyEvaluator?: ProvenanceReadPolicyEvaluator,
-  ) {
+  constructor(handlers: WorkflowHandler[] = [new InternalDiagnosticWorkflowHandler()]) {
     handlers.forEach((handler) => this.handlers.set(handler.workflow_id, handler));
   }
 
@@ -182,18 +173,6 @@ export class WorkflowExecutionKernel {
       );
     }
 
-    if (this.provenanceReadPolicyEvaluator && !this.provenanceReadPolicyEvaluator({
-      execution_id: executionId,
-      scope_key: execution.scope_key,
-      access_policy_refs: [...envelope.access_policy_refs],
-    })) {
-      throw new WorkflowKernelError(
-        "PROVENANCE_READ_POLICY_DENIED",
-        "Active provenance read policy denied this metadata lookup.",
-        403,
-      );
-    }
-
     return {
       schema_name: "ContextProvenanceEnvelopeReadProjection",
       schema_version: "0.1",
@@ -206,12 +185,6 @@ export class WorkflowExecutionKernel {
       authority_domain: envelope.authority_domain,
       authority_state: envelope.authority_state,
       authority_conflict_state: envelope.authority_conflict_state,
-      access_policy_refs: [...envelope.access_policy_refs],
-      write_policy_refs: [...envelope.write_policy_refs],
-      source_fingerprint: envelope.source_fingerprint,
-      object_fingerprint: envelope.object_fingerprint,
-      retrieved_at: envelope.retrieved_at,
-      validated_at: envelope.validated_at,
       used_by_execution_id: envelope.used_by_execution_id,
       workflow_id: envelope.workflow_id,
       validity: "VALID",
