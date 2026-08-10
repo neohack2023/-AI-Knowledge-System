@@ -1,22 +1,17 @@
 import type { ContextProvenanceEnvelopeReadProjection } from "../provenance/types.ts";
 
-export const influenceReceiptContributionClasses = [
-  "EVIDENCE",
-  "CONSTRAINT",
-  "CURRENT_STATE",
-  "AUTHORITY_REFERENCE",
-  "ACTION_INPUT",
-] as const;
+export type InfluenceReceiptContributionClass =
+  | "EVIDENCE"
+  | "CONSTRAINT"
+  | "CURRENT_STATE"
+  | "AUTHORITY_REFERENCE"
+  | "ACTION_INPUT";
 
-export const influenceReceiptLinkageTypes = [
-  "CITED_IN_OUTPUT",
-  "NAMED_IN_DECISION_RECEIPT",
-  "LINKED_TO_ACTION_INPUT",
-  "LINKED_TO_VERIFICATION_RECEIPT",
-] as const;
-
-export type InfluenceReceiptContributionClass = typeof influenceReceiptContributionClasses[number];
-export type InfluenceReceiptLinkageType = typeof influenceReceiptLinkageTypes[number];
+export type InfluenceReceiptLinkageType =
+  | "CITED_IN_OUTPUT"
+  | "NAMED_IN_DECISION_RECEIPT"
+  | "LINKED_TO_ACTION_INPUT"
+  | "LINKED_TO_VERIFICATION_RECEIPT";
 
 export type InfluenceReceiptReferencedProvenanceSource = {
   provenance_envelope_id: string;
@@ -38,7 +33,7 @@ export type ResolvedInfluenceReceiptProvenanceReference = {
   provenance: ContextProvenanceEnvelopeReadProjection;
 };
 
-export type ContextProvenanceEnvelopeReader = {
+type ContextProvenanceEnvelopeReader = {
   getProvenanceEnvelope: (
     executionId: string,
     provenanceEnvelopeId: string,
