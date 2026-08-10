@@ -3,7 +3,6 @@ import test from "node:test";
 
 import { GET as workflowGet } from "../app/api/workflow-executions/route.ts";
 import type { ContextProvenanceEnvelope } from "../server/provenance/types.ts";
-import { InternalDiagnosticWorkflowHandler } from "../server/workflows/diagnostic-handler.ts";
 import {
   WorkflowExecutionKernel,
   WorkflowKernelError,
@@ -113,7 +112,7 @@ test("C07 stored envelope failing current validation is rejected", async () => {
   );
 });
 
-test("C08 metadata projection excludes payload, prompt, and output-like fields", async () => {
+test("C08 minimum projection excludes payload, correlation, policy, and timestamp fields", async () => {
   const kernel = new WorkflowExecutionKernel();
   const snapshot = await executeDiagnostic(kernel);
   const envelope = firstEnvelope(kernel, snapshot.execution.execution_id) as ContextProvenanceEnvelope & Record<string, unknown>;
@@ -121,9 +120,19 @@ test("C08 metadata projection excludes payload, prompt, and output-like fields",
   envelope.prompt = "forbidden prompt";
   envelope.output = { forbidden: true };
   const projection = kernel.getProvenanceEnvelope(snapshot.execution.execution_id, envelope.envelope_id) as Record<string, unknown>;
-  assert.equal("source_body" in projection, false);
-  assert.equal("prompt" in projection, false);
-  assert.equal("output" in projection, false);
+  for (const field of [
+    "source_body",
+    "prompt",
+    "output",
+    "source_fingerprint",
+    "object_fingerprint",
+    "access_policy_refs",
+    "write_policy_refs",
+    "retrieved_at",
+    "validated_at",
+  ]) {
+    assert.equal(field in projection, false, `${field} must not be projected`);
+  }
 });
 
 test("C09 envelope existing only in another execution does not trigger global fallback", async () => {
@@ -148,32 +157,28 @@ test("C10 authority metadata does not project write authorization", async () => 
   assert.equal("destination" in projection, false);
 });
 
-test("C11 injected read-policy evaluator can deny metadata lookup without claiming a live evaluator exists", async () => {
-  const kernel = new WorkflowExecutionKernel(
-    [new InternalDiagnosticWorkflowHandler()],
-    () => false,
-  );
+test("C11 policy metadata is not exposed and no policy-enforcement result is implied", async () => {
+  const kernel = new WorkflowExecutionKernel();
   const snapshot = await executeDiagnostic(kernel);
   const envelope = snapshot.provenance_envelopes[0];
-  expectKernelError(
-    () => kernel.getProvenanceEnvelope(snapshot.execution.execution_id, envelope.envelope_id),
-    "PROVENANCE_READ_POLICY_DENIED",
-  );
+  assert.ok(envelope.access_policy_refs.length > 0);
+  const projection = kernel.getProvenanceEnvelope(snapshot.execution.execution_id, envelope.envelope_id) as Record<string, unknown>;
+  assert.equal("access_policy_refs" in projection, false);
+  assert.equal("policy_evaluated" in projection, false);
+  assert.equal("read_authorized" in projection, false);
 });
 
-test("C12 existing GET route resolves provenance identity without returning source payload", async () => {
+test("C12 workflow GET route does not expose a provenance-envelope lookup primitive", async () => {
   const snapshot = await executeDiagnostic(workflowExecutionKernel, { route_fixture: true });
   const envelope = snapshot.provenance_envelopes[0];
   const request = new Request(
     `http://localhost/api/workflow-executions?execution_id=${snapshot.execution.execution_id}`
-      + `&provenance_envelope_id=${envelope.envelope_id}`
-      + "&scope_key=global-working-memory",
+      + `&provenance_envelope_id=${envelope.envelope_id}`,
   );
   const response = await workflowGet(request);
   assert.equal(response.status, 200);
-  const projection = await response.json() as Record<string, unknown>;
-  assert.equal(projection.envelope_id, envelope.envelope_id);
-  assert.equal(projection.validity, "VALID");
-  assert.equal("source_id" in projection, false);
-  assert.equal("source_body" in projection, false);
+  const body = await response.json() as Record<string, unknown>;
+  assert.equal("schema_name" in body, false);
+  assert.ok("execution" in body);
+  assert.ok("provenance_envelopes" in body);
 });
