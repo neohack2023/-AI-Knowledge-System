@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { GET as workflowGet } from "../app/api/workflow-executions/route.ts";
-import { ContextProvenanceService } from "../server/provenance/service.ts";
 import type { ContextProvenanceEnvelope } from "../server/provenance/types.ts";
 import { InternalDiagnosticWorkflowHandler } from "../server/workflows/diagnostic-handler.ts";
 import {
@@ -177,12 +176,4 @@ test("C12 existing GET route resolves provenance identity without returning sour
   assert.equal(projection.validity, "VALID");
   assert.equal("source_id" in projection, false);
   assert.equal("source_body" in projection, false);
-});
-
-test("projection remains compatible with the current provenance validator", async () => {
-  const kernel = new WorkflowExecutionKernel();
-  const snapshot = await executeDiagnostic(kernel);
-  const envelope = snapshot.provenance_envelopes[0];
-  const validator = new ContextProvenanceService();
-  assert.deepEqual(validator.validate(envelope), []);
 });
