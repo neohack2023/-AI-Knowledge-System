@@ -6,7 +6,9 @@ normalizes that backend into ChatGPT tools plus one inline workbench resource.
 
 Initial authority boundary:
 - search/fetch/status are read-only
-- workflow calls are hard-coded to SIMULATION by the backend bridge
+- workflow execution is restricted by the backend to A0, INTERNAL_NATIVE,
+  EXECUTION_LOCAL, FULLY_REVERSIBLE, PROCESS_LOCAL handlers
+- governed_write_probe input is explicitly blocked
 - no Notion/Drive memory authority is exposed here yet
 - no destination-write or canon-promotion authority
 - developer-mode fixture until MCP authentication is added
@@ -32,11 +34,11 @@ WIDGET_PATH = Path(__file__).with_name("widget.html")
 mcp = MCPServer(
     "AI Knowledge System",
     title="AIOS Repo Workbench",
-    description="Read repository execution truth and run bounded AIOS backend simulations from ChatGPT.",
+    description="Read repository execution truth and run policy-bounded AIOS backend logic from ChatGPT.",
     instructions=(
         "Use search and fetch for repository execution truth. "
-        "Use run_backend_workflow only when a user explicitly wants to exercise a registered workflow. "
-        "All workflow calls through this bridge are SIMULATION-only and carry no destination-write authority."
+        "Use run_backend_workflow only when a user explicitly wants to exercise a registered backend workflow. "
+        "The backend admits only A0 process-local execution and blocks governed-write input."
     ),
     version="0.1.0",
 )
@@ -47,7 +49,7 @@ READ_ONLY = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=False,
 )
-SIMULATION = ToolAnnotations(
+PROCESS_LOCAL_EXECUTION = ToolAnnotations(
     readOnlyHint=False,
     destructiveHint=False,
     idempotentHint=False,
@@ -89,14 +91,14 @@ def _request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]
     WIDGET_URI,
     name="AIOS Repo Workbench",
     title="AIOS Repo Workbench",
-    description="Inline ChatGPT UI for repository search and simulation-only workflow execution.",
+    description="Inline ChatGPT UI for repository search and policy-bounded process-local workflow execution.",
     mime_type="text/html;profile=mcp-app",
     meta={
         "ui": {
             "prefersBorder": True,
             "csp": {"connectDomains": [], "resourceDomains": []},
         },
-        "openai/widgetDescription": "Search AIOS repository execution truth and run bounded backend simulations.",
+        "openai/widgetDescription": "Search AIOS repository execution truth and run bounded backend logic.",
     },
 )
 def workbench_resource() -> str:
@@ -161,23 +163,24 @@ def aios_status() -> dict[str, Any]:
 
 @mcp.tool(
     name="run_backend_workflow",
-    title="Run an AIOS backend simulation",
+    title="Run safe AIOS backend logic",
     description=(
-        "Use this only when the user explicitly wants to exercise a registered AIOS workflow from ChatGPT. "
-        "This bridge always executes in SIMULATION mode and grants no destination-write authority."
+        "Use this only when the user explicitly wants to exercise a registered AIOS backend workflow from ChatGPT. "
+        "The backend allows only A0, INTERNAL_NATIVE, EXECUTION_LOCAL, FULLY_REVERSIBLE, PROCESS_LOCAL LIVE execution, "
+        "blocks governed_write_probe input, and grants no destination-write authority."
     ),
-    annotations=SIMULATION,
+    annotations=PROCESS_LOCAL_EXECUTION,
 )
 def run_backend_workflow(
     workflow_id: str,
     scope_key: str = "global-working-memory",
     input: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute one registered workflow through the backend's SIMULATION-only bridge action."""
+    """Execute one workflow through the backend-enforced safe process-local policy."""
     return _request(
         "/api/aios-bridge",
         {
-            "action": "simulate_workflow",
+            "action": "execute_safe_workflow",
             "workflow_id": workflow_id,
             "scope_key": scope_key,
             "input": input or {},
@@ -190,7 +193,7 @@ def run_backend_workflow(
     title="Open AIOS Repo Workbench",
     description=(
         "Use this when the user wants the interactive AIOS repository interface inside ChatGPT. "
-        "The workbench can search repository execution truth and run simulation-only backend workflows."
+        "The workbench can search repository execution truth and invoke policy-bounded process-local backend logic."
     ),
     annotations=READ_ONLY,
     meta={
