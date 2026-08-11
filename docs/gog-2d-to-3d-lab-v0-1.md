@@ -78,6 +78,29 @@ Normalized response:
 - procedural baseline reset
 - explicit pending stages for camera-fit QA, clothing/accessories, retopology, and skinning
 
+## ChatGPT app bridge
+
+The same draft branch now includes a thin ChatGPT-facing MCP adapter instead of duplicating AIOS logic inside a widget.
+
+```text
+ChatGPT inline widget
+  → worker/aios-chatgpt-app/server.py `/mcp`
+  → /api/aios-bridge
+  → live capability registry + workflow kernel
+  → existing /gog-3d-lab and provider surfaces
+```
+
+The backend bridge exposes:
+
+- standard read-only `search` and `fetch` over bounded repository execution truth
+- `aios_status` inventory
+- `run_backend_workflow` through a backend-enforced `SIMULATION` action only
+- `open_aios_workbench` to render the inline ChatGPT UI
+
+The initial bridge scope is `global-working-memory` with coverage `REPOSITORY_EXECUTION_TRUTH_ONLY`. It does not project full Notion/Drive memory authority and does not grant MASON or destination-write authority.
+
+Server-to-server calls may be protected with a matching `AIOS_BRIDGE_TOKEN`. The MCP endpoint itself still requires a production user-auth slice before public deployment, so the current bridge is Developer Mode only.
+
 ## Boundaries
 
 - the human-prior worker does not own character canon
@@ -86,10 +109,20 @@ Normalized response:
 - SAM3D/MHR owns the articulated human prior, not costume/hair/accessory truth
 - PyTorch3D camera/silhouette scoring remains a later stage
 - GPU/checkpoint availability is never fabricated by the web UI
+- ChatGPT bridge search/fetch remain read-only
+- ChatGPT workflow execution is forced to SIMULATION
 - merge remains a separate authorization decision
 
-## Next gate
+## Next gates
+
+### Provider execution
 
 `GOG_3D_PROVIDER_EXECUTION_FIXTURE_03`
 
 Run one admitted source image through a configured SAM3D/MHR worker and compare the returned prior against the procedural Kan-E-Senna baseline before extending the product line into clothing or production retopology.
+
+### ChatGPT bridge execution
+
+`AIOS_CHATGPT_APP_BRIDGE_FIXTURE_01`
+
+Deploy or tunnel the MCP worker, connect `/mcp` through ChatGPT Developer Mode, render the inline workbench, verify `search`/`fetch`, and run one registered workflow in SIMULATION. No public deployment or authority expansion until authentication is separately admitted.
