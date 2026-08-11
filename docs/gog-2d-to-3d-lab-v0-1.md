@@ -2,53 +2,49 @@
 
 Status: `EXPERIMENTAL / DRAFT BRANCH / NO MERGE AUTHORIZATION`
 
-The Lab is the interactive control surface for the reusable Girls of Gaming 2D→3D product line. It deliberately separates the web application from GPU reconstruction runtimes.
+The Lab is the interactive control surface for the reusable Girls of Gaming 2D→3D product line. The browser/server app stays lightweight while heavy GPU reconstruction runs in a replaceable worker.
 
-## Current user flow
+## User flow
 
-1. Upload a 2D character reference.
+1. Upload a 2D character image.
 2. Select an admitted reconstruction provider.
-3. Submit the image through `/api/gog-3d-lab/run`.
+3. Submit through `/api/gog-3d-lab/run`.
 4. The server forwards the image to the provider worker.
-5. The worker runs repo-native inference and normalizes the result to the GoG provider contract.
-6. The browser parses and displays the returned OBJ mesh.
-7. Inspect front, 3/4, side, back, wireframe, and silhouette views.
-8. Download the normalized OBJ for downstream QA/retopology.
+5. The worker performs repo-native inference and returns the provider-independent mesh contract.
+6. The browser renders the normalized OBJ and exposes front, 3/4, side, back, wireframe, and silhouette inspection.
+7. Download the OBJ for downstream fitting, clothing, retopology, and rigging.
 
 ## First real provider adapter
 
-### SAM 3D Body + MHR
+`worker/gog-sam3d-body/server.py`
 
-The first worker lives at:
+The adapter uses the public `facebookresearch/sam-3d-body` inference surface and its MHR body representation. It reads `pred_vertices` plus `estimator.faces` and converts them to a normalized OBJ payload for the web app.
 
-`workers/gog-sam3d-body/server.py`
+The repository does not redistribute SAM 3D Body checkpoints or MHR model assets.
 
-It uses the public `facebookresearch/sam-3d-body` inference surface:
+## Runtime bindings
 
-- `load_sam_3d_body`
-- `SAM3DBodyEstimator`
-- `estimator.process_one_image(...)`
-- `person_output["pred_vertices"]`
-- `estimator.faces`
-
-The worker converts those vertices/faces to a provider-independent OBJ response. It does not redistribute upstream checkpoints or MHR assets.
-
-Main app runtime configuration:
+Web application:
 
 ```text
 GOG_SAM3D_BODY_ENDPOINT=http://gpu-worker:8100
-GOG_SAM3D_BODY_TOKEN=<optional gateway bearer token>
+GOG_SAM3D_BODY_TOKEN=<optional bearer token>
 ```
 
-If no worker endpoint is configured, the UI shows `WORKER NOT CONFIGURED`, disables repo inference, and keeps the procedural Kan-E-Senna fixture available for viewer testing. It never claims neural inference ran.
+GPU worker:
 
-## Provider contract v0.1
+```text
+SAM3D_CHECKPOINT_PATH=/models/sam3d/model.ckpt
+SAM3D_MHR_PATH=/models/sam3d/assets/mhr_model.pt
+```
 
-Worker endpoint:
+When the endpoint is absent, the UI explicitly reports `WORKER NOT CONFIGURED`, disables neural reconstruction, and retains a procedural baseline for viewer QA.
+
+## Provider contract
 
 `POST /reconstruct`
 
-Input is multipart form data:
+Multipart input:
 
 ```text
 image=<image file>
@@ -68,35 +64,32 @@ Normalized response:
 }
 ```
 
-The browser/server boundary depends on this contract rather than on provider-specific Python types. This is what allows later TRELLIS.2, Hunyuan3D, or other admitted workers to plug into the product line without replacing the evidence/QA interface.
+## Current app capability
 
-## What the app does today
-
-- source image upload/preview
-- SAM3D/MHR provider readiness check
+- source upload and preview
+- provider readiness state
+- SAM3D/MHR inference routing
 - mask-conditioned and bbox-threshold controls
-- server-side provider proxy
 - normalized OBJ ingestion
-- 3D projection/orbit viewer
-- fixed front / 3/4 / side / back views
-- wireframe and silhouette inspection
-- vertex/face/run metadata
+- interactive orbit and fixed-angle inspection
+- wireframe and silhouette modes
+- vertex/face/runtime metadata
 - OBJ download
 - procedural baseline reset
-- explicit pending stages for camera/silhouette QA, clothing/accessories, and production retopo
+- explicit pending stages for camera-fit QA, clothing/accessories, retopology, and skinning
 
-## Deliberate boundaries
+## Boundaries
 
-- generated geometry is never promoted to GoG canon automatically
-- inference does not mutate Notion or Drive
-- SAM3D/MHR provides the articulated human prior, not final costume truth
-- clothing/accessory reconstruction remains a later product-line stage
-- PyTorch3D camera/silhouette fitting remains pending
-- no model checkpoint or GPU runtime is falsely claimed as installed in the web host
-- draft PR only; merge is a separate decision
+- the human-prior worker does not own character canon
+- inference never auto-writes Notion or Drive
+- generated meshes are candidates until GoG QA admits them
+- SAM3D/MHR owns the articulated human prior, not costume/hair/accessory truth
+- PyTorch3D camera/silhouette scoring remains a later stage
+- GPU/checkpoint availability is never fabricated by the web UI
+- merge remains a separate authorization decision
 
-## Next implementation gate
+## Next gate
 
 `GOG_3D_PROVIDER_EXECUTION_FIXTURE_03`
 
-Run one actual source image through a configured SAM3D/MHR GPU worker, capture the returned mesh and metrics, and compare it against the procedural v0.4 fixture before adding clothing or retopology stages.
+Run one admitted source image through a configured SAM3D/MHR worker and compare the returned prior against the procedural Kan-E-Senna baseline before extending the product line into clothing or production retopology.
