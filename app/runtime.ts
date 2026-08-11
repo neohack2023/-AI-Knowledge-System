@@ -34,12 +34,16 @@ export type EventListener = (event: WorkflowEvent) => void;
 export interface WorkflowEventTransport {
   readonly mode: RuntimeMode;
   subscribe(listener: EventListener): () => void;
-  start(workflow: WorkflowDefinition, scopeKey: string, executionId: string): void;
-  pause(): void;
-  resume(): void;
-  cancel(): void;
+  start(workflow: WorkflowDefinition, scopeKey: string, executionId?: string): Promise<string>;
+  pause(): void | Promise<void>;
+  resume(): void | Promise<void>;
+  cancel(): void | Promise<void>;
   approve(): void;
   reject(): void;
+  selectNextAction?(command: string): Promise<void>;
+  approveNextAction?(): Promise<void>;
+  rejectNextAction?(): Promise<void>;
+  spawnNextAction?(input?: Record<string, unknown>): Promise<string>;
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -70,7 +74,7 @@ export class SimulationEventTransport implements WorkflowEventTransport {
   approve() { this.approvalResolver?.(); this.approvalResolver = undefined; }
   reject() { this.rejected = true; this.cancel(); }
 
-  async start(workflow: WorkflowDefinition, scopeKey: string, executionId: string) {
+  async start(workflow: WorkflowDefinition, scopeKey: string, executionId = crypto.randomUUID()) {
     this.cancelled = false; this.paused = false; this.rejected = false;
     const started = performance.now();
     for (let i = 0; i < workflow.stages.length; i++) {
@@ -149,6 +153,7 @@ export class SimulationEventTransport implements WorkflowEventTransport {
       undefined,
       nextActions ?? undefined,
     ));
+    return executionId;
   }
 
   private makeEvent(
@@ -177,12 +182,227 @@ export class SimulationEventTransport implements WorkflowEventTransport {
   }
 }
 
-// Production adapter boundary. Point this at a server-sent-event endpoint once runtime telemetry is available.
+type CockpitExecutionEnvelope = {
+  schema_name: "CockpitLiveExecutionReadEnvelope";
+  schema_version: string;
+  transport: "LIVE_SERVER_POLL" | "LIVE_SERVER_SSE";
+  execution: {
+    execution_id: string;
+    workflow_id: string;
+    scope_key: string;
+    mode: "LIVE";
+    status: string;
+    display_status: RuntimeStatus;
+    current_stage: string | null;
+  };
+  events: WorkflowEvent[];
+  cursor: {
+    after_sequence: number;
+    last_sequence: number;
+    terminal: boolean;
+    poll_after_ms: number;
+  };
+  authority_context: {
+    execution_state_authority: string;
+    implementation_truth: string;
+  };
+  provenance: { envelope_count: number; envelope_ids: string[] };
+};
+
+type SnapshotResponse = {
+  execution?: { execution_id?: string; status?: string };
+  error?: { code?: string; message?: string };
+};
+
+export class LiveWorkflowEventTransport implements WorkflowEventTransport {
+  readonly mode: RuntimeMode = "LIVE";
+  private readonly listeners = new Set<EventListener>();
+  private executionId?: string;
+  private afterSequence = 0;
+  private kernelStatus = "QUEUED";
+  private terminal = false;
+  private paused = false;
+  private cancelled = false;
+  private driving = false;
+  private workflow?: WorkflowDefinition;
+  private scopeKey?: string;
+
+  constructor(readonly endpoint = "/api/workflow-executions") {}
+
+  subscribe(listener: EventListener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  private emit(event: WorkflowEvent) { this.listeners.forEach((listener) => listener(event)); }
+
+  async start(workflow: WorkflowDefinition, scopeKey: string) {
+    this.workflow = workflow;
+    this.scopeKey = scopeKey;
+    this.afterSequence = 0;
+    this.terminal = false;
+    this.paused = false;
+    this.cancelled = false;
+
+    const created = await this.post({
+      action: "create",
+      workflow_id: workflow.id,
+      scope_key: scopeKey,
+      mode: "LIVE",
+      input: {
+        source: "aios-cockpit",
+        capability_id: workflow.capability,
+        requested_transport: "CockpitLiveExecutionReadEnvelope/0.1",
+      },
+    });
+    const id = created.execution?.execution_id;
+    if (!id) throw new Error(created.error?.message ?? "The workflow kernel did not return an execution ID.");
+    this.executionId = id;
+    await this.pull();
+    void this.drive();
+    return id;
+  }
+
+  async pause() {
+    if (!this.executionId || this.terminal) return;
+    this.paused = true;
+    await this.post({ action: "pause", execution_id: this.executionId });
+    await this.pull();
+  }
+
+  async resume() {
+    if (!this.executionId || this.terminal) return;
+    await this.post({ action: "resume", execution_id: this.executionId });
+    this.paused = false;
+    await this.pull();
+    void this.drive();
+  }
+
+  async cancel() {
+    if (!this.executionId || this.terminal) return;
+    this.cancelled = true;
+    await this.post({ action: "cancel", execution_id: this.executionId });
+    await this.pull();
+  }
+
+  approve() {}
+  reject() {}
+
+  async selectNextAction(command: string) {
+    if (!this.executionId) return;
+    await this.post({ action: "select_next_action", execution_id: this.executionId, command });
+    await this.pull();
+  }
+
+  async approveNextAction() {
+    if (!this.executionId) return;
+    await this.post({ action: "approve_next_action", execution_id: this.executionId });
+    await this.pull();
+  }
+
+  async rejectNextAction() {
+    if (!this.executionId) return;
+    await this.post({ action: "reject_next_action", execution_id: this.executionId });
+    await this.pull();
+  }
+
+  async spawnNextAction(input: Record<string, unknown> = {}) {
+    if (!this.executionId) throw new Error("No live execution is active.");
+    const child = await this.post({ action: "spawn_next_action", execution_id: this.executionId, input });
+    const childId = child.execution?.execution_id;
+    if (!childId) throw new Error(child.error?.message ?? "The workflow kernel did not create the child execution.");
+    this.executionId = childId;
+    this.afterSequence = 0;
+    this.kernelStatus = "QUEUED";
+    this.terminal = false;
+    this.paused = false;
+    this.cancelled = false;
+    await this.pull();
+    void this.drive();
+    return childId;
+  }
+
+  private async drive() {
+    if (this.driving || !this.executionId || this.terminal || this.cancelled) return;
+    this.driving = true;
+    try {
+      if (this.kernelStatus === "QUEUED") {
+        await this.post({ action: "start", execution_id: this.executionId });
+        await this.pull();
+      }
+      while (!this.terminal && !this.cancelled && !this.paused && this.kernelStatus === "RUNNING") {
+        await wait(520);
+        if (this.paused || this.cancelled || this.terminal) break;
+        await this.post({ action: "advance", execution_id: this.executionId });
+        await this.pull();
+      }
+    } catch (error) {
+      this.emitFailure(error);
+    } finally {
+      this.driving = false;
+    }
+  }
+
+  private async pull() {
+    if (!this.executionId) return;
+    const url = new URL(this.endpoint, window.location.origin);
+    url.searchParams.set("view", "cockpit");
+    url.searchParams.set("execution_id", this.executionId);
+    url.searchParams.set("after_sequence", String(this.afterSequence));
+    const response = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
+    const body = await response.json() as CockpitExecutionEnvelope | SnapshotResponse;
+    if (!response.ok || !("cursor" in body)) {
+      const failure = body as SnapshotResponse;
+      throw new Error(failure.error?.message ?? `Live workflow read failed with HTTP ${response.status}.`);
+    }
+    this.afterSequence = body.cursor.last_sequence;
+    this.kernelStatus = body.execution.status;
+    this.terminal = body.cursor.terminal;
+    body.events.forEach((event) => this.emit(event));
+  }
+
+  private async post(payload: Record<string, unknown>) {
+    const response = await fetch(this.endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json() as SnapshotResponse;
+    if (!response.ok) throw new Error(body.error?.message ?? `Workflow operation failed with HTTP ${response.status}.`);
+    return body;
+  }
+
+  private emitFailure(error: unknown) {
+    if (!this.workflow || !this.scopeKey) return;
+    const message = error instanceof Error ? error.message : "Live workflow transport failed.";
+    this.terminal = true;
+    this.emit({
+      id: `${this.executionId ?? "live"}-transport-failed-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      event_type: "cockpit.live_transport.failed",
+      workflow_id: this.workflow.id,
+      execution_id: this.executionId ?? "unassigned",
+      scope_key: this.scopeKey,
+      stage: "Live transport",
+      node_id: "execution",
+      source: "WorkflowExecutionKernel",
+      authority: "GitHub implementation truth",
+      capability: this.workflow.capability,
+      operation: "Read live execution envelope",
+      status: "FAILED",
+      error: message,
+      output_summary: message,
+      provenance: "Transport failure observation · no authority widened",
+    });
+  }
+}
+
+// Optional streaming adapter retained for endpoints that expose continuous SSE.
 export class SseEventTransport {
   readonly mode: RuntimeMode = "LIVE";
   constructor(readonly endpoint: string) {}
   connect(executionId: string, listener: EventListener) {
-    const source = new EventSource(`${this.endpoint}?execution_id=${encodeURIComponent(executionId)}`);
+    const url = new URL(this.endpoint, window.location.origin);
+    url.searchParams.set("view", "cockpit");
+    url.searchParams.set("transport", "sse");
+    url.searchParams.set("execution_id", executionId);
+    const source = new EventSource(url);
     source.onmessage = (message) => listener(JSON.parse(message.data) as WorkflowEvent);
     return () => source.close();
   }

@@ -27,10 +27,12 @@ EXPECTED_TOOLS = {
     "search",
     "fetch",
     "aios_status",
+    "read_execution",
+    "read_execution_provenance",
     "run_backend_workflow",
     "open_aios_workbench",
 }
-WIDGET_URI = "ui://aios/repo-workbench-v0.1.html"
+WIDGET_URI = "ui://aios/repo-workbench-v0.2.html"
 
 
 def text_from_result(result: Any) -> str:
@@ -69,13 +71,25 @@ def validate_url(url: str, allow_http_localhost: bool) -> None:
 
 
 async def verify(url: str, run_safe_workflow: bool) -> None:
-    async with streamable_http_client(url) as (read_stream, write_stream, _):
+    async with streamable_http_client(url) as streams:
+        # MCP Python 2.x returns the read/write pair. Older supported SDK
+        # builds also included a third session-id callback, so consume only
+        # the stable transport pair.
+        read_stream, write_stream = streams[:2]
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
 
             tools_result = await session.list_tools()
             tool_names = {tool.name for tool in tools_result.tools}
             assert tool_names == EXPECTED_TOOLS, (tool_names, EXPECTED_TOOLS)
+            by_name = {tool.name: tool for tool in tools_result.tools}
+            for name in {
+                "search", "fetch", "aios_status", "read_execution",
+                "read_execution_provenance", "open_aios_workbench",
+            }:
+                annotations = by_name[name].annotations
+                assert annotations is not None
+                assert annotations.read_only_hint is True, name
 
             resources_result = await session.list_resources()
             widget = next(
@@ -94,6 +108,8 @@ async def verify(url: str, run_safe_workflow: bool) -> None:
             assert widget_result.contents, "Widget resource returned no content"
             widget_text = getattr(widget_result.contents[0], "text", "")
             assert "AIOS Repo Workbench" in widget_text
+            assert "read_execution" in widget_text
+            assert "read_execution_provenance" in widget_text
 
             status = parse_json_result(await session.call_tool("aios_status", arguments={}))
             assert status.get("status") == "READY", status
@@ -138,6 +154,42 @@ async def verify(url: str, run_safe_workflow: bool) -> None:
                 snapshot = execution.get("snapshot") or {}
                 execution_state = snapshot.get("execution") or {}
                 assert execution_state.get("status") == "COMPLETED", execution
+                execution_id = execution_state.get("execution_id")
+                assert execution_id, execution
+
+                reread = parse_json_result(
+                    await session.call_tool(
+                        "read_execution",
+                        arguments={"execution_id": execution_id},
+                    )
+                )
+                assert reread.get("authority") == "WORKFLOW_EXECUTION_KERNEL", reread
+                assert reread.get("write_authorization") == "NONE", reread
+                reread_snapshot = reread.get("snapshot") or {}
+                assert (reread_snapshot.get("execution") or {}).get("execution_id") == execution_id
+                events = reread_snapshot.get("events") or []
+                assert events, reread
+                assert [event.get("sequence") for event in events] == sorted(
+                    event.get("sequence") for event in events
+                )
+
+                envelopes = reread_snapshot.get("provenance_envelopes") or []
+                assert envelopes, reread
+                envelope_id = envelopes[0].get("envelope_id")
+                assert envelope_id, reread
+                provenance = parse_json_result(
+                    await session.call_tool(
+                        "read_execution_provenance",
+                        arguments={
+                            "execution_id": execution_id,
+                            "provenance_envelope_id": envelope_id,
+                        },
+                    )
+                )
+                assert provenance.get("write_authorization") == "NONE", provenance
+                projection = provenance.get("provenance") or {}
+                assert projection.get("validity") == "VALID", provenance
+                assert projection.get("used_by_execution_id") == execution_id, provenance
 
     print("AIOS_CHATGPT_APP_BRIDGE_DEPLOY_BINDING_02 remote MCP smoke: PASS")
 

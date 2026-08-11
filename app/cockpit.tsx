@@ -11,7 +11,12 @@ import {
   graphEdges, graphNodes, projectUniverses, scopeRegistry, workflowRegistry,
   type GraphNode, type RuntimeStatus, type StageId, type WorkflowDefinition,
 } from "./system-registry";
-import { SimulationEventTransport, type WorkflowEvent } from "./runtime";
+import {
+  LiveWorkflowEventTransport,
+  SimulationEventTransport,
+  type WorkflowEvent,
+  type WorkflowEventTransport,
+} from "./runtime";
 import { runtimeModePresentation, type RuntimeMode } from "../shared/runtime-mode";
 import type { NextActionDefinition, NextActionEnvelope } from "../shared/next-actions";
 import { NextActionApprovalPanel, NextActionsPanel } from "./next-actions-panel";
@@ -182,7 +187,7 @@ function Observatory() {
   const [executionId, setExecutionId] = useState("—");
   const [startAt, setStartAt] = useState<number>();
   const [elapsed, setElapsed] = useState(0);
-  const [transport, setTransport] = useState<SimulationEventTransport>();
+  const [transport, setTransport] = useState<WorkflowEventTransport>();
   const [paused, setPaused] = useState(false);
   const [focusNode, setFocusNode] = useState<string>();
   const [selectedNode, setSelectedNode] = useState<GraphNode>(graphNodes.find((node) => node.id === "retrieval")!);
@@ -193,8 +198,10 @@ function Observatory() {
   const [pendingAction, setPendingAction] = useState<NextActionDefinition>();
   const [selectedCommand, setSelectedCommand] = useState<string>();
   const eventsRef = useRef<WorkflowEvent[]>([]);
+  const modeRef = useRef<RuntimeMode>("IDLE");
   const currentEvent = events.at(-1);
   const modeCopy = runtimeModePresentation[mode];
+  const liveSelected = workflow.executionModes?.includes("LIVE") === true;
 
   useEffect(() => { if (!startAt || ["COMPLETED", "CANCELLED", "FAILED", "IDLE"].includes(status)) return; const id = window.setInterval(() => setElapsed(performance.now() - startAt), 50); return () => clearInterval(id); }, [startAt, status]);
 
@@ -209,26 +216,52 @@ function Observatory() {
     eventsRef.current = [...eventsRef.current, event]; setEvents(eventsRef.current); setStatus(event.status); setFocusNode(event.node_id);
     setRuntime((old) => ({ ...old, [event.node_id]: { status: event.status, duration: event.duration } }));
     if (event.next_action_envelope) setNextActions(event.next_action_envelope);
-    if (event.event_type === "workflow.completed") {
-      setHistory((old) => [{ id: event.execution_id, workflow: event.workflow_id, scope: event.scope_key, startedAt: eventsRef.current[0]?.timestamp ?? event.timestamp, mode: "SIMULATION", status: "COMPLETED", events: [...eventsRef.current] }, ...old]);
-    }
+    const terminal = event.event_type === "workflow.completed"
+      || event.event_type === "workflow.execution.completed"
+      || event.status === "CANCELLED"
+      || event.status === "FAILED";
+    setHistory((old) => {
+      if (old.some((run) => run.id === event.execution_id)) {
+        return old.map((run) => run.id === event.execution_id
+          ? { ...run, events: [...eventsRef.current], status: event.status }
+          : run);
+      }
+      if (!terminal) return old;
+      return [{
+        id: event.execution_id,
+        workflow: event.workflow_id,
+        scope: event.scope_key,
+        startedAt: eventsRef.current[0]?.timestamp ?? event.timestamp,
+        mode: modeRef.current,
+        status: event.status,
+        events: [...eventsRef.current],
+      }, ...old];
+    });
   }, []);
 
   const executeDefinition = (definition: WorkflowDefinition, targetScope: string) => {
-    const id = `trc-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${Math.random().toString(16).slice(2, 8)}`;
-    const sim = new SimulationEventTransport(workflowRegistry.map((candidate) => candidate.id));
-    sim.subscribe(accept);
+    const live = definition.executionModes?.includes("LIVE") === true;
+    const id = live ? undefined : `trc-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${Math.random().toString(16).slice(2, 8)}`;
+    const nextTransport: WorkflowEventTransport = live
+      ? new LiveWorkflowEventTransport()
+      : new SimulationEventTransport(workflowRegistry.map((candidate) => candidate.id));
+    nextTransport.subscribe(accept);
     eventsRef.current = [];
-    setEvents([]); setRuntime({}); setMode(sim.mode); setStatus("QUEUED"); setExecutionId(id); setStartAt(performance.now()); setElapsed(0); setPaused(false); setTransport(sim); setHistoryOpen(false);
+    modeRef.current = nextTransport.mode;
+    setEvents([]); setRuntime({}); setMode(nextTransport.mode); setStatus("QUEUED"); setExecutionId(id ?? "kernel assigning…"); setStartAt(performance.now()); setElapsed(0); setPaused(false); setTransport(nextTransport); setHistoryOpen(false);
     setWorkflowId(definition.id); setScopeKey(targetScope); setNextActions(undefined); setPendingAction(undefined); setSelectedCommand(undefined);
-    void sim.start(definition, targetScope, id);
+    void nextTransport.start(definition, targetScope, id).then(setExecutionId).catch((error: unknown) => {
+      setMode("FAILED"); setStatus("FAILED");
+      setExecutionId("unassigned");
+      console.error("AIOS workflow launch failed", error);
+    });
   };
 
   const execute = () => executeDefinition(workflow, scopeKey);
-  const cancel = () => { transport?.cancel(); setStatus("CANCELLED"); };
-  const togglePause = () => { if (!transport) return; if (paused) { transport.resume(); setPaused(false); setStatus("ACTIVE"); } else { transport.pause(); setPaused(true); setStatus("WAITING"); } };
+  const cancel = () => { if (!transport) return; void transport.cancel(); };
+  const togglePause = () => { if (!transport) return; if (paused) { void transport.resume(); setPaused(false); } else { void transport.pause(); setPaused(true); } };
   const replay = async (run: RunRecord) => {
-    setHistoryOpen(false); setMode("REPLAY"); setExecutionId(run.id); setEvents([]); setRuntime({}); setStatus("ACTIVE"); eventsRef.current = []; setNextActions(undefined);
+    setHistoryOpen(false); modeRef.current = "REPLAY"; setMode("REPLAY"); setExecutionId(run.id); setEvents([]); setRuntime({}); setStatus("ACTIVE"); eventsRef.current = []; setNextActions(undefined);
     for (const event of run.events) { const replayed = { ...event, id: `replay-${event.id}` }; accept(replayed); await new Promise((resolve) => setTimeout(resolve, 180)); }
     setStatus(run.status);
   };
@@ -244,20 +277,37 @@ function Observatory() {
       provenance: "Registry-backed transition selection · simulation only", next_stage: action.target_workflow_id,
     };
     accept(event);
-    setHistory((old) => old.map((run) => run.id === executionId ? { ...run, events: [...run.events, event] } : run));
   };
 
-  const launchSelectedTarget = (action: NextActionDefinition) => {
+  const launchSelectedTarget = async (action: NextActionDefinition) => {
     if (!action.target_workflow_id) return;
     const target = workflowRegistry.find((candidate) => candidate.id === action.target_workflow_id);
     if (!target) return;
     const targetAllowsScope = target.allowedScopes.includes("*") || target.allowedScopes.includes(scopeKey);
     if (!targetAllowsScope) return;
+    if (mode === "LIVE" && transport?.spawnNextAction) {
+      eventsRef.current = [];
+      setEvents([]); setRuntime({}); setWorkflowId(target.id); setNextActions(undefined); setPendingAction(undefined); setSelectedCommand(undefined);
+      setStatus("QUEUED"); setExecutionId("kernel assigning…"); setStartAt(performance.now()); setElapsed(0); setPaused(false);
+      const childId = await transport.spawnNextAction({ source: "aios-cockpit-next-action" });
+      setExecutionId(childId);
+      return;
+    }
     executeDefinition(target, scopeKey);
   };
 
-  const handleNextAction = (action: NextActionDefinition) => {
+  const handleNextAction = async (action: NextActionDefinition) => {
     setSelectedCommand(action.command);
+    if (mode === "LIVE" && transport?.selectNextAction) {
+      await transport.selectNextAction(action.command);
+      if (action.requires_approval) {
+        setPendingAction(action);
+        return;
+      }
+      if (action.terminal) { setNextActions(undefined); return; }
+      await launchSelectedTarget(action);
+      return;
+    }
     if (action.requires_approval) {
       recordNextActionEvent(action, "next_action.approval_required", "APPROVAL REQUIRED");
       setPendingAction(action);
@@ -265,19 +315,30 @@ function Observatory() {
     }
     recordNextActionEvent(action, "next_action.selected");
     if (action.terminal) { setNextActions(undefined); return; }
-    if (action.target_workflow_id) launchSelectedTarget(action);
+    if (action.target_workflow_id) void launchSelectedTarget(action);
   };
 
-  const approvePendingAction = () => {
+  const approvePendingAction = async () => {
     if (!pendingAction) return;
     const approved = pendingAction;
+    if (mode === "LIVE" && transport?.approveNextAction) {
+      await transport.approveNextAction();
+      setPendingAction(undefined);
+      await launchSelectedTarget(approved);
+      return;
+    }
     recordNextActionEvent(approved, "next_action.approved");
     setPendingAction(undefined);
-    launchSelectedTarget(approved);
+    void launchSelectedTarget(approved);
   };
 
-  const rejectPendingAction = () => {
+  const rejectPendingAction = async () => {
     if (!pendingAction) return;
+    if (mode === "LIVE" && transport?.rejectNextAction) {
+      await transport.rejectNextAction();
+      setPendingAction(undefined); setStatus("COMPLETED");
+      return;
+    }
     recordNextActionEvent(pendingAction, "next_action.rejected");
     setPendingAction(undefined); setStatus("COMPLETED");
   };
@@ -286,22 +347,22 @@ function Observatory() {
   const approvalActive = status === "APPROVAL REQUIRED" && approvalEvent && !pendingAction;
 
   return <section className="observatory">
-    <div className="section-heading"><div><MiniLabel>04 / OBSERVATORY</MiniLabel><h1>Workflow execution topology</h1><p>Structured results now expose only registry-valid follow-up transitions.</p></div><div className="heading-actions"><button className={historyOpen ? "icon-btn selected" : "icon-btn"} onClick={() => setHistoryOpen(!historyOpen)}><History size={16} /><span>History</span><b>{history.length}</b></button><ModeBadge mode={mode} /></div></div>
+    <div className="section-heading"><div><MiniLabel>04 / OBSERVATORY</MiniLabel><h1>Workflow execution topology</h1><p>Live kernel events and execution-bound provenance share one governed trace.</p></div><div className="heading-actions"><button className={historyOpen ? "icon-btn selected" : "icon-btn"} onClick={() => setHistoryOpen(!historyOpen)}><History size={16} /><span>History</span><b>{history.length}</b></button><ModeBadge mode={mode} /></div></div>
 
     <div className="launcher panel-cut">
-      <div className="launcher-title"><div className="pulse-mark"><Zap size={15} /></div><div><MiniLabel>WORKFLOW LAUNCHER</MiniLabel><strong>Explicit simulation harness</strong></div></div>
+      <div className="launcher-title"><div className="pulse-mark"><Zap size={15} /></div><div><MiniLabel>WORKFLOW LAUNCHER</MiniLabel><strong>{liveSelected ? "Governed server execution" : "Explicit simulation harness"}</strong></div></div>
       <label><span>Workflow</span><div className="select-wrap"><select value={workflowId} onChange={(event) => selectWorkflow(event.target.value)} disabled={!(["IDLE", "COMPLETED", "CANCELLED", "FAILED"].includes(status))}>{workflowRegistry.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select><ChevronDown size={14} /></div></label>
       <label><span>Scope / Project</span><div className="select-wrap"><select value={scopeKey} onChange={(event) => setScopeKey(event.target.value)} disabled={!(["IDLE", "COMPLETED", "CANCELLED", "FAILED"].includes(status))}>{allowedScopes.map((scope) => <option key={scope.key} value={scope.key}>{scope.label}</option>)}</select><ChevronDown size={14} /></div></label>
-      <button className="execute-btn" onClick={execute} disabled={["ACTIVE", "WAITING", "APPROVAL REQUIRED", "QUEUED"].includes(status)}><Play size={15} fill="currentColor" />Execute</button>
+      <button className="execute-btn" onClick={execute} disabled={["ACTIVE", "WAITING", "APPROVAL REQUIRED", "QUEUED"].includes(status)}><Play size={15} fill="currentColor" />{liveSelected ? "Run live" : "Simulate"}</button>
       <div className="run-state"><div><span className={`status-light ${statusClass(status)}`} /><span>{status}</span></div><strong><Clock3 size={13} />{formatTimer(elapsed)}</strong><code>{executionId}</code></div>
       <div className="run-controls"><button onClick={togglePause} disabled={!transport || !workflow.supportsPause || ["COMPLETED", "CANCELLED", "FAILED"].includes(status)}>{paused ? <CirclePlay size={16} /> : <CirclePause size={16} />}</button><button onClick={cancel} disabled={!transport || !workflow.supportsCancel || ["COMPLETED", "CANCELLED", "FAILED"].includes(status)}><Square size={15} /></button></div>
     </div>
 
-    <div className="registry-line"><span><Database size={12} />REGISTRY-BACKED Capability Registry</span><code>{workflow.capability}</code><span>{workflow.autonomy}</span><span>{workflow.status}</span><span>v{workflow.version}</span><span className="source-note">NEXT_ACTION_ENVELOPE · 2026-07-23</span></div>
+    <div className="registry-line"><span><Database size={12} />REGISTRY-BACKED Capability Registry</span><code>{workflow.capability}</code><span>{workflow.autonomy}</span><span>{workflow.status}</span><span>v{workflow.version}</span><span className="source-note">{liveSelected ? "LIVE_SERVER_POLL · NOTION/DRIVE NOT ACCESSED" : "SIMULATION · NO EXTERNAL ACCESS"}</span></div>
 
     {historyOpen ? <div className="history-view panel-cut">
-      <div className="history-head"><div><MiniLabel>EXECUTION HISTORY</MiniLabel><h2>Local trace archive</h2></div><span>Historical runs are session-local and never presented as live telemetry.</span></div>
-      {history.length === 0 ? <div className="empty-history"><FileClock size={28} /><strong>No executions recorded in this session</strong><span>Run a simulation to create a replayable trace.</span></div> : history.map((run) => <button className="history-row" key={run.id} onClick={() => void replay(run)}><RotateCcw size={15} /><div><strong>{workflowRegistry.find((candidate) => candidate.id === run.workflow)?.name}</strong><span>{scopeRegistry.find((scope) => scope.key === run.scope)?.label}</span></div><code>{run.id}</code><span>{run.mode} · {run.events.length} events</span><i className={`status-pill ${statusClass(run.status)}`}>{run.status}</i></button>)}
+      <div className="history-head"><div><MiniLabel>EXECUTION HISTORY</MiniLabel><h2>Trace readback</h2></div><span>LIVE runs retain server-owned process state; this browser keeps only the displayed replay cache.</span></div>
+      {history.length === 0 ? <div className="empty-history"><FileClock size={28} /><strong>No executions recorded in this session</strong><span>Run the live diagnostic or a simulation to create a replayable trace.</span></div> : history.map((run) => <button className="history-row" key={run.id} onClick={() => void replay(run)}><RotateCcw size={15} /><div><strong>{workflowRegistry.find((candidate) => candidate.id === run.workflow)?.name}</strong><span>{scopeRegistry.find((scope) => scope.key === run.scope)?.label}</span></div><code>{run.id}</code><span>{run.mode} · {run.events.length} events</span><i className={`status-pill ${statusClass(run.status)}`}>{run.status}</i></button>)}
     </div> : <>
       <div className="observatory-grid">
         <div className="map-panel panel-cut">

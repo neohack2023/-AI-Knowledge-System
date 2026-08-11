@@ -8,23 +8,25 @@ import {
   evaluateChatBridgeWorkflow,
   listChatBridgeExecutableWorkflows,
 } from "../../../server/chat-bridge/execution-policy.ts";
-import { workflowExecutionKernel } from "../../../server/workflows/kernel.ts";
+import { workflowExecutionKernel, WorkflowKernelError } from "../../../server/workflows/kernel.ts";
 import { capabilityDiscoveryRuntime } from "../../../server/capabilities/index.ts";
 import type { JsonObject } from "../../../server/workflows/types.ts";
 
 export const runtime = "edge";
 
 type BridgeBody = {
-  action?: "search" | "fetch" | "execute_safe_workflow";
+  action?: "search" | "fetch" | "execute_safe_workflow" | "read_execution" | "read_execution_provenance";
   query?: string;
   id?: string;
   limit?: number;
   scope_key?: string;
   workflow_id?: string;
+  execution_id?: string;
+  provenance_envelope_id?: string;
   input?: JsonObject;
 };
 
-const CONTRACT = "AIOSChatBridge/0.1";
+const CONTRACT = "AIOSChatBridge/0.2";
 const SCOPE = "global-working-memory";
 
 function authorized(request: Request) {
@@ -76,7 +78,7 @@ export async function GET(request: Request) {
       gog_3d_lab: "/gog-3d-lab",
       gog_3d_provider: "/api/gog-3d-lab/run",
     },
-    allowed_bridge_actions: ["search", "fetch", "execute_safe_workflow"],
+    allowed_bridge_actions: ["search", "fetch", "read_execution", "read_execution_provenance", "execute_safe_workflow"],
     execution_policy: {
       mode: "LIVE",
       autonomy_band: "A0",
@@ -162,6 +164,49 @@ export async function POST(request: Request) {
       });
     }
 
+    if (body.action === "read_execution") {
+      const executionId = body.execution_id?.trim();
+      if (!executionId) {
+        return NextResponse.json(
+          { error: { code: "EXECUTION_ID_REQUIRED", message: "execution_id is required." } },
+          { status: 400 },
+        );
+      }
+      const snapshot = workflowExecutionKernel.getExecution(executionId);
+      if (snapshot.execution.scope_key !== SCOPE) {
+        return NextResponse.json(
+          { error: { code: "BRIDGE_SCOPE_UNAVAILABLE", message: `The initial bridge exposes only '${SCOPE}'.` } },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({
+        contract: CONTRACT,
+        scope_key: SCOPE,
+        authority: "WORKFLOW_EXECUTION_KERNEL",
+        write_authorization: "NONE",
+        snapshot,
+      });
+    }
+
+    if (body.action === "read_execution_provenance") {
+      const executionId = body.execution_id?.trim();
+      const envelopeId = body.provenance_envelope_id?.trim();
+      if (!executionId || !envelopeId) {
+        return NextResponse.json(
+          { error: { code: "PROVENANCE_READ_IDS_REQUIRED", message: "execution_id and provenance_envelope_id are required." } },
+          { status: 400 },
+        );
+      }
+      const provenance = workflowExecutionKernel.getProvenanceEnvelope(executionId, envelopeId, SCOPE);
+      return NextResponse.json({
+        contract: CONTRACT,
+        scope_key: SCOPE,
+        authority: "WORKFLOW_EXECUTION_KERNEL",
+        write_authorization: "NONE",
+        provenance,
+      });
+    }
+
     if (body.action === "execute_safe_workflow") {
       const workflowId = body.workflow_id?.trim();
       if (!workflowId) {
@@ -200,10 +245,16 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: { code: "UNKNOWN_BRIDGE_ACTION", message: "Use action 'search', 'fetch', or 'execute_safe_workflow'." } },
+      { error: { code: "UNKNOWN_BRIDGE_ACTION", message: "Use an action returned by allowed_bridge_actions." } },
       { status: 400 },
     );
   } catch (error) {
+    if (error instanceof WorkflowKernelError) {
+      return NextResponse.json(
+        { error: { code: error.code, message: error.message } },
+        { status: error.httpStatus },
+      );
+    }
     return NextResponse.json(
       {
         error: {

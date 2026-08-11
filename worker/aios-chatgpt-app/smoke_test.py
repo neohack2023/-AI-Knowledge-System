@@ -28,10 +28,12 @@ EXPECTED_TOOLS = {
     "search",
     "fetch",
     "aios_status",
+    "read_execution",
+    "read_execution_provenance",
     "run_backend_workflow",
     "open_aios_workbench",
 }
-WIDGET_URI = "ui://aios/repo-workbench-v0.1.html"
+WIDGET_URI = "ui://aios/repo-workbench-v0.2.html"
 
 
 def load_server_module():
@@ -58,6 +60,14 @@ async def exercise_registered_surface(module) -> None:
     tools = await module.mcp.list_tools()
     tool_names = {tool.name for tool in tools}
     assert tool_names == EXPECTED_TOOLS, (tool_names, EXPECTED_TOOLS)
+    by_name = {tool.name: tool for tool in tools}
+    for name in {
+        "search", "fetch", "aios_status", "read_execution",
+        "read_execution_provenance", "open_aios_workbench",
+    }:
+        annotations = by_name[name].annotations
+        assert annotations is not None
+        assert annotations.read_only_hint is True, name
 
     resources = await module.mcp.list_resources()
     widget = next((resource for resource in resources if str(resource.uri) == WIDGET_URI), None)
@@ -70,12 +80,15 @@ async def exercise_registered_surface(module) -> None:
     html = str(resource_items[0].content)
     assert "AIOS Repo Workbench" in html
     assert "run_backend_workflow" in html
+    assert "read_execution" in html
+    assert "read_execution_provenance" in html
+    assert "Execution trace" in html
 
     def fake_request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         assert path == "/api/aios-bridge"
         if payload is None:
             return {
-                "contract": "AIOSChatBridge/0.1",
+                "contract": "AIOSChatBridge/0.2",
                 "status": "READY",
                 "coverage": "REPOSITORY_EXECUTION_TRUTH_ONLY",
                 "authority": "GITHUB_EXECUTION_TRUTH",
@@ -106,11 +119,61 @@ async def exercise_registered_surface(module) -> None:
             }
         if action == "execute_safe_workflow":
             return {
-                "contract": "AIOSChatBridge/0.1",
+                "contract": "AIOSChatBridge/0.2",
                 "mode": "LIVE",
                 "bridge_policy": "A0_PROCESS_LOCAL_EXECUTION_ONLY",
                 "write_authorization": "NONE",
-                "snapshot": {"execution": {"status": "COMPLETED"}},
+                "snapshot": {
+                    "execution": {
+                        "execution_id": "execution-fixture",
+                        "workflow_id": "internal-runtime-diagnostic",
+                        "scope_key": "global-working-memory",
+                        "status": "COMPLETED",
+                    },
+                    "events": [{
+                        "event_id": "event-fixture",
+                        "execution_id": "execution-fixture",
+                        "event_type": "workflow.execution.completed",
+                        "sequence": 4,
+                    }],
+                    "provenance_envelopes": [{
+                        "envelope_id": "envelope-fixture",
+                        "used_by_execution_id": "execution-fixture",
+                    }],
+                },
+            }
+        if action == "read_execution":
+            assert payload["execution_id"] == "execution-fixture"
+            return {
+                "contract": "AIOSChatBridge/0.2",
+                "scope_key": "global-working-memory",
+                "authority": "WORKFLOW_EXECUTION_KERNEL",
+                "write_authorization": "NONE",
+                "snapshot": {
+                    "execution": {
+                        "execution_id": "execution-fixture",
+                        "workflow_id": "internal-runtime-diagnostic",
+                        "scope_key": "global-working-memory",
+                        "status": "COMPLETED",
+                    },
+                    "events": [{"event_id": "event-fixture", "sequence": 4}],
+                    "provenance_envelopes": [{"envelope_id": "envelope-fixture"}],
+                },
+            }
+        if action == "read_execution_provenance":
+            assert payload["execution_id"] == "execution-fixture"
+            assert payload["provenance_envelope_id"] == "envelope-fixture"
+            return {
+                "contract": "AIOSChatBridge/0.2",
+                "authority": "WORKFLOW_EXECUTION_KERNEL",
+                "write_authorization": "NONE",
+                "provenance": {
+                    "schema_name": "ContextProvenanceEnvelopeReadProjection",
+                    "schema_version": "0.1",
+                    "envelope_id": "envelope-fixture",
+                    "used_by_execution_id": "execution-fixture",
+                    "validity": "VALID",
+                },
             }
         raise AssertionError(f"Unexpected fake bridge action: {action!r}")
 
@@ -129,6 +192,24 @@ async def exercise_registered_surface(module) -> None:
     status_result = await module.mcp.call_tool("aios_status", {})
     assert getattr(status_result, "is_error", False) is False
     assert "READY" in text_from_tool_result(status_result)
+
+    execution_result = await module.mcp.call_tool(
+        "read_execution", {"execution_id": "execution-fixture"}
+    )
+    execution_payload = json.loads(text_from_tool_result(execution_result))
+    assert execution_payload["write_authorization"] == "NONE"
+    assert execution_payload["snapshot"]["events"][0]["sequence"] == 4
+
+    provenance_result = await module.mcp.call_tool(
+        "read_execution_provenance",
+        {
+            "execution_id": "execution-fixture",
+            "provenance_envelope_id": "envelope-fixture",
+        },
+    )
+    provenance_payload = json.loads(text_from_tool_result(provenance_result))
+    assert provenance_payload["provenance"]["validity"] == "VALID"
+    assert provenance_payload["provenance"]["used_by_execution_id"] == "execution-fixture"
 
     run_result = await module.mcp.call_tool(
         "run_backend_workflow",

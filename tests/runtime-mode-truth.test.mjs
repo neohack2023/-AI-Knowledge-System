@@ -30,7 +30,9 @@ test("SimulationEventTransport cannot present live trace or live execution label
   assert.match(model, /pathLabel: "SIMULATED WORKFLOW PATH"/);
   assert.doesNotMatch(cockpit, />LIVE TRACE</);
   assert.doesNotMatch(cockpit, />LIVE MINDMAP EXECUTION</);
-  assert.match(cockpit, /setMode\(sim\.mode\)/);
+  assert.match(cockpit, /new SimulationEventTransport/);
+  assert.match(cockpit, /setMode\(nextTransport\.mode\)/);
+  assert.match(cockpit, /definition\.executionModes\?\.includes\("LIVE"\)/);
 });
 
 test("fabricated and static cockpit facts carry explicit truth labels", async () => {
@@ -46,4 +48,16 @@ test("fabricated and static cockpit facts carry explicit truth labels", async ()
   assert.match(cockpit, /Registry-backed transition selection · simulation only/);
   assert.match(nextActions, /write_authorized: false/);
   assert.match(registry, /SNAPSHOT · authoritative repository execution facts/);
+});
+
+test("live cockpit clients target the normalized read contract and retain terminal traces", async () => {
+  const [runtime, cockpit] = await Promise.all([
+    read("../app/runtime.ts"),
+    read("../app/cockpit.tsx"),
+  ]);
+  assert.match(runtime, /url\.searchParams\.set\("view", "cockpit"\)/);
+  assert.match(runtime, /url\.searchParams\.set\("transport", "sse"\)/);
+  assert.match(runtime, /url\.searchParams\.set\("execution_id", executionId\)/);
+  assert.match(cockpit, /event\.status === "CANCELLED"/);
+  assert.match(cockpit, /event\.status === "FAILED"/);
 });

@@ -1,4 +1,8 @@
 import { workflowExecutionKernel, WorkflowKernelError } from "../../../server/workflows/kernel.ts";
+import {
+  cockpitLiveReadSchema,
+  projectCockpitLiveRead,
+} from "../../../server/workflows/cockpit-read-adapter.ts";
 import type { CreateExecutionRequest, JsonObject } from "../../../server/workflows/types.ts";
 import type { RuntimeMode } from "../../../shared/runtime-mode.ts";
 
@@ -17,6 +21,12 @@ type OperationBody = {
 };
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
+const cockpitJson = (body: unknown) => Response.json(body, {
+  headers: {
+    "cache-control": "no-store",
+    "x-aios-event-contract": `${cockpitLiveReadSchema.name}/${cockpitLiveReadSchema.version}`,
+  },
+});
 
 const requestedBy = (request: Request) => {
   const email = request.headers.get("oai-authenticated-user-email");
@@ -30,11 +40,34 @@ const requestedBy = (request: Request) => {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const executionId = url.searchParams.get("execution_id");
+  const cockpitView = url.searchParams.get("view") === "cockpit";
+  const eventStream = url.searchParams.get("transport") === "sse"
+    || request.headers.get("accept")?.includes("text/event-stream") === true;
   try {
+    if (cockpitView || eventStream) {
+      if (!executionId) {
+        throw new WorkflowKernelError(
+          "INVALID_REQUEST",
+          "execution_id is required for the cockpit live read surface.",
+        );
+      }
+      const afterSequence = parseAfterSequence(url, request);
+      const snapshot = workflowExecutionKernel.getExecution(executionId);
+      if (eventStream) return cockpitEventStream(request, executionId, afterSequence);
+      return cockpitJson(projectCockpitLiveRead(snapshot, afterSequence));
+    }
     if (executionId) return json(workflowExecutionKernel.getExecution(executionId));
     return json({
       live_workflows: workflowExecutionKernel.listLiveWorkflows(),
       simulation_transport: "client-only",
+      cockpit_live_read: {
+        schema_name: cockpitLiveReadSchema.name,
+        schema_version: cockpitLiveReadSchema.version,
+        endpoint: "/api/workflow-executions?view=cockpit&execution_id={execution_id}&after_sequence={sequence}",
+        transports: ["json-poll", "sse"],
+        execution_authority: "WorkflowExecutionKernel",
+        connector_write_authorization: "NONE",
+      },
       next_action_contract: "registry-backed",
       capability_discovery_endpoint: "/api/capabilities",
       capability_discovery_contract: "CapabilityDiscoveryEnvelope/1.0",
@@ -105,6 +138,60 @@ export async function POST(request: Request) {
 const requireId = (body: OperationBody) => {
   if (!body.execution_id) throw new WorkflowKernelError("INVALID_REQUEST", "execution_id is required.");
   return body.execution_id;
+};
+
+const parseAfterSequence = (url: URL, request: Request) => {
+  const raw = url.searchParams.get("after_sequence") ?? request.headers.get("last-event-id") ?? "0";
+  if (!/^\d+$/.test(raw)) {
+    throw new WorkflowKernelError("INVALID_REQUEST", "after_sequence must be a non-negative integer.");
+  }
+  const sequence = Number.parseInt(raw, 10);
+  if (!Number.isSafeInteger(sequence)) {
+    throw new WorkflowKernelError("INVALID_REQUEST", "after_sequence must be a non-negative safe integer.");
+  }
+  return sequence;
+};
+
+const cockpitEventStream = (request: Request, executionId: string, initialSequence: number) => {
+  const encoder = new TextEncoder();
+  let cursor = initialSequence;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const write = (value: string) => controller.enqueue(encoder.encode(value));
+      write("retry: 1000\n\n");
+      const deadline = Date.now() + 25_000;
+      try {
+        while (!cancelled && !request.signal.aborted) {
+          const projection = projectCockpitLiveRead(
+            workflowExecutionKernel.getExecution(executionId),
+            cursor,
+          );
+          for (const event of projection.events) {
+            cursor += 1;
+            write(`id: ${cursor}\ndata: ${JSON.stringify(event)}\n\n`);
+          }
+          if (projection.cursor.terminal || Date.now() >= deadline) break;
+          write(`: heartbeat ${projection.generated_at}\n\n`);
+          await new Promise((resolve) => setTimeout(resolve, projection.cursor.poll_after_ms));
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+    cancel() { cancelled = true; },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+      "x-accel-buffering": "no",
+      "x-aios-event-contract": `${cockpitLiveReadSchema.name}/${cockpitLiveReadSchema.version}`,
+    },
+  });
 };
 
 const handleError = (error: unknown) => {
