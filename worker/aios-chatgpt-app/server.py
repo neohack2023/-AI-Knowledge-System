@@ -11,7 +11,13 @@ Initial authority boundary:
 - governed_write_probe input is explicitly blocked
 - no Notion/Drive memory authority is exposed here yet
 - no destination-write or canon-promotion authority
-- developer-mode fixture until MCP authentication is added
+- developer-mode fixture until MCP user authentication is added
+
+Deployment boundary:
+- local is the safe default and binds only to loopback
+- remote-dev requires an HTTPS AIOS backend origin, a backend bridge token,
+  and explicit MCP Host/Origin allowlists
+- a non-loopback bind without explicit transport security fails closed
 """
 
 from __future__ import annotations
@@ -24,12 +30,15 @@ from pathlib import Path
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp_types import ToolAnnotations
 
 BACKEND_ORIGIN = os.environ.get("AIOS_BACKEND_ORIGIN", "").strip().rstrip("/")
 BRIDGE_TOKEN = os.environ.get("AIOS_BRIDGE_TOKEN", "").strip()
+DEPLOYMENT_PROFILE = os.environ.get("AIOS_MCP_DEPLOYMENT_PROFILE", "local").strip().lower()
 WIDGET_URI = "ui://aios/repo-workbench-v0.1.html"
 WIDGET_PATH = Path(__file__).with_name("widget.html")
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 mcp = MCPServer(
     "AI Knowledge System",
@@ -55,6 +64,57 @@ PROCESS_LOCAL_EXECUTION = ToolAnnotations(
     idempotentHint=False,
     openWorldHint=False,
 )
+
+
+def _csv_env(name: str) -> list[str]:
+    raw = os.environ.get(name, "")
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _transport_security_for(host: str) -> TransportSecuritySettings | None:
+    """Build the MCP transport-security policy and fail closed for remote binds."""
+    allowed_hosts = _csv_env("MCP_ALLOWED_HOSTS")
+    allowed_origins = _csv_env("MCP_ALLOWED_ORIGINS")
+
+    if DEPLOYMENT_PROFILE not in {"local", "remote-dev"}:
+        raise RuntimeError(
+            "AIOS_MCP_DEPLOYMENT_PROFILE must be 'local' or 'remote-dev' for this fixture"
+        )
+
+    if DEPLOYMENT_PROFILE == "local":
+        if host in LOOPBACK_HOSTS and not allowed_hosts and not allowed_origins:
+            # The MCP SDK auto-enables loopback-only DNS-rebinding protection.
+            return None
+        if not allowed_hosts:
+            raise RuntimeError(
+                "Non-loopback MCP binds require MCP_ALLOWED_HOSTS; refusing insecure startup"
+            )
+        return TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        )
+
+    # remote-dev is intentionally strict because the endpoint becomes reachable
+    # outside the local process boundary. It is still not a public-production
+    # profile because MCP user OAuth is a separate future gate.
+    if not BACKEND_ORIGIN.startswith("https://"):
+        raise RuntimeError(
+            "remote-dev requires AIOS_BACKEND_ORIGIN to use HTTPS"
+        )
+    if not BRIDGE_TOKEN:
+        raise RuntimeError(
+            "remote-dev requires AIOS_BRIDGE_TOKEN for worker-to-backend authentication"
+        )
+    if not allowed_hosts:
+        raise RuntimeError(
+            "remote-dev requires MCP_ALLOWED_HOSTS for DNS-rebinding protection"
+        )
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
+    )
 
 
 def _backend_url(path: str) -> str:
@@ -209,13 +269,15 @@ def open_aios_workbench() -> dict[str, Any]:
         "contract": status.get("contract"),
         "status_payload": status,
         "backend_origin": BACKEND_ORIGIN,
+        "deployment_profile": DEPLOYMENT_PROFILE,
         "gog_lab_url": f"{BACKEND_ORIGIN}/gog-3d-lab" if BACKEND_ORIGIN else None,
     }
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
-    host = os.environ.get("HOST", "0.0.0.0")
+    host = os.environ.get("HOST", "127.0.0.1").strip()
+    transport_security = _transport_security_for(host)
     mcp.run(
         transport="streamable-http",
         host=host,
@@ -223,4 +285,5 @@ if __name__ == "__main__":
         streamable_http_path="/mcp",
         stateless_http=True,
         json_response=True,
+        transport_security=transport_security,
     )
