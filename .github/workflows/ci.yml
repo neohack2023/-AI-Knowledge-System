@@ -27,6 +27,13 @@ jobs:
         run: |
           python3 -m py_compile worker/gog-sam3d-body/server.py
           python3 -m py_compile worker/aios-chatgpt-app/server.py
+          python3 -m py_compile worker/aios-chatgpt-app/smoke_test.py
+
+      - name: Install MCP bridge dependencies
+        run: python3 -m pip install -r worker/aios-chatgpt-app/requirements.txt
+
+      - name: Smoke test ChatGPT MCP bridge
+        run: python3 worker/aios-chatgpt-app/smoke_test.py
 
       - name: Install dependencies
         run: npm ci
@@ -46,8 +53,6 @@ jobs:
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
-        with:
-          node-version: '22'
 
       - name: Test public release contracts
         run: |
