@@ -6,15 +6,18 @@ import {
 } from "../../../server/chat-bridge/repository-knowledge.ts";
 import { workflowExecutionKernel } from "../../../server/workflows/kernel.ts";
 import { capabilityDiscoveryRuntime } from "../../../server/capabilities/index.ts";
+import type { JsonObject } from "../../../server/workflows/types.ts";
 
 export const runtime = "edge";
 
 type BridgeBody = {
-  action?: "search" | "fetch";
+  action?: "search" | "fetch" | "simulate_workflow";
   query?: string;
   id?: string;
   limit?: number;
   scope_key?: string;
+  workflow_id?: string;
+  input?: JsonObject;
 };
 
 const CONTRACT = "AIOSChatBridge/0.1";
@@ -64,11 +67,12 @@ export async function GET(request: Request) {
       gog_3d_lab: "/gog-3d-lab",
       gog_3d_provider: "/api/gog-3d-lab/run",
     },
+    allowed_bridge_actions: ["search", "fetch", "simulate_workflow"],
     boundaries: [
       "This bridge exposes repository execution truth, not the full Notion or Drive memory authority surface.",
       "Search and fetch are read-only.",
-      "ChatGPT-side workflow execution is restricted to SIMULATION by the MCP adapter.",
-      "No result is automatically promoted to memory, canon, or destination-write authority.",
+      "ChatGPT-side workflow execution is restricted to SIMULATION inside this bridge.",
+      "No bridge result is automatically promoted to memory, canon, or destination-write authority.",
     ],
   });
 }
@@ -142,8 +146,35 @@ export async function POST(request: Request) {
       });
     }
 
+    if (body.action === "simulate_workflow") {
+      const workflowId = body.workflow_id?.trim();
+      if (!workflowId) {
+        return NextResponse.json(
+          { error: { code: "WORKFLOW_ID_REQUIRED", message: "workflow_id is required." } },
+          { status: 400 },
+        );
+      }
+      const created = workflowExecutionKernel.createExecution({
+        workflow_id: workflowId,
+        scope_key: SCOPE,
+        requested_by: "chatgpt-mcp-bridge",
+        mode: "SIMULATION",
+        input: body.input ?? {},
+      });
+      if (created.execution.status === "FAILED") {
+        return NextResponse.json({ contract: CONTRACT, mode: "SIMULATION", snapshot: created }, { status: 409 });
+      }
+      const completed = await workflowExecutionKernel.runToCompletion(created.execution.execution_id);
+      return NextResponse.json({
+        contract: CONTRACT,
+        mode: "SIMULATION",
+        write_authorization: "NONE",
+        snapshot: completed,
+      }, { status: completed.execution.status === "FAILED" ? 409 : 201 });
+    }
+
     return NextResponse.json(
-      { error: { code: "UNKNOWN_BRIDGE_ACTION", message: "Use action 'search' or 'fetch'." } },
+      { error: { code: "UNKNOWN_BRIDGE_ACTION", message: "Use action 'search', 'fetch', or 'simulate_workflow'." } },
       { status: 400 },
     );
   } catch (error) {
