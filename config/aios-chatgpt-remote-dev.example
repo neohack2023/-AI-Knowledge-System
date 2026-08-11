@@ -1,11 +1,11 @@
-# AIOS_CHATGPT_APP_BRIDGE_DEPLOY_BINDING_02
-# Developer Mode deployment profile. Copy these key/value pairs into the
-# deployment platform's environment/secret manager. Do not commit real values.
+# AIOS_CHATGPT_APP_BRIDGE_ENDPOINT_PROVISION_03
+# Developer Mode deployment profile. This file contains only public/non-secret
+# binding values plus secret-manager placeholders. Do not commit real secrets.
 
 AIOS_MCP_DEPLOYMENT_PROFILE=remote-dev
 
-# Stable HTTPS origin for the deployed AI Knowledge System Sites application.
-AIOS_BACKEND_ORIGIN=https://REPLACE_WITH_DEPLOYED_AIOS_ORIGIN
+# Resolved OpenAI Sites production origin supplied for the deployed AI Knowledge System.
+AIOS_BACKEND_ORIGIN=https://ai-knowledge-system.neohack.chatgpt.site
 
 # Must match AIOS_BRIDGE_TOKEN configured on the AI Knowledge System backend.
 AIOS_BRIDGE_TOKEN=REPLACE_IN_SECRET_MANAGER
@@ -15,7 +15,8 @@ HOST=0.0.0.0
 PORT=8000
 
 # Exact Host header values admitted by the MCP transport-security middleware.
-MCP_ALLOWED_HOSTS=mcp.example.com
+# Replace after the MCP host/tunnel hostname is provisioned.
+MCP_ALLOWED_HOSTS=REPLACE_WITH_MCP_HOST
 
 # Optional exact Origin header allowlist. Leave empty only when the chosen
 # ChatGPT/server connection sends no Origin header. Add observed legitimate
