@@ -2,8 +2,9 @@
 
 This fixture proves the MCP SDK can import the server, discover its advertised
 surface, read the inline UI resource, normalize representative backend results,
-and bind the Streamable HTTP endpoint locally. It does not claim a public ChatGPT
-Developer Mode connection or a deployed backend origin.
+bind the Streamable HTTP endpoint locally, and fail closed when a remote bind is
+missing its deployment security configuration. It does not claim a public
+ChatGPT Developer Mode connection or a deployed backend origin.
 """
 
 from __future__ import annotations
@@ -145,15 +146,78 @@ async def exercise_registered_surface(module) -> None:
     assert "gog_lab_url" in text_from_tool_result(open_result)
 
 
+def exercise_deployment_security(module) -> None:
+    original_profile = module.DEPLOYMENT_PROFILE
+    original_origin = module.BACKEND_ORIGIN
+    original_token = module.BRIDGE_TOKEN
+    original_hosts = os.environ.get("MCP_ALLOWED_HOSTS")
+    original_origins = os.environ.get("MCP_ALLOWED_ORIGINS")
+    try:
+        module.DEPLOYMENT_PROFILE = "local"
+        os.environ.pop("MCP_ALLOWED_HOSTS", None)
+        os.environ.pop("MCP_ALLOWED_ORIGINS", None)
+        assert module._transport_security_for("127.0.0.1") is None
+
+        try:
+            module._transport_security_for("0.0.0.0")
+        except RuntimeError as error:
+            assert "MCP_ALLOWED_HOSTS" in str(error)
+        else:
+            raise AssertionError("Non-loopback local profile did not fail closed")
+
+        module.DEPLOYMENT_PROFILE = "remote-dev"
+        module.BACKEND_ORIGIN = "http://backend.example"
+        module.BRIDGE_TOKEN = "fixture-token"
+        os.environ["MCP_ALLOWED_HOSTS"] = "mcp.example.test"
+        try:
+            module._transport_security_for("0.0.0.0")
+        except RuntimeError as error:
+            assert "HTTPS" in str(error)
+        else:
+            raise AssertionError("remote-dev accepted a non-HTTPS backend")
+
+        module.BACKEND_ORIGIN = "https://backend.example"
+        module.BRIDGE_TOKEN = ""
+        try:
+            module._transport_security_for("0.0.0.0")
+        except RuntimeError as error:
+            assert "AIOS_BRIDGE_TOKEN" in str(error)
+        else:
+            raise AssertionError("remote-dev accepted a missing backend token")
+
+        module.BRIDGE_TOKEN = "fixture-token"
+        os.environ["MCP_ALLOWED_ORIGINS"] = "https://chatgpt.example.test"
+        security = module._transport_security_for("0.0.0.0")
+        assert security is not None
+        assert security.enable_dns_rebinding_protection is True
+        assert security.allowed_hosts == ["mcp.example.test"]
+        assert security.allowed_origins == ["https://chatgpt.example.test"]
+    finally:
+        module.DEPLOYMENT_PROFILE = original_profile
+        module.BACKEND_ORIGIN = original_origin
+        module.BRIDGE_TOKEN = original_token
+        if original_hosts is None:
+            os.environ.pop("MCP_ALLOWED_HOSTS", None)
+        else:
+            os.environ["MCP_ALLOWED_HOSTS"] = original_hosts
+        if original_origins is None:
+            os.environ.pop("MCP_ALLOWED_ORIGINS", None)
+        else:
+            os.environ["MCP_ALLOWED_ORIGINS"] = original_origins
+
+
 def probe_streamable_http_binding() -> None:
     env = os.environ.copy()
     env.update(
         {
             "AIOS_BACKEND_ORIGIN": "http://127.0.0.1:9",
+            "AIOS_MCP_DEPLOYMENT_PROFILE": "local",
             "HOST": "127.0.0.1",
             "PORT": "8765",
         }
     )
+    env.pop("MCP_ALLOWED_HOSTS", None)
+    env.pop("MCP_ALLOWED_ORIGINS", None)
     proc = subprocess.Popen(
         [sys.executable, str(SERVER_PATH)],
         cwd=str(ROOT),
@@ -199,8 +263,9 @@ def probe_streamable_http_binding() -> None:
 def main() -> None:
     module = load_server_module()
     asyncio.run(exercise_registered_surface(module))
+    exercise_deployment_security(module)
     probe_streamable_http_binding()
-    print("AIOS_CHATGPT_APP_BRIDGE_FIXTURE_01 local MCP smoke: PASS")
+    print("AIOS_CHATGPT_APP_BRIDGE_FIXTURE_01 local MCP + deployment security smoke: PASS")
 
 
 if __name__ == "__main__":
