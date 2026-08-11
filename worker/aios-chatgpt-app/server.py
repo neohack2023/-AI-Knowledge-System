@@ -5,7 +5,7 @@ logic remain in the deployed AI Knowledge System backend. The MCP server only
 normalizes that backend into ChatGPT tools plus one inline workbench resource.
 
 Initial authority boundary:
-- search/fetch/status are read-only
+- search/fetch/status/execution/provenance reads are read-only
 - workflow execution is restricted by the backend to A0, INTERNAL_NATIVE,
   EXECUTION_LOCAL, FULLY_REVERSIBLE, PROCESS_LOCAL handlers
 - governed_write_probe input is explicitly blocked
@@ -36,20 +36,22 @@ from mcp_types import ToolAnnotations
 BACKEND_ORIGIN = os.environ.get("AIOS_BACKEND_ORIGIN", "").strip().rstrip("/")
 BRIDGE_TOKEN = os.environ.get("AIOS_BRIDGE_TOKEN", "").strip()
 DEPLOYMENT_PROFILE = os.environ.get("AIOS_MCP_DEPLOYMENT_PROFILE", "local").strip().lower()
-WIDGET_URI = "ui://aios/repo-workbench-v0.1.html"
+WIDGET_URI = "ui://aios/repo-workbench-v0.2.html"
 WIDGET_PATH = Path(__file__).with_name("widget.html")
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 mcp = MCPServer(
     "AI Knowledge System",
     title="AIOS Repo Workbench",
-    description="Read repository execution truth and run policy-bounded AIOS backend logic from ChatGPT.",
+    description="Read repository and live execution truth, then run policy-bounded AIOS backend logic from ChatGPT.",
     instructions=(
         "Use search and fetch for repository execution truth. "
+        "Use read_execution for an execution-scoped live snapshot and "
+        "read_execution_provenance for the minimum validated provenance projection. "
         "Use run_backend_workflow only when a user explicitly wants to exercise a registered backend workflow. "
         "The backend admits only A0 process-local execution and blocks governed-write input."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
 
 READ_ONLY = ToolAnnotations(
@@ -151,14 +153,14 @@ def _request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]
     WIDGET_URI,
     name="AIOS Repo Workbench",
     title="AIOS Repo Workbench",
-    description="Inline ChatGPT UI for repository search and policy-bounded process-local workflow execution.",
+    description="Inline ChatGPT UI for repository search, live execution inspection, and policy-bounded process-local workflow execution.",
     mime_type="text/html;profile=mcp-app",
     meta={
         "ui": {
             "prefersBorder": True,
             "csp": {"connectDomains": [], "resourceDomains": []},
         },
-        "openai/widgetDescription": "Search AIOS repository execution truth and run bounded backend logic.",
+        "openai/widgetDescription": "Search AIOS repository truth, inspect live execution traces, and run bounded backend logic.",
     },
 )
 def workbench_resource() -> str:
@@ -222,6 +224,48 @@ def aios_status() -> dict[str, Any]:
 
 
 @mcp.tool(
+    name="read_execution",
+    title="Read AIOS execution snapshot",
+    description=(
+        "Use this when the user needs the current status, ordered events, and execution-bound provenance "
+        "for one exact live AIOS execution. This is read-only and grants no workflow or destination-write authority."
+    ),
+    annotations=READ_ONLY,
+)
+def read_execution(execution_id: str) -> dict[str, Any]:
+    """Read one exact workflow execution snapshot through the bounded bridge."""
+    return _request(
+        "/api/aios-bridge",
+        {"action": "read_execution", "execution_id": execution_id},
+    )
+
+
+@mcp.tool(
+    name="read_execution_provenance",
+    title="Read validated AIOS execution provenance",
+    description=(
+        "Use this when the user needs the minimum validated provenance projection for one envelope already "
+        "identified inside a specific AIOS execution. The lookup is execution-bound, read-only, and does not "
+        "expose source payloads, policy internals, credentials, or write authorization."
+    ),
+    annotations=READ_ONLY,
+)
+def read_execution_provenance(
+    execution_id: str,
+    provenance_envelope_id: str,
+) -> dict[str, Any]:
+    """Read one execution-bound provenance projection through the bounded bridge."""
+    return _request(
+        "/api/aios-bridge",
+        {
+            "action": "read_execution_provenance",
+            "execution_id": execution_id,
+            "provenance_envelope_id": provenance_envelope_id,
+        },
+    )
+
+
+@mcp.tool(
     name="run_backend_workflow",
     title="Run safe AIOS backend logic",
     description=(
@@ -253,7 +297,8 @@ def run_backend_workflow(
     title="Open AIOS Repo Workbench",
     description=(
         "Use this when the user wants the interactive AIOS repository interface inside ChatGPT. "
-        "The workbench can search repository execution truth and invoke policy-bounded process-local backend logic."
+        "The workbench can search repository execution truth, inspect live execution events and provenance, "
+        "and invoke policy-bounded process-local backend logic."
     ),
     annotations=READ_ONLY,
     meta={

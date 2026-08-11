@@ -77,6 +77,7 @@ export type WorkflowDefinition = {
   supportsPause: boolean;
   supportsCancel: boolean;
   status: "Active" | "Review";
+  executionModes?: ("LIVE" | "SIMULATION")[];
   allowedScopes: string[];
   stages: WorkflowStage[];
 };
@@ -103,35 +104,40 @@ const common = {
 // Registry-backed presentation: the UI derives its launcher, paths, trust bands and gates from this collection.
 export const workflowRegistry: WorkflowDefinition[] = [
   {
+    id: "internal-runtime-diagnostic", name: "Internal Runtime Diagnostic", capability: "cap:internal-runtime-diagnostic", version: "1.3",
+    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", executionModes: ["LIVE"], allowedScopes: ["*"],
+    stages: [common.source, common.capability, common.execution, common.verification, common.receipt],
+  },
+  {
     id: "resume-project", name: "Resume Project", capability: "cap:resume-project", version: "1.0",
-    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", allowedScopes: ["*"],
+    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", executionModes: ["SIMULATION"], allowedScopes: ["*"],
     stages: [common.source, common.scope, common.capability, common.retrieval, common.verification, common.receipt],
   },
   {
     id: "memory-audit", name: "Memory Audit", capability: "cap:memory-audit", version: "1.0",
-    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", allowedScopes: ["*"],
+    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", executionModes: ["SIMULATION"], allowedScopes: ["*"],
     stages: [common.source, common.scope, common.capability, common.retrieval, common.stone, common.verification, common.receipt],
   },
   {
     id: "cross-project-comparison", name: "Cross-Project Comparison", capability: "cap:cross-project-comparison", version: "1.0",
-    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", allowedScopes: ["*"],
+    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", executionModes: ["SIMULATION"], allowedScopes: ["*"],
     stages: [common.source, common.scope, common.capability, common.retrieval, common.mason, common.verification, common.receipt],
   },
   {
     id: "repository-state-sync", name: "Repository State Sync", capability: "cap:github-repository-state-sync", version: "1.0",
-    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active",
+    autonomy: "A0", approvalRequired: false, supportsPause: true, supportsCancel: true, status: "Active", executionModes: ["SIMULATION"],
     allowedScopes: ["github:neohack2023/Looper"],
     stages: [common.source, common.scope, common.capability, { ...common.retrieval, source: "GitHub", authority: "GitHub execution facts", operation: "Delta-first repository inventory" }, common.verification, common.receipt],
   },
   {
     id: "repository-development-bridge", name: "Repository Project Development Bridge", capability: "cap:repository-project-development-bridge", version: "1.0",
-    autonomy: "A3", approvalRequired: true, supportsPause: true, supportsCancel: true, status: "Review",
+    autonomy: "A3", approvalRequired: true, supportsPause: true, supportsCancel: true, status: "Review", executionModes: ["SIMULATION"],
     allowedScopes: ["github:neohack2023/Looper"],
     stages: [common.source, common.scope, common.capability, { ...common.retrieval, source: "GitHub + Notion", authority: "Split authority" }, common.mason, common.plan, common.approval, common.execution, common.verification, common.receipt],
   },
   {
     id: "stone-mason-harvester", name: "STONE → MASON Single-Chat Harvester", capability: "cap:stone-mason-single-chat-harvester", version: "1.0",
-    autonomy: "A3", approvalRequired: true, supportsPause: true, supportsCancel: true, status: "Active", allowedScopes: ["*"],
+    autonomy: "A3", approvalRequired: true, supportsPause: true, supportsCancel: true, status: "Active", executionModes: ["SIMULATION"], allowedScopes: ["*"],
     stages: [common.source, common.scope, common.capability, common.retrieval, common.stone, common.mason, common.plan, common.approval, common.execution, common.verification, common.receipt],
   },
 ];

@@ -1,4 +1,4 @@
-# AIOS ChatGPT App Bridge v0.1
+# AIOS ChatGPT App Bridge v0.2
 
 Status: `CANDIDATE / DEVELOPER_MODE_ONLY / NO MERGE AUTHORIZATION`
 
@@ -23,8 +23,12 @@ The worker is intentionally thin. Backend execution truth stays in the TypeScrip
 - `search(query)` — read-only standard company-knowledge search shape.
 - `fetch(id)` — read-only standard company-knowledge fetch shape.
 - `aios_status()` — live bridge, capability, and workflow inventory.
+- `read_execution(execution_id)` — read-only execution status, ordered events, and execution-bound provenance snapshot.
+- `read_execution_provenance(execution_id, provenance_envelope_id)` — minimum validated provenance projection for one exact execution-bound envelope.
 - `run_backend_workflow(...)` — policy-bounded backend execution.
-- `open_aios_workbench()` — renders `ui://aios/repo-workbench-v0.1.html` inside ChatGPT.
+- `open_aios_workbench()` — renders `ui://aios/repo-workbench-v0.2.html` inside ChatGPT.
+
+The two execution readers use the `AIOSChatBridge/0.2` contract and remain bounded to `global-working-memory`. They report `WORKFLOW_EXECUTION_KERNEL` as read authority and `write_authorization=NONE`. The provenance reader returns the kernel's minimum validated read projection rather than source payloads, policy internals, credentials, or write authorization.
 
 ## Execution policy
 
@@ -115,15 +119,17 @@ python worker/aios-chatgpt-app/remote_smoke_test.py \
 
 The remote verifier uses the real MCP Streamable HTTP client and checks:
 
-- the exact five-tool surface;
-- `ui://aios/repo-workbench-v0.1.html` and `text/html;profile=mcp-app`;
+- the exact seven-tool surface and read-only annotations on all six read/render tools;
+- `ui://aios/repo-workbench-v0.2.html` and `text/html;profile=mcp-app`;
 - backend `READY` state;
 - `REPOSITORY_EXECUTION_TRUTH_ONLY` coverage;
 - `GITHUB_EXECUTION_TRUTH` authority;
 - `write_authorization=NONE`;
 - search/fetch identity;
 - remote-dev workbench metadata;
-- `internal-runtime-diagnostic` through the A0 process-local policy.
+- `internal-runtime-diagnostic` through the A0 process-local policy;
+- a read-after-execute snapshot with ordered live events;
+- an execution-bound provenance lookup returning `validity=VALID` and no write authorization.
 
 A manual GitHub Action is also available at `.github/workflows/aios-chatgpt-deploy-binding.yml`. Configure the repository/environment secret `AIOS_MCP_URL` with the deployed HTTPS `/mcp` endpoint, then dispatch **AIOS ChatGPT Deploy Binding**.
 
