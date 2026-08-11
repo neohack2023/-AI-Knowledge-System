@@ -39,7 +39,7 @@ const supplementalApiRecords = (): RepositoryKnowledgeRecord[] => [
     scope_key: "global-working-memory",
     title: "Runtime capability discovery API",
     url: `${MAIN_BLOB}/app/api/capabilities/route.ts`,
-    text: "The capability API projects the live capability registry, including scope, authority, execution modes, health, and materialization policy. Capability discovery and materialization do not themselves grant execution or destination-write authority.",
+    text: "The capability API projects the bounded public inventory of the live capability registry, including scope, health, source authority, autonomy, and materialization policy. Capability discovery and materialization do not themselves grant execution or destination-write authority.",
     metadata: {
       authority: "GITHUB_EXECUTION_TRUTH",
       source_ref: "app/api/capabilities/route.ts",
@@ -63,28 +63,30 @@ const supplementalApiRecords = (): RepositoryKnowledgeRecord[] => [
 ];
 
 export const listRepositoryKnowledge = (): RepositoryKnowledgeRecord[] => {
-  const capabilities = capabilityDiscoveryRuntime.listCapabilities().map((definition) => ({
-    id: `repo:capability:${definition.capability_id}`,
+  // Use only the service's deliberate public summary projection. Do not reach
+  // through the runtime to recover hidden capability definition fields.
+  const capabilities = capabilityDiscoveryRuntime.listCapabilities().map((summary) => ({
+    id: `repo:capability:${summary.capability_id}`,
     scope_key: "global-working-memory" as const,
-    title: `Runtime capability: ${definition.name}`,
+    title: `Runtime capability: ${summary.name}`,
     url: `${MAIN_BLOB}/server/capabilities/registry.ts`,
     text: [
-      `${definition.capability_id} v${definition.version} is ${definition.status}.`,
-      definition.description,
-      `Workflow: ${definition.workflow_id}.`,
-      `Modes: ${definition.execution_modes.join(", ")}.`,
-      `Scopes: ${definition.scope_allowlist.join(", ") || "none"}.`,
-      `Authority domains: ${definition.authority_domains.join(", ") || "none"}.`,
-      `Handler: ${definition.handler_ref}.`,
-      `Trust: ${definition.trust_level}; data access: ${definition.data_access}; autonomy: ${definition.autonomy_band}.`,
+      `${summary.capability_id} v${summary.version} is ${summary.status}.`,
+      `Workflow: ${summary.workflow_id}.`,
+      `Intents: ${summary.intent_classes.join(", ") || "none"}.`,
+      `Scopes: ${summary.scope_allowlist.join(", ") || "none"}.`,
+      `Autonomy: ${summary.autonomy_band}; approval required: ${summary.approval_required}.`,
+      `Health: ${summary.health_status}.`,
+      `Schema references: ${summary.schema_refs.join(", ")}.`,
+      `Source authority: ${summary.source_authority}.`,
     ].join(" "),
     metadata: {
       authority: "GITHUB_EXECUTION_TRUTH" as const,
       source_ref: "server/capabilities/registry.ts",
       kind: "CAPABILITY" as const,
-      status: definition.status,
-      version: definition.version,
-      tags: ["runtime", "capability", "registry", ...definition.intent_classes],
+      status: summary.status,
+      version: summary.version,
+      tags: ["runtime", "capability", "registry", ...summary.intent_classes, ...summary.scope_allowlist],
     },
   }));
 
