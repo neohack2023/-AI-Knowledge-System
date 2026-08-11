@@ -49,45 +49,98 @@ The first bridge intentionally exposes only `REPOSITORY_EXECUTION_TRUTH_ONLY` un
 
 It does **not** expose the full Notion or Drive authority surface. It grants no destination-write authority, no canon promotion, no MASON write path, and no automatic memory mutation.
 
-## Configuration
+## Safe local configuration
 
-Required:
-
-```bash
-AIOS_BACKEND_ORIGIN=https://your-ai-knowledge-system.example
-```
-
-Optional server-to-server protection:
+Local is the default deployment profile. The worker now binds to loopback by default so an accidental `python server.py` does not create a network-visible MCP service.
 
 ```bash
-AIOS_BRIDGE_TOKEN=<same value configured on the AI Knowledge System backend>
-```
-
-Runtime:
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r worker/aios-chatgpt-app/requirements.txt
+AIOS_BACKEND_ORIGIN=http://127.0.0.1:3000 \
+AIOS_MCP_DEPLOYMENT_PROFILE=local \
+HOST=127.0.0.1 \
+PORT=8000 \
 python worker/aios-chatgpt-app/server.py
 ```
 
-The default MCP endpoint is:
+The local endpoint is `http://127.0.0.1:8000/mcp`.
+
+## Remote Developer Mode binding
+
+Use `remote-dev` only after the AI Knowledge System backend has a stable HTTPS origin.
+
+Required deployment values:
 
 ```text
-http://localhost:8000/mcp
+AIOS_MCP_DEPLOYMENT_PROFILE=remote-dev
+AIOS_BACKEND_ORIGIN=https://<deployed-aios-origin>
+AIOS_BRIDGE_TOKEN=<secret shared with the backend>
+HOST=0.0.0.0
+PORT=8000
+MCP_ALLOWED_HOSTS=<exact deployed MCP host>
+MCP_ALLOWED_ORIGINS=<optional exact comma-separated origins>
 ```
 
-Use a public HTTPS tunnel or stable HTTPS deployment for ChatGPT Developer Mode.
+A non-secret copy template lives at:
+
+`config/aios-chatgpt-remote-dev.example`
+
+Do not commit real environment files or secrets. The repository public-release policy intentionally deny-lists `.env*` paths.
+
+### Transport security
+
+A network-visible bind fails closed unless `MCP_ALLOWED_HOSTS` is configured. The worker passes explicit `TransportSecuritySettings` to the official MCP Python SDK so Host/Origin validation remains enabled behind a real hostname.
+
+For the `remote-dev` profile the worker also requires:
+
+- `AIOS_BACKEND_ORIGIN` to use HTTPS;
+- `AIOS_BRIDGE_TOKEN` to be present;
+- an explicit MCP host allowlist.
+
+Origin values are not guessed or wildcarded. If the deployment receives an `Origin` header, add only the exact legitimate origin observed for the chosen connection path.
+
+## Deployment verification
+
+Local/runtime verification:
+
+```bash
+pip install -r worker/aios-chatgpt-app/requirements.txt
+python worker/aios-chatgpt-app/smoke_test.py
+```
+
+Remote verification after an HTTPS endpoint exists:
+
+```bash
+python worker/aios-chatgpt-app/remote_smoke_test.py \
+  --mcp-url https://<mcp-host>/mcp
+```
+
+The remote verifier uses the real MCP Streamable HTTP client and checks:
+
+- the exact five-tool surface;
+- `ui://aios/repo-workbench-v0.1.html` and `text/html;profile=mcp-app`;
+- backend `READY` state;
+- `REPOSITORY_EXECUTION_TRUTH_ONLY` coverage;
+- `GITHUB_EXECUTION_TRUTH` authority;
+- `write_authorization=NONE`;
+- search/fetch identity;
+- remote-dev workbench metadata;
+- `internal-runtime-diagnostic` through the A0 process-local policy.
+
+A manual GitHub Action is also available at `.github/workflows/aios-chatgpt-deploy-binding.yml`. Configure the repository/environment secret `AIOS_MCP_URL` with the deployed HTTPS `/mcp` endpoint, then dispatch **AIOS ChatGPT Deploy Binding**.
+
+## ChatGPT Developer Mode
+
+After the remote verifier is green, register the same HTTPS `/mcp` URL in ChatGPT Developer Mode and refresh the app after tool/resource metadata changes. The final acceptance check is a ChatGPT-originated discovery/render/run, because a generic network client cannot prove the ChatGPT host itself loaded the app.
+
+A Secure MCP Tunnel can be used for private development instead of a generally public MCP endpoint. The tunnel/deployment connection is an infrastructure action and is not stored as repository authority.
 
 ## Security status
 
-This is a developer-mode fixture. `AIOS_BRIDGE_TOKEN` protects worker-to-backend traffic when configured, but the MCP endpoint itself does not yet implement user OAuth. Do not treat this version as a public production app.
+This is still a Developer Mode fixture. `AIOS_BRIDGE_TOKEN` protects worker-to-backend traffic, and MCP transport Host/Origin validation is enforced for remote binds, but the MCP endpoint itself does not yet implement user OAuth. Do not treat this version as a public production app.
 
-The exposed knowledge projection is intentionally limited to repository execution truth until MCP user authentication and connector-backed authority adapters are separately admitted.
+The exposed knowledge projection remains limited to repository execution truth until MCP user authentication and connector-backed authority adapters are separately admitted.
 
 ## GoG relationship
 
 The inline widget can open the existing `/gog-3d-lab` web surface. The actual 2D→3D GPU provider remains behind the existing GoG provider API and is not duplicated inside the MCP worker.
 
-A later slice can add a file-aware MCP reconstruction tool once the base ChatGPT ↔ MCP ↔ AIOS backend path is proven.
+A later slice can add a file-aware MCP reconstruction tool once the ChatGPT ↔ MCP ↔ AIOS backend deployment path is proven.
