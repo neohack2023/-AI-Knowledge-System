@@ -94,8 +94,10 @@ The backend bridge exposes:
 
 - standard read-only `search` and `fetch` over bounded repository execution truth
 - `aios_status` inventory
-- `run_backend_workflow` through a backend-enforced `SIMULATION` action only
+- `run_backend_workflow` through a backend-enforced safe execution policy
 - `open_aios_workbench` to render the inline ChatGPT UI
+
+The live workflow kernel deliberately accepts `LIVE` execution only; UI simulation remains a separate presentation transport. The bridge therefore does not fake server-side SIMULATION. It admits LIVE backend execution only when the registered capability is `ACTIVE`, `INTERNAL_NATIVE`, `EXECUTION_LOCAL`, `FULLY_REVERSIBLE`, `PROCESS_LOCAL`, autonomy `A0`, requires no approval, and supports LIVE mode. `governed_write_probe` input is explicitly blocked.
 
 The initial bridge scope is `global-working-memory` with coverage `REPOSITORY_EXECUTION_TRUTH_ONLY`. It does not project full Notion/Drive memory authority and does not grant MASON or destination-write authority.
 
@@ -110,7 +112,9 @@ Server-to-server calls may be protected with a matching `AIOS_BRIDGE_TOKEN`. The
 - PyTorch3D camera/silhouette scoring remains a later stage
 - GPU/checkpoint availability is never fabricated by the web UI
 - ChatGPT bridge search/fetch remain read-only
-- ChatGPT workflow execution is forced to SIMULATION
+- ChatGPT backend execution is constrained to A0 process-local reversible handlers
+- governed-write probe input is blocked
+- no bridge call grants destination-write or canon-promotion authority
 - merge remains a separate authorization decision
 
 ## Next gates
@@ -125,4 +129,4 @@ Run one admitted source image through a configured SAM3D/MHR worker and compare 
 
 `AIOS_CHATGPT_APP_BRIDGE_FIXTURE_01`
 
-Deploy or tunnel the MCP worker, connect `/mcp` through ChatGPT Developer Mode, render the inline workbench, verify `search`/`fetch`, and run one registered workflow in SIMULATION. No public deployment or authority expansion until authentication is separately admitted.
+Deploy or tunnel the MCP worker, connect `/mcp` through ChatGPT Developer Mode, render the inline workbench, verify `search`/`fetch`/status, and execute `internal-runtime-diagnostic` without governed-write input through the A0 process-local bridge policy. No public deployment or authority expansion until authentication is separately admitted.
