@@ -4,9 +4,12 @@ import {
   listRepositoryKnowledge,
   searchRepositoryKnowledge,
 } from "../../../server/chat-bridge/repository-knowledge.ts";
+import {
+  evaluateChatBridgeWorkflow,
+  listChatBridgeExecutableWorkflows,
+} from "../../../server/chat-bridge/execution-policy.ts";
 import { workflowExecutionKernel } from "../../../server/workflows/kernel.ts";
 import { capabilityDiscoveryRuntime } from "../../../server/capabilities/index.ts";
-import { nativeRuntimeCapabilityRegistry } from "../../../server/capabilities/registry.ts";
 import type { JsonObject } from "../../../server/workflows/types.ts";
 
 export const runtime = "edge";
@@ -38,36 +41,6 @@ function rejectUnauthorized() {
   );
 }
 
-function safeWorkflowPolicy(workflowId: string, input: JsonObject) {
-  const capability = nativeRuntimeCapabilityRegistry.find((definition) => definition.workflow_id === workflowId);
-  if (!capability) return { allowed: false as const, code: "BRIDGE_WORKFLOW_NOT_ADMITTED", message: "Workflow is not bound to an admitted runtime capability." };
-  const safe = (
-    capability.status === "ACTIVE"
-    && capability.trust_level === "INTERNAL_NATIVE"
-    && capability.data_access === "EXECUTION_LOCAL"
-    && capability.reversibility === "FULLY_REVERSIBLE"
-    && capability.blast_radius === "PROCESS_LOCAL"
-    && capability.autonomy_band === "A0"
-    && capability.approval_required === false
-    && capability.execution_modes.includes("LIVE")
-  );
-  if (!safe) {
-    return {
-      allowed: false as const,
-      code: "BRIDGE_WORKFLOW_POLICY_BLOCKED",
-      message: "Workflow does not satisfy the A0 / INTERNAL_NATIVE / EXECUTION_LOCAL / FULLY_REVERSIBLE / PROCESS_LOCAL bridge policy.",
-    };
-  }
-  if (Object.hasOwn(input, "governed_write_probe")) {
-    return {
-      allowed: false as const,
-      code: "BRIDGE_GOVERNED_WRITE_BLOCKED",
-      message: "The ChatGPT bridge does not admit governed_write_probe input.",
-    };
-  }
-  return { allowed: true as const, capability };
-}
-
 export async function GET(request: Request) {
   if (!authorized(request)) return rejectUnauthorized();
 
@@ -82,6 +55,7 @@ export async function GET(request: Request) {
     persistence: "PROCESS_LOCAL_READ_PROJECTION",
     records: records.length,
     live_workflows: workflowExecutionKernel.listLiveWorkflows(),
+    executable_workflows: listChatBridgeExecutableWorkflows(),
     capabilities: capabilityDiscoveryRuntime.listCapabilities().map((capability) => ({
       capability_id: capability.capability_id,
       name: capability.name,
@@ -197,7 +171,7 @@ export async function POST(request: Request) {
         );
       }
       const input = body.input ?? {};
-      const policy = safeWorkflowPolicy(workflowId, input);
+      const policy = evaluateChatBridgeWorkflow(workflowId, input);
       if (!policy.allowed) {
         return NextResponse.json(
           { error: { code: policy.code, message: policy.message } },
@@ -219,7 +193,7 @@ export async function POST(request: Request) {
         contract: CONTRACT,
         mode: "LIVE",
         bridge_policy: "A0_PROCESS_LOCAL_EXECUTION_ONLY",
-        capability_id: policy.capability.capability_id,
+        capability_id: policy.capability_id,
         write_authorization: "NONE",
         snapshot: completed,
       }, { status: completed.execution.status === "FAILED" ? 409 : 201 });
