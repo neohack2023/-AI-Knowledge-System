@@ -286,7 +286,7 @@ function Observatory() {
   const approvalActive = status === "APPROVAL REQUIRED" && approvalEvent && !pendingAction;
 
   return <section className="observatory">
-    <div className="section-heading"><div><MiniLabel>04 / OBSERVATORY</MiniLabel><h1>Workflow execution topology</h1><p>Structured results now expose only registry-valid follow-up transitions.</p></div><div className="heading-actions"><button className={historyOpen ? "icon-btn selected" : "icon-btn"} onClick={() => setHistoryOpen(!historyOpen)}><History size={16} /><span>History</span><b>{history.length}</b></button><ModeBadge mode={mode} /></div></div>
+    <div className="section-heading"><div><MiniLabel>04 / OBSERVATORY</MiniLabel><h1>Workflow execution topology</h1><p>Structured results now expose only registry-valid follow-up transitions.</p></div><div className="heading-actions"><a className="icon-btn live-slice-link" href="/observability"><Activity size={16} /><span>Live slice</span></a><button className={historyOpen ? "icon-btn selected" : "icon-btn"} onClick={() => setHistoryOpen(!historyOpen)}><History size={16} /><span>History</span><b>{history.length}</b></button><ModeBadge mode={mode} /></div></div>
 
     <div className="launcher panel-cut">
       <div className="launcher-title"><div className="pulse-mark"><Zap size={15} /></div><div><MiniLabel>WORKFLOW LAUNCHER</MiniLabel><strong>Explicit simulation harness</strong></div></div>
