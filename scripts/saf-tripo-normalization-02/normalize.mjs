@@ -4,9 +4,16 @@ const STATES = new Map([
   ['cancelled','CANCELLED'], ['canceled','CANCELLED'], ['banned','BANNED'], ['expired','EXPIRED']
 ]);
 
+function redactSensitiveText(value) {
+  return String(value ?? '')
+    .replace(/authorization\s*:\s*bearer\s+[^\s]+/gi, 'Authorization: Bearer [REDACTED]')
+    .replace(/\btsk_[A-Za-z0-9._-]+\b/g, '[REDACTED_TRIPO_KEY]')
+    .replace(/([?&](?:token|sig|signature|key|api_key|access_token)=)[^&#\s]+/gi, '$1[REDACTED]');
+}
+
 function boundedText(value, max = 512) {
   if (value == null) return null;
-  return String(value).replace(/[\r\n\t]+/g, ' ').slice(0, max);
+  return redactSensitiveText(value).replace(/[\r\n\t]+/g, ' ').slice(0, max);
 }
 
 export function normalizeStatus(value) {
