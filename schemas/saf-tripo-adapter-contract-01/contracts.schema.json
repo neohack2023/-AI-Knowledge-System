@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aios.local/schemas/saf-tripo-adapter-contract-01/contracts.schema.json",
+  "title": "SAF Tripo Adapter Contract 01",
+  "$defs": {
+    "safeString": {"type":"string","minLength":1,"maxLength":2048},
+    "sha256": {"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "request": {
+      "type":"object","additionalProperties":false,
+      "required":["contract","provider","operation","scope_key","tls_policy","authorization","parameters"],
+      "properties": {
+        "contract":{"const":"TripoProviderRequest/0.1"},
+        "provider":{"const":"tripo"},
+        "operation":{"enum":["TEXT_TO_MODEL","IMAGE_TO_MODEL","MULTIVIEW_TO_MODEL","CONVERT_MODEL","TEXTURE_MODEL","SEGMENT_MODEL"]},
+        "scope_key":{"$ref":"#/$defs/safeString"},
+        "provider_model_version":{"type":["string","null"],"maxLength":128},
+        "api_route_family":{"enum":["v2","v3"]},
+        "tls_policy":{"const":"VERIFY_REQUIRED"},
+        "authorization":{"const":"NONE"},
+        "source_refs":{"type":"array","items":{"$ref":"#/$defs/safeString"},"maxItems":16},
+        "parameters":{"type":"object","additionalProperties":true},
+        "secret_ref":{"type":["string","null"],"maxLength":256}
+      },
+      "not":{"anyOf":[
+        {"required":["api_key"]},{"required":["token"]},{"required":["authorization_header"]}
+      ]}
+    },
+    "observation": {
+      "type":"object","additionalProperties":false,
+      "required":["contract","provider","task_id","status","progress","observed_at","transport"],
+      "properties": {
+        "contract":{"const":"TripoTaskObservation/0.1"},
+        "provider":{"const":"tripo"},
+        "task_id":{"$ref":"#/$defs/safeString"},
+        "task_type":{"type":["string","null"],"maxLength":128},
+        "status":{"enum":["QUEUED","RUNNING","SUCCESS","FAILED","CANCELLED","UNKNOWN","BANNED","EXPIRED"]},
+        "progress":{"type":"integer","minimum":0,"maximum":100},
+        "observed_at":{"type":"string","format":"date-time"},
+        "transport":{"enum":["v2","v3"]},
+        "output_refs":{"type":"object","additionalProperties":{"type":["string","null"]}},
+        "error":{"type":["object","null"],"additionalProperties":false,"properties":{"code":{"type":["string","integer","null"]},"message":{"type":["string","null"],"maxLength":512}}},
+        "raw_provider_body_logged":{"const":false}
+      }
+    },
+    "artifact": {
+      "type":"object","additionalProperties":false,
+      "required":["contract","provider","task_id","artifact_kind","source_url","digest_state","validation_state","authorization"],
+      "properties": {
+        "contract":{"const":"TripoArtifactCandidate/0.1"},
+        "provider":{"const":"tripo"},
+        "task_id":{"$ref":"#/$defs/safeString"},
+        "artifact_kind":{"enum":["BASE_MODEL","MODEL","PBR_MODEL","RENDERED_IMAGE","MULTIVIEW_IMAGE"]},
+        "source_url":{"type":"string","format":"uri"},
+        "digest_state":{"enum":["PENDING","VERIFIED"]},
+        "sha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"},
+        "validation_state":{"enum":["UNVALIDATED","PASS","FAIL"]},
+        "authorization":{"const":"NONE"}
+      },
+      "allOf":[{"if":{"properties":{"digest_state":{"const":"VERIFIED"}}},"then":{"required":["sha256"],"properties":{"sha256":{"$ref":"#/$defs/sha256"}}}}]
+    },
+    "importProposal": {
+      "type":"object","additionalProperties":false,
+      "required":["contract","artifact_ref","target_executor","requested_effect","authorization"],
+      "properties": {
+        "contract":{"const":"TripoImportProposal/0.1"},
+        "artifact_ref":{"$ref":"#/$defs/safeString"},
+        "target_executor":{"const":"blender"},
+        "requested_effect":{"enum":["IMPORT_GLB"]},
+        "authorization":{"const":"NONE"},
+        "arbitrary_code":{"const":false}
+      }
+    }
+  },
+  "oneOf":[
+    {"$ref":"#/$defs/request"},
+    {"$ref":"#/$defs/observation"},
+    {"$ref":"#/$defs/artifact"},
+    {"$ref":"#/$defs/importProposal"}
+  ]
+}
