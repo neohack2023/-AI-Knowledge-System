@@ -1,0 +1,61 @@
+{
+  "request": {
+    "contract": "TripoProviderRequest/0.1",
+    "provider": "tripo",
+    "operation": "IMAGE_TO_MODEL",
+    "scope_key": "global-working-memory",
+    "provider_model_version": "fixture-model",
+    "api_route_family": "v2",
+    "tls_policy": "VERIFY_REQUIRED",
+    "authorization": "NONE",
+    "source_refs": ["fixture:image:front"],
+    "parameters": {"face_limit": 5000, "quad": true, "pbr": true},
+    "secret_ref": "secret://TRIPO_API_KEY"
+  },
+  "v2Success": {
+    "task_id": "task-200",
+    "type": "image_to_model",
+    "status": "success",
+    "progress": 100,
+    "output": {
+      "model": "https://cdn.example.invalid/model.glb?sig=ephemeral#ignored",
+      "pbr_model": "https://cdn.example.invalid/model-pbr.glb?token=ephemeral"
+    }
+  },
+  "v3Equivalent": {
+    "data": {
+      "task": {
+        "id": "task-200",
+        "taskType": "image_to_model",
+        "state": "SUCCESS",
+        "percentage": 100,
+        "result": {
+          "model": "https://cdn.example.invalid/model.glb?sig=other",
+          "pbrModel": "https://cdn.example.invalid/model-pbr.glb#fragment"
+        }
+      }
+    }
+  },
+  "providerFailure": {
+    "data": {
+      "task_id": "task-500",
+      "status": "failed",
+      "progress": 63,
+      "error": {
+        "code": "E_PROVIDER",
+        "message": "Generation failed\nAuthorization: Bearer should-not-persist\tprovider detail"
+      }
+    }
+  },
+  "unknownState": {
+    "task_id": "task-unknown",
+    "status": "paused_by_provider",
+    "progress": 12
+  },
+  "invalidHttpArtifact": {
+    "task_id": "task-http",
+    "status": "success",
+    "progress": 100,
+    "output": {"model": "http://cdn.example.invalid/model.glb"}
+  }
+}
