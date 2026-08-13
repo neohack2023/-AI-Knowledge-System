@@ -68,6 +68,26 @@
       "parameters": {},
       "api_key": "tsk_should-never-be-here"
     },
+    "nestedSecretSerialized": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "TEXT_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_REQUIRED",
+      "authorization": "NONE",
+      "parameters": {"transport": {"api_key": "tsk_nested-should-never-be-here"}}
+    },
+    "deepNestedTokenSerialized": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "IMAGE_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_REQUIRED",
+      "authorization": "NONE",
+      "parameters": {"provider": {"auth": [{"token": "nested-token"}]}}
+    },
     "arbitraryBlenderCode": {
       "contract": "TripoImportProposal/0.1",
       "artifact_ref": "artifact:x",
@@ -84,6 +104,36 @@
       "source_url": "https://example.invalid/model.glb",
       "digest_state": "VERIFIED",
       "sha256": null,
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "signedUrlPersisted": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-003",
+      "artifact_kind": "MODEL",
+      "source_url": "https://example.invalid/model.glb?signature=ephemeral-secret",
+      "digest_state": "PENDING",
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "fragmentUrlPersisted": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-004",
+      "artifact_kind": "MODEL",
+      "source_url": "https://example.invalid/model.glb#transport-fragment",
+      "digest_state": "PENDING",
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "insecureArtifactUrl": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-005",
+      "artifact_kind": "MODEL",
+      "source_url": "http://example.invalid/model.glb",
+      "digest_state": "PENDING",
       "validation_state": "UNVALIDATED",
       "authorization": "NONE"
     }
