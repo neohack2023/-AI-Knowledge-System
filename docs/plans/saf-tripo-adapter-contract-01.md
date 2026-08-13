@@ -54,12 +54,15 @@ IMPORTED
 ## Security invariants
 
 - TLS verification is mandatory. Certificate failure terminates the transfer.
-- API keys are references/secrets owned by the executor and never serialized into requests, observations, receipts, fixtures, logs, or telemetry.
+- API keys are references/secrets owned by the executor and never serialized into requests, observations, receipts, fixtures, logs, telemetry, nested parameter maps, or output maps.
+- Secret-field rejection is recursive. Moving `api_key`, `token`, or `authorization_header` under nested objects or arrays does not bypass the contract.
+- `secret_ref` may identify an executor-owned secret by `secret://...` reference only. It may not contain raw secret bytes or query-style payloads.
 - Provider error payloads are normalized to bounded codes/messages; raw HTTP bodies are not durable telemetry.
 - Provider success does not authorize Blender import.
 - Blender import does not authorize arbitrary Python execution.
 - `execute_blender_code`-style unrestricted execution is outside this adapter contract.
-- Artifact URLs are untrusted transport pointers until downloaded and hashed by an authorized executor.
+- Artifact transport URLs are untrusted and may be ephemeral or signed. Durable records persist only a sanitized HTTPS URL identity with no query string or fragment.
+- Certificate-verified download plus a cryptographic artifact digest are independent requirements.
 - No external call may occur in this contract slice.
 
 ## Receipt candidates
@@ -79,11 +82,20 @@ A future execution receipt SHOULD bind:
 - quad / PBR / smart-low-poly / part-generation flags when used
 - submit/observe/terminal timestamps
 - normalized terminal state
-- artifact URL identities without query-secret persistence
+- sanitized artifact URL identities without query-secret persistence
 - downloaded artifact digest
 - local validation report id
 - import proposal id
 - external effects actually performed
+
+## Self-review hardening pass
+
+The first green CI pass exposed two contract gaps during manual adversarial review:
+
+1. Top-level secret rejection did not prove that nested parameter objects were equally protected.
+2. `source_url` accepted generic URI values even though the design forbids durable persistence of signed query strings or fragments.
+
+The slice now closes both gaps by applying recursive forbidden-key constraints to parameter/output structures and requiring persistent artifact URL identities to be HTTPS URLs without query or fragment components. Adversarial fixtures cover nested `api_key`, deeply nested `token`, signed URL query persistence, fragment persistence, and insecure HTTP artifact pointers.
 
 ## Acceptance criteria
 
@@ -91,7 +103,9 @@ A future execution receipt SHOULD bind:
 - Success without a task id fails.
 - Artifact candidate without a cryptographic digest state fails.
 - Any `tls_policy` other than `VERIFY_REQUIRED` fails.
-- Any serialized API key/token field fails.
+- Any serialized API key/token/authorization-header field fails at any nesting depth governed by the contract.
+- `secret_ref` is a narrow executor-owned reference, not secret material.
+- Persistent artifact URL identity must use HTTPS and must contain no query string or fragment.
 - Import proposal defaults to `authorization: NONE`.
 - Import proposal cannot request arbitrary code execution.
 - Provider terminal success and Blender import remain separate records.
@@ -99,4 +113,4 @@ A future execution receipt SHOULD bind:
 
 ## Terminal state
 
-`CONTRACT_READY / FROZEN_FIXTURES / NO_PROVIDER_CALL / NO_BLENDER_MUTATION / NO_CANON_PROMOTION`
+`CONTRACT_READY / FROZEN_FIXTURES / RECURSIVE_SECRET_GUARD / SANITIZED_ARTIFACT_IDENTITY / NO_PROVIDER_CALL / NO_BLENDER_MUTATION / NO_CANON_PROMOTION`
