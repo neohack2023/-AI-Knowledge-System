@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neohack.chatgpt.site/schemas/code-reuse-context-packet-v0.1.json",
+  "title": "CodeReuseContextPacket v0.1",
+  "type": "object",
+  "required": ["schema_version", "created_at", "baseline", "request", "target_context", "decision", "knowledge_query", "code_query", "knowledge_results", "selected_units", "rejected_candidates", "ranking", "receipt_refs", "write_authorization", "packet_digest", "packet_id"],
+  "properties": {
+    "schema_version": {"const": "code-reuse-context-packet/v0.1"},
+    "created_at": {"type": "string"},
+    "baseline": {"type": "object"},
+    "request": {"type": "object"},
+    "target_context": {"type": "object"},
+    "decision": {"type": "object", "required": ["state", "reason_codes"], "properties": {"state": {"enum": ["SKIP", "RETRIEVE_KNOWLEDGE_ONLY", "RETRIEVE_CODE_ONLY", "RETRIEVE_BOTH", "EXPAND", "FAIL_CLOSED"]}, "reason_codes": {"type": "array", "items": {"type": "string"}}}},
+    "knowledge_query": {"type": "object"},
+    "code_query": {"type": "object"},
+    "knowledge_results": {"type": "array"},
+    "selected_units": {"type": "array"},
+    "rejected_candidates": {"type": "array"},
+    "ranking": {"type": "object"},
+    "receipt_refs": {"type": "object"},
+    "write_authorization": {"const": "NONE"},
+    "packet_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "packet_id": {"type": "string", "pattern": "^CRCP-[0-9a-f]{16}$"}
+  },
+  "additionalProperties": false
+}
