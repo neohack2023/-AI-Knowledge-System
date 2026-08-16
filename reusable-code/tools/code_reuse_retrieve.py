@@ -18,7 +18,7 @@ from typing import Any
 SCHEMA_VERSION = "code-reuse-context-packet/v0.1"
 ALGORITHM = "code-reuse-two-stage-lexical/v0.1"
 
-EXECUTABLE_STATUS = {"VERIFIED", "REUSABLE"}
+EXECUTABLE_STATUS = {"VERIFIED"}
 ACCEPTABLE_FRESHNESS = {"CURRENT", "FRESH", "UNCHANGED"}
 RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 TOKEN_RE = re.compile(r"[A-Za-z0-9_+-]+")
@@ -47,6 +47,9 @@ CRITICAL_FILTER_CODES = {
     "CODE_STORE_RECEIPT_MISSING",
     "CODE_STORE_BYTES_MISSING",
     "CODE_STORE_BYTES_DIGEST_MISMATCH",
+    "CODE_STORE_LICENSE_EVIDENCE_MISSING",
+    "CODE_STORE_LICENSE_DIGEST_MISMATCH",
+    "CODE_STORE_REQUIRED_GATE_NOT_PASS",
     "CODE_STORE_BINDING_MISMATCH",
 }
 
@@ -100,7 +103,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
-    """Verify a registry row against exact stored metadata, receipt, and bytes."""
+    """Verify a registry row against exact stored metadata, receipt, license, and bytes."""
 
     pointer = candidate.get("code_store_pointer")
     if not pointer:
@@ -147,6 +150,28 @@ def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
     except ValueError:
         return ["CODE_STORE_BYTES_MISSING"]
 
+    license_info = provenance.get("license")
+    if not isinstance(license_info, dict):
+        return ["CODE_STORE_LICENSE_EVIDENCE_MISSING"]
+    license_path = _safe_repo_path(license_info.get("evidence_path"))
+    if license_path is None or not license_path.is_file():
+        return ["CODE_STORE_LICENSE_EVIDENCE_MISSING"]
+    try:
+        license_path.relative_to(unit_dir)
+    except ValueError:
+        return ["CODE_STORE_LICENSE_EVIDENCE_MISSING"]
+    expected_license_digest = license_info.get("evidence_digest")
+    if not expected_license_digest or _sha256_file(license_path) != expected_license_digest:
+        return ["CODE_STORE_LICENSE_DIGEST_MISMATCH"]
+
+    blocking_gates = [
+        gate
+        for gate in receipt.get("gate_results", [])
+        if gate.get("required") and gate.get("result") not in {"PASS", "NOT_APPLICABLE"}
+    ]
+    if blocking_gates:
+        return ["CODE_STORE_REQUIRED_GATE_NOT_PASS"]
+
     chunk_id = candidate.get("chunk_id")
     digest = candidate.get("candidate_digest")
     source_revision = candidate.get("source_revision")
@@ -173,9 +198,11 @@ def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
         manifest.get("validation_receipt_id") == receipt_id,
         validation.get("validation_receipt_id") == receipt_id,
         receipt.get("license_gate") == "PASS",
-        manifest.get("status") in EXECUTABLE_STATUS,
-        validation.get("terminal_status") in EXECUTABLE_STATUS,
-        receipt.get("terminal_status") in EXECUTABLE_STATUS,
+        manifest.get("license_spdx") == license_info.get("spdx"),
+        manifest.get("attribution_required") == license_info.get("attribution_required"),
+        manifest.get("status") == "VERIFIED",
+        validation.get("terminal_status") == "VERIFIED",
+        receipt.get("terminal_status") == "VERIFIED",
     ]
     if not all(bindings):
         return ["CODE_STORE_BINDING_MISMATCH"]
@@ -246,7 +273,7 @@ def rank_knowledge(query: str, records: list[dict[str, Any]], limit: int = 5) ->
 
 
 def _validation_strength(status: str) -> float:
-    return {"REUSABLE": 1.0, "VERIFIED": 0.8}.get(status, 0.0)
+    return {"VERIFIED": 0.8}.get(status, 0.0)
 
 
 def _cross_context_strength(value: Any) -> float:
@@ -385,7 +412,16 @@ def assemble(
             for code in relevant_blockers
         )
 
-        if request.get("code_needed") and not selected_units and critical:
+        if request.get("code_needed") and critical:
+            for item in selected_units:
+                rejected.append(
+                    {
+                        "chunk_id": item.get("chunk_id"),
+                        "title": item.get("title"),
+                        "reason_codes": ["SUPPRESSED_BY_CRITICAL_RELEVANT_BLOCKER"],
+                    }
+                )
+            selected_units = []
             decision = "FAIL_CLOSED"
             decision_reasons = ["EXECUTABLE_REUSE_BLOCKED_BY_HARD_FILTER"]
         elif request.get("code_needed") and not selected_units and request.get("allow_expand", False):
