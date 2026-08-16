@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -10,16 +12,29 @@ const fixtures = path.join(root, "tests", "fixtures", "code-reuse-06a");
 const knowledge = path.join(fixtures, "developer-knowledge.json");
 const registry = path.join(fixtures, "code-registry.json");
 
-function runCase(name, stamp = "2026-08-16T21:20:00Z") {
+function runCase(name, stamp = "2026-08-16T21:20:00Z", registryPath = registry) {
   const result = spawnSync("python3", [
     tool,
     "--request", path.join(fixtures, `request-${name}.json`),
     "--knowledge", knowledge,
-    "--registry", registry,
+    "--registry", registryPath,
     "--generated-at", stamp,
   ], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
+}
+
+function withMutatedRegistry(mutator, fn) {
+  const parsed = JSON.parse(fs.readFileSync(registry, "utf8"));
+  mutator(parsed);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "code-reuse-06a-"));
+  const tempRegistry = path.join(tempDir, "registry.json");
+  fs.writeFileSync(tempRegistry, JSON.stringify(parsed, null, 2));
+  try {
+    return fn(tempRegistry);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 test("CODE-REUSE-06A covers all six decision states", () => {
@@ -44,6 +59,30 @@ test("hard filters reject relevant unsafe candidates before ranking", () => {
   assert.ok(rejected["SEED-002"].includes("STATUS_NOT_EXECUTABLE"));
   assert.ok(rejected["SEED-002"].includes("SECURITY_RISK_NOT_ALLOWED"));
   assert.ok(rejected["SEED-002"].includes("CODE_STORE_POINTER_MISSING"));
+});
+
+test("stale nonempty Code Store pointer fails closed before ranking", () => {
+  withMutatedRegistry((snapshot) => {
+    const seed = snapshot.records.find((item) => item.chunk_id === "SEED-003");
+    seed.code_store_pointer = "reusable-code/units/DOES-NOT-EXIST";
+  }, (registryPath) => {
+    const packet = runCase("code-only", "2026-08-16T21:20:00Z", registryPath);
+    assert.equal(packet.decision.state, "FAIL_CLOSED");
+    const seed = packet.rejected_candidates.find((item) => item.chunk_id === "SEED-003");
+    assert.ok(seed.reason_codes.includes("CODE_STORE_POINTER_INVALID"));
+  });
+});
+
+test("registry and stored source revision disagreement fails closed", () => {
+  withMutatedRegistry((snapshot) => {
+    const seed = snapshot.records.find((item) => item.chunk_id === "SEED-003");
+    seed.source_revision = "stale-source-revision";
+  }, (registryPath) => {
+    const packet = runCase("code-only", "2026-08-16T21:20:00Z", registryPath);
+    assert.equal(packet.decision.state, "FAIL_CLOSED");
+    const seed = packet.rejected_candidates.find((item) => item.chunk_id === "SEED-003");
+    assert.ok(seed.reason_codes.includes("CODE_STORE_BINDING_MISMATCH"));
+  });
 });
 
 test("logical packet digest ignores timestamp-only changes", () => {
