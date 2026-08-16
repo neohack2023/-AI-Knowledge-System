@@ -1,0 +1,13 @@
+{
+  "chunk_id": "SEED-001",
+  "admitted": false,
+  "decision": "REJECT_ADMISSION",
+  "reason_codes": [
+    "MISSING_CANDIDATE_CANDIDATE_DIGEST",
+    "MISSING_RECEIPT_CANDIDATE_DIGEST",
+    "LICENSE_NOT_PASS",
+    "TERMINAL_NOT_ADMISSIBLE:BLOCKED",
+    "REQUIRED_GATE_NOT_PASS"
+  ],
+  "validation_run_id": "CRI-VAL-20260816-SEED001"
+}

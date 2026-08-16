@@ -1,0 +1,20 @@
+{
+  "validation_run_id": "CRI-VAL-20260816-SEED002",
+  "chunk_id": "SEED-002",
+  "candidate_digest": "sha256:f37b9c80e090ea41ca281edc9f06778f347c65ca28aba56cc6d8b791490e1b21",
+  "source_revision": "a8e19e44ab74d2c6f20edcf0d06d1b1d875d9ecc",
+  "terminal_status": "REWRITE_REQUIRED",
+  "gate_results": [
+    {"gate_id":"G0","name":"identity-provenance","required":true,"result":"PASS","reason_codes":[]},
+    {"gate_id":"G1","name":"license-attribution","required":true,"result":"PASS","reason_codes":["MIT_LICENSE_CONFIRMED"]},
+    {"gate_id":"G3","name":"static-policy-security","required":true,"result":"WARN","reason_codes":["PROCESS_EXECUTION_CAPABILITY","FIXED_TIMEOUT","NO_CANCELLATION_INTERFACE","STDERR_NOT_RETURNED_BY_RUN_ADB","NO_AUDIT_EVENT"]},
+    {"gate_id":"G4","name":"parse-type-compile-lint","required":true,"result":"PASS","reason_codes":["PYTHON_SYNTAX_FRAGMENT_VALID"]},
+    {"gate_id":"G8","name":"hidden-dependency-portability","required":true,"result":"FAIL","reason_codes":["HARD_CODED_ADB_BINARY","SUBPROCESS_RUNTIME_DEPENDENCY","DECLARED_HARDENED_ADAPTER_BOUNDARY_NOT_MET"]}
+  ],
+  "source_evidence": {
+    "repository": "fawadqureshi007/Mobile-hack",
+    "file": "modules/apk_analyzer.py",
+    "blob_sha": "870deb2303137cbb5a9cd74ef099e2897d09f685",
+    "license": "MIT"
+  }
+}

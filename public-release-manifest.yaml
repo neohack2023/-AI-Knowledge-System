@@ -59,6 +59,48 @@
       "reason": "Synthetic examples and optional starter demonstrations."
     },
     {
+      "id": "reusable-code-policy-docs",
+      "pattern": "reusable-code/*.md",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public reusable-code store policy and top-level documentation."
+    },
+    {
+      "id": "reusable-code-lane-docs",
+      "pattern": "reusable-code/anti-patterns/*.md",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public documentation for the non-executable anti-pattern lane."
+    },
+    {
+      "id": "reusable-code-unit-docs",
+      "pattern": "reusable-code/units/*.md",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Public documentation for the executable unit lane."
+    },
+    {
+      "id": "reusable-code-tooling",
+      "pattern": "reusable-code/tools/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Repository-owned admission and registry consistency tooling."
+    },
+    {
+      "id": "reusable-code-registry-schema",
+      "pattern": "reusable-code/registry/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Versioned reusable-code manifest schemas and registry contracts."
+    },
+    {
+      "id": "reusable-code-fixture-docs",
+      "pattern": "reusable-code/fixtures/*.md",
+      "classification": "PUBLIC_SYNTHETIC_FIXTURE",
+      "reason": "Documentation for sanitized reusable-code regression fixtures."
+    },
+    {
+      "id": "reusable-code-synthetic-fixtures",
+      "pattern": "reusable-code/fixtures/SEED-*/**",
+      "classification": "PUBLIC_SYNTHETIC_FIXTURE",
+      "reason": "Sanitized candidate, validation, and admission receipts used only as bounded regression fixtures."
+    },
+    {
       "id": "public-static-assets",
       "pattern": "public/**",
       "classification": "PUBLIC_TEMPLATE",
