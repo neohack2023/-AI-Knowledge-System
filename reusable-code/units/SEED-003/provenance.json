@@ -3,7 +3,12 @@
   "candidate_digest": "sha256:8704befb0537ed7c3f9b35d53d16579c2e36bd1e11d552c986f33539791265e8",
   "canonical_source": "https://github.com/neohack2023/-AI-Knowledge-System",
   "chunk_id": "SEED-003",
-  "license": {"attribution_required": true, "evidence_path": "reusable-code/fixtures/SEED-003/LICENSE", "spdx": "MIT"},
+  "license": {
+    "attribution_required": true,
+    "evidence_digest": "sha256:d2a1eb985f547f74858ad3b9d179d34810774d5aec21a26d62dd42c6cefa0ff0",
+    "evidence_path": "reusable-code/units/SEED-003/LICENSE",
+    "spdx": "MIT"
+  },
   "schema_version": "code-store-provenance/v0.1",
   "source_path": "reusable-code/fixtures/SEED-003/src/canonical_json.py",
   "source_repository": "neohack2023/-AI-Knowledge-System",
