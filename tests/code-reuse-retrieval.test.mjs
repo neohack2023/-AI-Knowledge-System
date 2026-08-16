@@ -11,6 +11,7 @@ const tool = path.join(root, "reusable-code", "tools", "code_reuse_retrieve.py")
 const fixtures = path.join(root, "tests", "fixtures", "code-reuse-06a");
 const knowledge = path.join(fixtures, "developer-knowledge.json");
 const registry = path.join(fixtures, "code-registry.json");
+const unitsRoot = path.join(root, "reusable-code", "units");
 
 function runCase(name, stamp = "2026-08-16T21:20:00Z", registryPath = registry) {
   const result = spawnSync("python3", [
@@ -34,6 +35,27 @@ function withMutatedRegistry(mutator, fn) {
     return fn(tempRegistry);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function repoRelative(target) {
+  return path.relative(root, target).split(path.sep).join("/");
+}
+
+function withTamperedStoredUnit(fn) {
+  const sourceUnit = path.join(unitsRoot, "SEED-003");
+  const tempUnit = path.join(unitsRoot, `.SEED-003-tamper-${process.pid}-${Date.now()}`);
+  fs.cpSync(sourceUnit, tempUnit, { recursive: true });
+  try {
+    const storedSource = path.join(tempUnit, "src", "canonical_json.py");
+    const provenancePath = path.join(tempUnit, "provenance.json");
+    const provenance = JSON.parse(fs.readFileSync(provenancePath, "utf8"));
+    provenance.stored_source_path = repoRelative(storedSource);
+    fs.writeFileSync(provenancePath, JSON.stringify(provenance, null, 2) + "\n");
+    fs.appendFileSync(storedSource, "\n# tampered after validation\n", "utf8");
+    return fn(repoRelative(tempUnit));
+  } finally {
+    fs.rmSync(tempUnit, { recursive: true, force: true });
   }
 }
 
@@ -82,6 +104,20 @@ test("registry and stored source revision disagreement fails closed", () => {
     assert.equal(packet.decision.state, "FAIL_CLOSED");
     const seed = packet.rejected_candidates.find((item) => item.chunk_id === "SEED-003");
     assert.ok(seed.reason_codes.includes("CODE_STORE_BINDING_MISMATCH"));
+  });
+});
+
+test("stored executable byte drift fails closed even when metadata still matches", () => {
+  withTamperedStoredUnit((tamperedPointer) => {
+    withMutatedRegistry((snapshot) => {
+      const seed = snapshot.records.find((item) => item.chunk_id === "SEED-003");
+      seed.code_store_pointer = tamperedPointer;
+    }, (registryPath) => {
+      const packet = runCase("code-only", "2026-08-16T21:20:00Z", registryPath);
+      assert.equal(packet.decision.state, "FAIL_CLOSED");
+      const seed = packet.rejected_candidates.find((item) => item.chunk_id === "SEED-003");
+      assert.ok(seed.reason_codes.includes("CODE_STORE_BYTES_DIGEST_MISMATCH"));
+    });
   });
 });
 
