@@ -1,0 +1,16 @@
+{
+  "validation_run_id": "CRI-VAL-20260816-SEED001",
+  "chunk_id": "SEED-001",
+  "candidate_digest": null,
+  "source_revision": "bf9e46be2ccd6cf2ebf4db047e418bb5d51d7ad2",
+  "terminal_status": "BLOCKED",
+  "gate_results": [
+    {
+      "gate_id": "G0",
+      "name": "identity-provenance",
+      "required": true,
+      "result": "BLOCKED",
+      "reason_codes": ["REVISION_UNRESOLVED", "CANDIDATE_DIGEST_UNAVAILABLE"]
+    }
+  ]
+}

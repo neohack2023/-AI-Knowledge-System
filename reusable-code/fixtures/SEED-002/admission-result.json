@@ -1,0 +1,10 @@
+{
+  "chunk_id": "SEED-002",
+  "admitted": false,
+  "decision": "REJECT_ADMISSION",
+  "reason_codes": [
+    "TERMINAL_NOT_ADMISSIBLE:REWRITE_REQUIRED",
+    "REQUIRED_GATE_NOT_PASS"
+  ],
+  "validation_run_id": "CRI-VAL-20260816-SEED002"
+}
