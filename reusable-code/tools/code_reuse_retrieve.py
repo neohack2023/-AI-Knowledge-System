@@ -43,7 +43,10 @@ CRITICAL_FILTER_CODES = {
     "CODE_STORE_POINTER_INVALID",
     "CODE_STORE_MANIFEST_MISSING",
     "CODE_STORE_VALIDATION_MISSING",
+    "CODE_STORE_PROVENANCE_MISSING",
     "CODE_STORE_RECEIPT_MISSING",
+    "CODE_STORE_BYTES_MISSING",
+    "CODE_STORE_BYTES_DIGEST_MISMATCH",
     "CODE_STORE_BINDING_MISMATCH",
 }
 
@@ -92,8 +95,12 @@ def _safe_repo_path(relative: Any) -> Path | None:
     return resolved
 
 
+def _sha256_file(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
-    """Verify a registry row against exact stored manifest and receipt evidence."""
+    """Verify a registry row against exact stored metadata, receipt, and bytes."""
 
     pointer = candidate.get("code_store_pointer")
     if not pointer:
@@ -111,10 +118,13 @@ def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
 
     manifest_path = unit_dir / "manifest.json"
     validation_path = unit_dir / "validation.json"
+    provenance_path = unit_dir / "provenance.json"
     if not manifest_path.is_file():
         return ["CODE_STORE_MANIFEST_MISSING"]
     if not validation_path.is_file():
         return ["CODE_STORE_VALIDATION_MISSING"]
+    if not provenance_path.is_file():
+        return ["CODE_STORE_PROVENANCE_MISSING"]
 
     receipt_ref = candidate.get("validation_receipt_ref")
     receipt_path = _safe_repo_path(receipt_ref)
@@ -124,25 +134,40 @@ def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
     try:
         manifest = load_json(manifest_path)
         validation = load_json(validation_path)
+        provenance = load_json(provenance_path)
         receipt = load_json(receipt_path)
     except (OSError, json.JSONDecodeError):
         return ["CODE_STORE_BINDING_MISMATCH"]
+
+    stored_source_path = _safe_repo_path(provenance.get("stored_source_path"))
+    if stored_source_path is None or not stored_source_path.is_file():
+        return ["CODE_STORE_BYTES_MISSING"]
+    try:
+        stored_source_path.relative_to(unit_dir)
+    except ValueError:
+        return ["CODE_STORE_BYTES_MISSING"]
 
     chunk_id = candidate.get("chunk_id")
     digest = candidate.get("candidate_digest")
     source_revision = candidate.get("source_revision")
     receipt_id = receipt.get("validation_run_id")
 
+    if _sha256_file(stored_source_path) != digest:
+        return ["CODE_STORE_BYTES_DIGEST_MISMATCH"]
+
     bindings = [
         bool(source_revision),
         manifest.get("chunk_id") == chunk_id,
         validation.get("chunk_id") == chunk_id,
+        provenance.get("chunk_id") == chunk_id,
         receipt.get("chunk_id") == chunk_id,
         manifest.get("candidate_digest") == digest,
         validation.get("candidate_digest") == digest,
+        provenance.get("candidate_digest") == digest,
         receipt.get("candidate_digest") == digest,
         manifest.get("source_revision") == source_revision,
         validation.get("source_revision") == source_revision,
+        provenance.get("source_revision") == source_revision,
         receipt.get("source_revision") == source_revision,
         validation.get("fixture_receipt_path") == receipt_ref,
         manifest.get("validation_receipt_id") == receipt_id,
