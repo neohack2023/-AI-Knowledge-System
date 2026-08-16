@@ -35,11 +35,7 @@ WEIGHTS = {
     "security_fit": 5,
 }
 
-CRITICAL_FILTER_CODES = {
-    "PROVENANCE_MISSING",
-    "LICENSE_NOT_PASS",
-    "SECURITY_RISK_NOT_ALLOWED",
-    "CODE_STORE_POINTER_MISSING",
+STORE_INTEGRITY_CODES = {
     "CODE_STORE_POINTER_INVALID",
     "CODE_STORE_MANIFEST_MISSING",
     "CODE_STORE_VALIDATION_MISSING",
@@ -362,7 +358,8 @@ def assemble(
         selected_units = []
         rejected = []
         eligible = []
-        relevant_blockers = []
+        relevant_rejection = False
+        critical_store_peer = False
         if request.get("code_needed"):
             for candidate in registry_snapshot.get("records", []):
                 query_fit = _overlap(
@@ -386,6 +383,7 @@ def assemble(
 
                 reasons = hard_filter(candidate, request)
                 if reasons:
+                    relevant_rejection = True
                     rejected.append(
                         {
                             "chunk_id": candidate.get("chunk_id"),
@@ -393,7 +391,14 @@ def assemble(
                             "reason_codes": reasons,
                         }
                     )
-                    relevant_blockers.extend(reasons)
+                    claims_store_lane = bool(candidate.get("code_store_pointer")) or (
+                        candidate.get("status") in EXECUTABLE_STATUS
+                        or candidate.get("validation_status") in EXECUTABLE_STATUS
+                    )
+                    if claims_store_lane and any(
+                        code.split(":", 1)[0] in STORE_INTEGRITY_CODES for code in reasons
+                    ):
+                        critical_store_peer = True
                 else:
                     eligible.append(rank_code(task, candidate))
 
@@ -407,12 +412,7 @@ def assemble(
             )
             selected_units = eligible[: int(request.get("code_limit", 3))]
 
-        critical = any(
-            code.split(":", 1)[0] in CRITICAL_FILTER_CODES
-            for code in relevant_blockers
-        )
-
-        if request.get("code_needed") and critical:
+        if request.get("code_needed") and critical_store_peer:
             for item in selected_units:
                 rejected.append(
                     {
@@ -427,6 +427,9 @@ def assemble(
         elif request.get("code_needed") and not selected_units and request.get("allow_expand", False):
             decision = "EXPAND"
             decision_reasons = ["NO_ELIGIBLE_CODE_BOUNDED_EXPANSION_ALLOWED"]
+        elif request.get("code_needed") and not selected_units and relevant_rejection:
+            decision = "FAIL_CLOSED"
+            decision_reasons = ["EXECUTABLE_REUSE_BLOCKED_BY_HARD_FILTER"]
         elif knowledge_results and selected_units:
             decision = "RETRIEVE_BOTH"
             decision_reasons = ["KNOWLEDGE_AND_EXECUTABLE_CODE_SELECTED"]
