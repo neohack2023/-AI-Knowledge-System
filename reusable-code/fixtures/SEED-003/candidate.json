@@ -1,0 +1,22 @@
+{
+  "candidate_digest": "sha256:8704befb0537ed7c3f9b35d53d16579c2e36bd1e11d552c986f33539791265e8",
+  "chunk_id": "SEED-003",
+  "chunk_type": "utility",
+  "dependencies": ["python-stdlib"],
+  "framework": "None",
+  "freshness": "CURRENT",
+  "known_limits": ["Not RFC 8785/JCS", "Floats are rejected", "Object keys must be strings"],
+  "language": "Python",
+  "license_gate": "PASS",
+  "license_spdx": "MIT",
+  "portability_score": 10,
+  "problem_solved": "Deterministic structured JSON fingerprint and receipt hashing without float ambiguity.",
+  "project_scope": "global-working-memory",
+  "public_api": ["canonical_json_bytes(value)", "sha256_json(value)"],
+  "runtime": "Python >=3.10",
+  "security_risk": "LOW",
+  "source_revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181",
+  "tags": ["deterministic", "json", "sha256", "fingerprint", "receipt", "structured", "hash"],
+  "title": "Stable JSON SHA-256 digest",
+  "use_domain": "verification"
+}

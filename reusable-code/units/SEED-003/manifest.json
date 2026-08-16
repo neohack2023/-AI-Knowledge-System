@@ -1,0 +1,21 @@
+{
+  "attribution_required": true,
+  "candidate_digest": "sha256:8704befb0537ed7c3f9b35d53d16579c2e36bd1e11d552c986f33539791265e8",
+  "capabilities": ["deterministic-json-fingerprint", "sha256-structured-state"],
+  "chunk_id": "SEED-003",
+  "cross_context_evidence": [],
+  "dependencies": ["python-stdlib"],
+  "known_limits": ["Not RFC 8785/JCS", "Floats are rejected", "Object keys must be strings"],
+  "language": "Python",
+  "license_spdx": "MIT",
+  "public_api": ["canonical_json_bytes(value)", "sha256_json(value)"],
+  "registry_record": "Code Chunk Registry:SEED-003",
+  "revalidation_triggers": ["source byte change", "validation policy change", "runtime incompatibility", "license change"],
+  "runtime": "Python >=3.10",
+  "schema_version": "code-store-unit-v0.1",
+  "source_revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181",
+  "status": "VERIFIED",
+  "validation_policy_version": "code-reuse-validation-v0.1",
+  "validation_receipt_id": "CRI-VAL-20260816-SEED003-001",
+  "version": "0.1.0"
+}
