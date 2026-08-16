@@ -22,6 +22,8 @@ EXECUTABLE_STATUS = {"VERIFIED", "REUSABLE"}
 ACCEPTABLE_FRESHNESS = {"CURRENT", "FRESH", "UNCHANGED"}
 RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 TOKEN_RE = re.compile(r"[A-Za-z0-9_+-]+")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CODE_STORE_ROOT = (REPO_ROOT / "reusable-code" / "units").resolve()
 
 WEIGHTS = {
     "task_fit": 40,
@@ -38,6 +40,11 @@ CRITICAL_FILTER_CODES = {
     "LICENSE_NOT_PASS",
     "SECURITY_RISK_NOT_ALLOWED",
     "CODE_STORE_POINTER_MISSING",
+    "CODE_STORE_POINTER_INVALID",
+    "CODE_STORE_MANIFEST_MISSING",
+    "CODE_STORE_VALIDATION_MISSING",
+    "CODE_STORE_RECEIPT_MISSING",
+    "CODE_STORE_BINDING_MISMATCH",
 }
 
 
@@ -71,6 +78,85 @@ def _framework_matches(candidate: str | None, target: str | None) -> bool:
     return c in {"", "none", "agnostic"} or c == t
 
 
+def _safe_repo_path(relative: Any) -> Path | None:
+    if not isinstance(relative, str) or not relative.strip():
+        return None
+    path = Path(relative)
+    if path.is_absolute():
+        return None
+    resolved = (REPO_ROOT / path).resolve()
+    try:
+        resolved.relative_to(REPO_ROOT)
+    except ValueError:
+        return None
+    return resolved
+
+
+def _verify_code_store_binding(candidate: dict[str, Any]) -> list[str]:
+    """Verify a registry row against exact stored manifest and receipt evidence."""
+
+    pointer = candidate.get("code_store_pointer")
+    if not pointer:
+        return []
+
+    unit_dir = _safe_repo_path(pointer)
+    if unit_dir is None:
+        return ["CODE_STORE_POINTER_INVALID"]
+    try:
+        unit_dir.relative_to(CODE_STORE_ROOT)
+    except ValueError:
+        return ["CODE_STORE_POINTER_INVALID"]
+    if not unit_dir.is_dir():
+        return ["CODE_STORE_POINTER_INVALID"]
+
+    manifest_path = unit_dir / "manifest.json"
+    validation_path = unit_dir / "validation.json"
+    if not manifest_path.is_file():
+        return ["CODE_STORE_MANIFEST_MISSING"]
+    if not validation_path.is_file():
+        return ["CODE_STORE_VALIDATION_MISSING"]
+
+    receipt_ref = candidate.get("validation_receipt_ref")
+    receipt_path = _safe_repo_path(receipt_ref)
+    if receipt_path is None or not receipt_path.is_file():
+        return ["CODE_STORE_RECEIPT_MISSING"]
+
+    try:
+        manifest = load_json(manifest_path)
+        validation = load_json(validation_path)
+        receipt = load_json(receipt_path)
+    except (OSError, json.JSONDecodeError):
+        return ["CODE_STORE_BINDING_MISMATCH"]
+
+    chunk_id = candidate.get("chunk_id")
+    digest = candidate.get("candidate_digest")
+    source_revision = candidate.get("source_revision")
+    receipt_id = receipt.get("validation_run_id")
+
+    bindings = [
+        bool(source_revision),
+        manifest.get("chunk_id") == chunk_id,
+        validation.get("chunk_id") == chunk_id,
+        receipt.get("chunk_id") == chunk_id,
+        manifest.get("candidate_digest") == digest,
+        validation.get("candidate_digest") == digest,
+        receipt.get("candidate_digest") == digest,
+        manifest.get("source_revision") == source_revision,
+        validation.get("source_revision") == source_revision,
+        receipt.get("source_revision") == source_revision,
+        validation.get("fixture_receipt_path") == receipt_ref,
+        manifest.get("validation_receipt_id") == receipt_id,
+        validation.get("validation_receipt_id") == receipt_id,
+        receipt.get("license_gate") == "PASS",
+        manifest.get("status") in EXECUTABLE_STATUS,
+        validation.get("terminal_status") in EXECUTABLE_STATUS,
+        receipt.get("terminal_status") in EXECUTABLE_STATUS,
+    ]
+    if not all(bindings):
+        return ["CODE_STORE_BINDING_MISMATCH"]
+    return []
+
+
 def hard_filter(candidate: dict[str, Any], request: dict[str, Any]) -> list[str]:
     target = request["target_context"]
     reasons: list[str] = []
@@ -87,6 +173,8 @@ def hard_filter(candidate: dict[str, Any], request: dict[str, Any]) -> list[str]
         reasons.append("FRESHNESS_NOT_ACCEPTABLE")
     if not candidate.get("code_store_pointer"):
         reasons.append("CODE_STORE_POINTER_MISSING")
+    else:
+        reasons.extend(_verify_code_store_binding(candidate))
 
     target_language = str(target.get("language") or "").lower()
     if target_language and str(candidate.get("language") or "").lower() != target_language:
