@@ -62,6 +62,7 @@
       "runtime": "Python >=3.10",
       "security_risk": "LOW",
       "source_evidence": "CRI-VAL-20260816-SEED003-001",
+      "source_revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181",
       "status": "VERIFIED",
       "tags": ["deterministic", "json", "sha256", "fingerprint", "receipt", "structured", "hash"],
       "title": "Stable JSON SHA-256 digest",
