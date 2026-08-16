@@ -3,7 +3,7 @@
   "candidate_digest": "sha256:8704befb0537ed7c3f9b35d53d16579c2e36bd1e11d552c986f33539791265e8",
   "capabilities": ["deterministic-json-fingerprint", "sha256-structured-state"],
   "chunk_id": "SEED-003",
-  "cross_context_evidence": [],
+  "cross_context_evidence": ["CRI-USE-20260816-SEED003-LOOPER-001"],
   "dependencies": ["python-stdlib"],
   "known_limits": ["Not RFC 8785/JCS", "Floats are rejected", "Object keys must be strings"],
   "language": "Python",
