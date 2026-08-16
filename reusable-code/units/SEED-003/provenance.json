@@ -9,6 +9,7 @@
   "source_repository": "neohack2023/-AI-Knowledge-System",
   "source_revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181",
   "source_system": "GitHub",
+  "stored_source_path": "reusable-code/units/SEED-003/src/canonical_json.py",
   "transformation_lineage": [
     {"path": "reusable-code/fixtures/SEED-003/src/canonical_json.py", "revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181", "type": "CANDIDATE_SOURCE"},
     {"receipt_id": "CRI-VAL-20260816-SEED003-001", "type": "VALIDATION"},
