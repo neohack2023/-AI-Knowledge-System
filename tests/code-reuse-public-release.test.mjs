@@ -43,6 +43,11 @@ test("reusable-code release surface is classified by responsibility instead of o
     "PUBLIC_SYNTHETIC_FIXTURE",
     "reusable-code-synthetic-fixtures",
   );
+  expectClassification(
+    "reusable-code/units/SEED-003/src/canonical_json.py",
+    "PUBLIC_CORE",
+    "reusable-code-verified-unit-seed003",
+  );
 });
 
 test("unreviewed reusable-code paths remain unresolved rather than inheriting broad public access", () => {
@@ -50,11 +55,21 @@ test("unreviewed reusable-code paths remain unresolved rather than inheriting br
   assert.equal(unknown.allowed, false);
   assert.equal(unknown.classification, "UNRESOLVED");
   assert.equal(unknown.rule, null);
+
+  const futureUnit = classifyPath(manifest, "reusable-code/units/SEED-999/src/future.py");
+  assert.equal(futureUnit.allowed, false);
+  assert.equal(futureUnit.classification, "UNRESOLVED");
+  assert.equal(futureUnit.rule, null);
 });
 
 test("deny-first secret rules still override reusable-code public classifications", () => {
-  const secret = classifyPath(manifest, "reusable-code/fixtures/SEED-003/.env.local");
-  assert.equal(secret.allowed, false);
-  assert.equal(secret.classification, "SECRET");
-  assert.equal(secret.rule?.id, "environment-files");
+  const fixtureSecret = classifyPath(manifest, "reusable-code/fixtures/SEED-003/.env.local");
+  assert.equal(fixtureSecret.allowed, false);
+  assert.equal(fixtureSecret.classification, "SECRET");
+  assert.equal(fixtureSecret.rule?.id, "environment-files");
+
+  const unitSecret = classifyPath(manifest, "reusable-code/units/SEED-003/.env.local");
+  assert.equal(unitSecret.allowed, false);
+  assert.equal(unitSecret.classification, "SECRET");
+  assert.equal(unitSecret.rule?.id, "environment-files");
 });

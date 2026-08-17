@@ -1,0 +1,11 @@
+{
+  "admission_decision": "ADMIT_VERIFIED",
+  "admission_result_path": "reusable-code/fixtures/SEED-003/admission-result.json",
+  "candidate_digest": "sha256:8704befb0537ed7c3f9b35d53d16579c2e36bd1e11d552c986f33539791265e8",
+  "chunk_id": "SEED-003",
+  "fixture_receipt_path": "reusable-code/fixtures/SEED-003/validation-receipt.json",
+  "schema_version": "code-store-validation-binding/v0.1",
+  "source_revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181",
+  "terminal_status": "VERIFIED",
+  "validation_receipt_id": "CRI-VAL-20260816-SEED003-001"
+}

@@ -1,0 +1,11 @@
+{
+  "allow_expand": false,
+  "baseline": {"repository": "neohack2023/-AI-Knowledge-System", "revision": "f909c9a78277d2adfad9917c814af3996a2d7e78"},
+  "code_limit": 3,
+  "code_needed": true,
+  "knowledge_needed": false,
+  "request_id": "CRQ-06A-FAIL",
+  "schema_version": "code-reuse-request/v0.1",
+  "target_context": {"available_dependencies": ["python-stdlib"], "forbidden_scopes": ["udio-algorithms", "girls-of-gaming"], "framework": "None", "language": "Python", "max_security_risk": "LOW", "repository": "neohack2023/Looper", "revision": "9091c6adc7a1df7f9069a6288c7dab991d08e02f"},
+  "task": "Execute an adb subprocess wrapper with timeout in Looper."
+}

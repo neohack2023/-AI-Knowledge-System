@@ -1,0 +1,21 @@
+{
+  "adapter": "developer-knowledge-snapshot/v0.1",
+  "records": [
+    {
+      "authority_class": "developer_knowledge",
+      "knowledge_id": "K-REPO-VERIFY-001",
+      "source_ref": "notion:3b943bd4-ae4a-8145-8996-c95397f2aa20",
+      "summary": "Use layered tests, validators, fixtures, smoke testing, CI proof, bounded branch/change workflow, and execution receipts.",
+      "title": "Repository and Verification Engineering"
+    },
+    {
+      "authority_class": "developer_knowledge",
+      "knowledge_id": "K-CODE-REUSE-001",
+      "source_ref": "notion:3be43bd4-ae4a-81c8-b5fa-ff917fffcb2a",
+      "summary": "Current repository truth wins; apply hard compatibility filters before ranking; VERIFIED source units still require target-project adaptation tests and usage receipts.",
+      "title": "Code reuse retrieval law"
+    }
+  ],
+  "schema_version": "developer-knowledge-snapshot/v0.1",
+  "snapshot_id": "DK-20260816-06A-001"
+}

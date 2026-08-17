@@ -1,0 +1,26 @@
+{
+  "candidate_digest": "sha256:8704befb0537ed7c3f9b35d53d16579c2e36bd1e11d552c986f33539791265e8",
+  "chunk_id": "SEED-003",
+  "environment": {"executor": "ChatGPT Python sandbox", "platform": "Linux-6.18.35-x86_64-with-glibc2.41", "python": "3.13.5"},
+  "gate_results": [
+    {"evidence": "Exact GitHub candidate source at immutable source revision; source SHA-256 bound.", "gate_id": "G0", "name": "IDENTITY_PROVENANCE", "required": true, "result": "PASS"},
+    {"evidence": "Explicit MIT license stored with candidate.", "gate_id": "G1", "name": "LICENSE_ATTRIBUTION", "required": true, "result": "PASS"},
+    {"evidence": "Bounded secret-pattern scan returned zero findings.", "gate_id": "G2", "name": "SECRET_SCAN", "required": true, "result": "PASS"},
+    {"evidence": "Standard-library imports only; no subprocess/network/dynamic execution.", "gate_id": "G3", "name": "STATIC_POLICY_SECURITY", "required": true, "result": "PASS"},
+    {"evidence": "Python source and tests compiled successfully.", "gate_id": "G4", "name": "PARSE_COMPILE_LINT", "required": true, "result": "PASS"},
+    {"evidence": "Python standard library only; no third-party dependency surface.", "gate_id": "G5", "name": "DEPENDENCY_VULNERABILITY", "required": true, "result": "PASS"},
+    {"evidence": "Five unit tests passed twice with identical semantic results.", "gate_id": "G6", "name": "DETERMINISTIC_BEHAVIOR", "required": true, "result": "PASS"},
+    {"evidence": "Executed in ephemeral ChatGPT Python sandbox with timeout; no network required.", "gate_id": "G7", "name": "ISOLATED_RUNTIME", "required": true, "result": "PASS"},
+    {"evidence": "Clean-copy test passed in independent temporary directory.", "gate_id": "G8", "name": "PORTABILITY_HIDDEN_DEPENDENCY", "required": true, "result": "PASS"},
+    {"evidence": "Validation bound to exact source revision and digest.", "gate_id": "G9", "name": "FRESHNESS_DRIFT", "required": true, "result": "PASS"}
+  ],
+  "license_gate": "PASS",
+  "notes": ["Validation proves the exact candidate snapshot only.", "VERIFIED does not imply REUSABLE or canon."],
+  "schema_version": "code-reuse-validation-receipt/v0.1",
+  "source_revision": "a46c402ec19fba1e30c8558c50e8d1c3ce185181",
+  "terminal_status": "VERIFIED",
+  "test_summary": {"result": "PASS", "runs": 2, "suite": "unittest", "tests": 5},
+  "validated_at": "2026-08-16T21:12:00Z",
+  "validation_policy_version": "code-reuse-validation-v0.1",
+  "validation_run_id": "CRI-VAL-20260816-SEED003-001"
+}

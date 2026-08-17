@@ -77,6 +77,12 @@
       "reason": "Public documentation for the executable unit lane."
     },
     {
+      "id": "reusable-code-verified-unit-seed003",
+      "pattern": "reusable-code/units/SEED-003/**",
+      "classification": "PUBLIC_CORE",
+      "reason": "Explicitly MIT-licensed, receipt-bound VERIFIED unit admitted through CODE-REUSE-04/05. Future units remain unresolved until separately reviewed."
+    },
+    {
       "id": "reusable-code-tooling",
       "pattern": "reusable-code/tools/**",
       "classification": "PUBLIC_CORE",
