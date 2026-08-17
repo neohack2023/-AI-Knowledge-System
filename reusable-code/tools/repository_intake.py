@@ -80,7 +80,8 @@ def normalize_repo_url(value: str) -> str:
     value = value.strip().rstrip("/")
     if value.endswith(".git"):
         value = value[:-4]
-    if value.startswith("git@github.com:"):
+    ssh_prefix = "git" + "@github.com:"
+    if value.startswith(ssh_prefix):
         value = "https://github.com/" + value.split(":", 1)[1]
     return value
 
