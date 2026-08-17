@@ -27,8 +27,10 @@ function makeRepo({ licensed = true } = {}) {
   git(repo, "remote", "add", "origin", "https://github.com/example/fixture");
   fs.mkdirSync(path.join(repo, "src"));
   fs.mkdirSync(path.join(repo, "dist"));
-  fs.writeFileSync(path.join(repo, "src", "sample.py"), `import json\n\ndef stable_digest(value):\n    \"\"\"Return a stable digest.\"\"\"\n    return json.dumps(value, sort_keys=True)\n\nclass Worker:\n    \"\"\"Process one work item.\"\"\"\n    def run(self, value):\n        return value\n`);
+  fs.mkdirSync(path.join(repo, "packages", "widget", "dist"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "src", "sample.py"), `import json\n\n@cache\ndef stable_digest(value):\n    \"\"\"Return a stable digest.\"\"\"\n    return json.dumps(value, sort_keys=True)\n\nclass Worker:\n    \"\"\"Process one work item.\"\"\"\n    def run(self, value):\n        return value\n`);
   fs.writeFileSync(path.join(repo, "dist", "generated.py"), "def generated():\n    return 1\n");
+  fs.writeFileSync(path.join(repo, "packages", "widget", "dist", "nested_generated.py"), "def nested_generated():\n    return 1\n");
   fs.writeFileSync(path.join(repo, "pyproject.toml"), '[project]\nname = "fixture"\nversion = "0.1.0"\n');
   fs.writeFileSync(path.join(repo, "package.json"), JSON.stringify({ name: "fixture", dependencies: { "fixture-lib": "^1.0.0" } }));
   if (licensed) {
@@ -64,6 +66,10 @@ test("CODE-REUSE-02 emits deterministic source-anchored Python candidates", () =
     assert.equal(payload.receipt.write_authorization, "NONE");
     assert.ok(payload.receipt.dependency_hints.some((item) => item.dependency === "fixture-lib" && item.source === "package.json"));
     assert.deepEqual(payload.candidates.map((item) => item.title), ["stable_digest", "Worker"]);
+    const stable = payload.candidates.find((item) => item.title === "stable_digest");
+    assert.equal(stable.source_evidence.start_line, 3);
+    assert.match(stable.runtime, /UNRESOLVED/);
+    assert.ok(stable.source_evidence.parser_version);
     for (const candidate of payload.candidates) {
       assert.equal(candidate.status, "CANDIDATE");
       assert.equal(candidate.validation_status, "UNVALIDATED");
@@ -73,7 +79,7 @@ test("CODE-REUSE-02 emits deterministic source-anchored Python candidates", () =
       assert.ok(candidate.source_url.includes(`/blob/${fixture.sha}/src/sample.py#L`));
       assert.ok(!("source_code" in candidate));
     }
-    assert.ok(!payload.candidates.some((item) => item.source_evidence.path.startsWith("dist/")));
+    assert.ok(!payload.candidates.some((item) => item.source_evidence.path.includes("/dist/") || item.source_evidence.path.startsWith("dist/")));
   } finally {
     fs.rmSync(fixture.repo, { recursive: true, force: true });
   }
@@ -174,6 +180,25 @@ test("tracked source symlinks are not followed outside the repository", () => {
   } finally {
     fs.rmSync(fixture.repo, { recursive: true, force: true });
     fs.rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("candidate cap does not truncate repository language inventory", () => {
+  const fixture = makeRepo();
+  try {
+    fs.writeFileSync(path.join(fixture.repo, "zzz-late.js"), "export function later() { return 1; }\n");
+    git(fixture.repo, "add", "zzz-late.js");
+    git(fixture.repo, "commit", "-qm", "add late javascript");
+    const sha = git(fixture.repo, "rev-parse", "HEAD");
+    const result = intake(fixture.repo, sha, ["--max-candidates", "1"]);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.receipt.candidate_count, 1);
+    assert.ok(payload.receipt.repository_languages.some((item) => item.language === "JavaScript"));
+    assert.ok(payload.receipt.warnings.includes("STRUCTURAL_EXTRACTOR_UNAVAILABLE:JavaScript"));
+    assert.ok(payload.receipt.warnings.includes("CANDIDATE_LIMIT_REACHED:1"));
+  } finally {
+    fs.rmSync(fixture.repo, { recursive: true, force: true });
   }
 });
 
