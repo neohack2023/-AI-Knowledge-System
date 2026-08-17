@@ -58,6 +58,7 @@ LICENSE_PATTERNS = (
 RISK_IMPORTS = {"subprocess": "HIGH", "socket": "HIGH", "ctypes": "HIGH", "paramiko": "HIGH",
                 "requests": "MEDIUM", "httpx": "MEDIUM", "urllib": "MEDIUM", "multiprocessing": "MEDIUM"}
 RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+MAX_SOURCE_BYTES = 512_000
 
 
 class IntakeError(RuntimeError):
@@ -106,12 +107,55 @@ def language_for(path: str) -> str | None:
     return LANGUAGE.get(Path(path).suffix.lower())
 
 
-def read_small(root: Path, relative: str, limit: int = 256_000) -> str | None:
+def safe_repo_file(root: Path, relative: str) -> Path | None:
     path = root / relative
+    try:
+        if path.is_symlink():
+            return None
+        resolved = path.resolve()
+        resolved.relative_to(root.resolve())
+        return resolved if resolved.is_file() else None
+    except (OSError, ValueError):
+        return None
+
+
+def read_small(root: Path, relative: str, limit: int = 256_000) -> str | None:
+    path = safe_repo_file(root, relative)
+    if path is None:
+        return None
     try:
         return None if path.stat().st_size > limit else path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
+
+
+def manifest_dependency_hints(root: Path, manifests: list[str]) -> list[dict[str, str]]:
+    hints: list[dict[str, str]] = []
+    for relative in manifests:
+        name = Path(relative).name
+        text = read_small(root, relative)
+        if not text:
+            continue
+        if name == "package.json":
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            for field in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+                values = parsed.get(field)
+                if isinstance(values, dict):
+                    for dependency, constraint in sorted(values.items()):
+                        if isinstance(constraint, str):
+                            hints.append({"source": relative, "kind": field, "dependency": dependency, "constraint": constraint})
+        elif name == "requirements.txt":
+            for raw in text.splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or line.startswith(("-r", "--requirement", "-e", "--editable")):
+                    continue
+                dependency = re.split(r"[<>=!~ ;\[]", line, maxsplit=1)[0].strip()
+                if dependency:
+                    hints.append({"source": relative, "kind": "requirement", "dependency": dependency, "constraint": line})
+    return hints
 
 
 def detect_license(root: Path, paths: list[str], manifests: list[str]) -> dict[str, Any]:
@@ -198,8 +242,13 @@ def portability(chunk_type: str, imports: list[str], risk: str, problem: str) ->
 
 def python_candidates(root: Path, relative: str, repository_url: str, revision: str, scope_id: str,
                       license_info: dict[str, Any], retrieved_at: str) -> tuple[list[dict[str, Any]], list[str]]:
+    path = safe_repo_file(root, relative)
+    if path is None:
+        return [], [f"PARSE_PARTIAL:{relative}:UNSAFE_PATH"]
     try:
-        text = (root / relative).read_text(encoding="utf-8")
+        if path.stat().st_size > MAX_SOURCE_BYTES:
+            return [], [f"PARSE_PARTIAL:{relative}:SOURCE_FILE_TOO_LARGE"]
+        text = path.read_text(encoding="utf-8")
         tree = ast.parse(text, filename=relative)
     except (OSError, UnicodeError, SyntaxError) as exc:
         return [], [f"PARSE_PARTIAL:{relative}:{type(exc).__name__}"]
@@ -280,12 +329,16 @@ def intake(*, root: Path, repository_url: str, revision: str, branch: str | None
     actual = git(root, "rev-parse", "HEAD")
     if actual != revision:
         raise IntakeError("REVISION_UNRESOLVED", f"requested {revision} but local HEAD is {actual}")
+    tracked_drift = git(root, "status", "--porcelain", "--untracked-files=no")
+    if tracked_drift:
+        raise IntakeError("SOURCE_DRIFT", "tracked working-tree state differs from the pinned HEAD")
     paths = tracked_files(root)
     if len(paths) > max_files:
         raise IntakeError("SOURCE_TOO_LARGE", f"{len(paths)} tracked files exceeds max_files={max_files}")
 
     manifests = sorted(path for path in paths if Path(path).name in MANIFESTS)
     license_info = detect_license(root, paths, manifests)
+    dependency_hints = manifest_dependency_hints(root, manifests)
     counts: Counter[str] = Counter()
     candidates: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -330,6 +383,7 @@ def intake(*, root: Path, repository_url: str, revision: str, branch: str | None
         "license_evidence": license_info["evidence"],
         "repository_languages": [{"language": lang, "file_count": count} for lang, count in sorted(counts.items())],
         "manifest_files": manifests,
+        "dependency_hints": dependency_hints,
         "candidate_count": len(candidates),
         "excluded_count": excluded_count,
         "warnings": sorted(set(warnings)),
