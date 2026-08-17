@@ -24,6 +24,7 @@ function makeRepo({ licensed = true } = {}) {
   git(repo, "init", "-q");
   git(repo, "config", "user.email", "fixture@example.com");
   git(repo, "config", "user.name", "Fixture");
+  git(repo, "remote", "add", "origin", "https://github.com/example/fixture");
   fs.mkdirSync(path.join(repo, "src"));
   fs.mkdirSync(path.join(repo, "dist"));
   fs.writeFileSync(path.join(repo, "src", "sample.py"), `import json\n\ndef stable_digest(value):\n    \"\"\"Return a stable digest.\"\"\"\n    return json.dumps(value, sort_keys=True)\n\nclass Worker:\n    \"\"\"Process one work item.\"\"\"\n    def run(self, value):\n        return value\n`);
@@ -100,6 +101,41 @@ test("missing license blocks literal reuse without erasing pattern-level candida
     assert.ok(payload.candidates.length > 0);
     assert.ok(payload.candidates.every((item) => item.license_gate === "BLOCKED"));
     assert.ok(payload.candidates.every((item) => item.status === "CANDIDATE"));
+  } finally {
+    fs.rmSync(fixture.repo, { recursive: true, force: true });
+  }
+});
+
+test("claimed repository identity must match the checkout origin", () => {
+  const fixture = makeRepo();
+  try {
+    const result = run("python3", [
+      tool,
+      "--repo-root", fixture.repo,
+      "--repository-url", "https://github.com/example/not-the-fixture",
+      "--revision", fixture.sha,
+      "--retrieved-at", "2026-08-17T22:10:00Z",
+    ]);
+    assert.equal(result.status, 2);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.receipt.failure_state, "SOURCE_UNRESOLVED");
+  } finally {
+    fs.rmSync(fixture.repo, { recursive: true, force: true });
+  }
+});
+
+test("unrecognized package license metadata cannot produce a PASS gate", () => {
+  const fixture = makeRepo({ licensed: false });
+  try {
+    fs.writeFileSync(path.join(fixture.repo, "package.json"), JSON.stringify({ name: "fixture", license: "UNLICENSED" }));
+    git(fixture.repo, "add", "package.json");
+    git(fixture.repo, "commit", "-qm", "add package metadata");
+    const sha = git(fixture.repo, "rev-parse", "HEAD");
+    const result = intake(fixture.repo, sha);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.receipt.license_state, "BLOCKED");
+    assert.ok(payload.candidates.every((item) => item.license_gate === "BLOCKED"));
   } finally {
     fs.rmSync(fixture.repo, { recursive: true, force: true });
   }
