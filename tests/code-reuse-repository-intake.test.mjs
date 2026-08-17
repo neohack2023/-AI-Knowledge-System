@@ -30,6 +30,7 @@ function makeRepo({ licensed = true } = {}) {
   fs.writeFileSync(path.join(repo, "src", "sample.py"), `import json\n\ndef stable_digest(value):\n    \"\"\"Return a stable digest.\"\"\"\n    return json.dumps(value, sort_keys=True)\n\nclass Worker:\n    \"\"\"Process one work item.\"\"\"\n    def run(self, value):\n        return value\n`);
   fs.writeFileSync(path.join(repo, "dist", "generated.py"), "def generated():\n    return 1\n");
   fs.writeFileSync(path.join(repo, "pyproject.toml"), '[project]\nname = "fixture"\nversion = "0.1.0"\n');
+  fs.writeFileSync(path.join(repo, "package.json"), JSON.stringify({ name: "fixture", dependencies: { "fixture-lib": "^1.0.0" } }));
   if (licensed) {
     fs.writeFileSync(path.join(repo, "LICENSE"), "MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \\\"Software\\\"), to deal in the Software without restriction.\n");
   }
@@ -61,6 +62,7 @@ test("CODE-REUSE-02 emits deterministic source-anchored Python candidates", () =
     assert.equal(payload.receipt.license_state, "PASS");
     assert.equal(payload.receipt.license_spdx, "MIT");
     assert.equal(payload.receipt.write_authorization, "NONE");
+    assert.ok(payload.receipt.dependency_hints.some((item) => item.dependency === "fixture-lib" && item.source === "package.json"));
     assert.deepEqual(payload.candidates.map((item) => item.title), ["stable_digest", "Worker"]);
     for (const candidate of payload.candidates) {
       assert.equal(candidate.status, "CANDIDATE");
@@ -127,7 +129,7 @@ test("claimed repository identity must match the checkout origin", () => {
 test("unrecognized package license metadata cannot produce a PASS gate", () => {
   const fixture = makeRepo({ licensed: false });
   try {
-    fs.writeFileSync(path.join(fixture.repo, "package.json"), JSON.stringify({ name: "fixture", license: "UNLICENSED" }));
+    fs.writeFileSync(path.join(fixture.repo, "package.json"), JSON.stringify({ name: "fixture", license: "UNLICENSED", dependencies: { "fixture-lib": "^1.0.0" } }));
     git(fixture.repo, "add", "package.json");
     git(fixture.repo, "commit", "-qm", "add package metadata");
     const sha = git(fixture.repo, "rev-parse", "HEAD");
@@ -138,6 +140,40 @@ test("unrecognized package license metadata cannot produce a PASS gate", () => {
     assert.ok(payload.candidates.every((item) => item.license_gate === "BLOCKED"));
   } finally {
     fs.rmSync(fixture.repo, { recursive: true, force: true });
+  }
+});
+
+test("tracked working-tree drift cannot masquerade as the pinned revision", () => {
+  const fixture = makeRepo();
+  try {
+    fs.appendFileSync(path.join(fixture.repo, "src", "sample.py"), "\n# modified after commit\n");
+    const result = intake(fixture.repo, fixture.sha);
+    assert.equal(result.status, 2);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.receipt.failure_state, "SOURCE_DRIFT");
+  } finally {
+    fs.rmSync(fixture.repo, { recursive: true, force: true });
+  }
+});
+
+test("tracked source symlinks are not followed outside the repository", () => {
+  const fixture = makeRepo();
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "cri-outside-"));
+  try {
+    const outside = path.join(outsideDir, "outside.py");
+    fs.writeFileSync(outside, "def external_secret_shape():\n    return 1\n");
+    fs.symlinkSync(outside, path.join(fixture.repo, "src", "linked.py"));
+    git(fixture.repo, "add", "src/linked.py");
+    git(fixture.repo, "commit", "-qm", "track symlink");
+    const sha = git(fixture.repo, "rev-parse", "HEAD");
+    const result = intake(fixture.repo, sha);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.ok(!payload.candidates.some((item) => item.title === "external_secret_shape"));
+    assert.ok(payload.receipt.warnings.some((item) => item.includes("UNSAFE_PATH")));
+  } finally {
+    fs.rmSync(fixture.repo, { recursive: true, force: true });
+    fs.rmSync(outsideDir, { recursive: true, force: true });
   }
 });
 
