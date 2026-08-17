@@ -29,6 +29,7 @@ jobs:
           python3 -m py_compile worker/aios-chatgpt-app/server.py
           python3 -m py_compile worker/aios-chatgpt-app/smoke_test.py
           python3 -m py_compile worker/aios-chatgpt-app/remote_smoke_test.py
+          python3 -m py_compile reusable-code/tools/*.py
 
       - name: Install MCP bridge dependencies
         run: python3 -m pip install -r worker/aios-chatgpt-app/requirements.txt
