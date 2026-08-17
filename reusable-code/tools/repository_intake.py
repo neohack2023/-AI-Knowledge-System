@@ -16,6 +16,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,6 +60,7 @@ RISK_IMPORTS = {"subprocess": "HIGH", "socket": "HIGH", "ctypes": "HIGH", "param
                 "requests": "MEDIUM", "httpx": "MEDIUM", "urllib": "MEDIUM", "multiprocessing": "MEDIUM"}
 RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 MAX_SOURCE_BYTES = 512_000
+EXCLUDED_DIR_NAMES = {".git", "node_modules", "vendor", "dist", "build", "target", ".next", ".cache", "__pycache__"}
 
 
 class IntakeError(RuntimeError):
@@ -100,7 +102,12 @@ def tracked_files(root: Path) -> list[str]:
 
 def excluded(path: str, patterns: tuple[str, ...]) -> bool:
     normalized = path.replace(os.sep, "/")
-    return Path(path).suffix.lower() in BINARY_SUFFIXES or any(fnmatch.fnmatch(normalized, p) for p in patterns)
+    parts = set(Path(normalized).parts[:-1])
+    return (
+        bool(parts & EXCLUDED_DIR_NAMES)
+        or Path(path).suffix.lower() in BINARY_SUFFIXES
+        or any(fnmatch.fnmatch(normalized, p) for p in patterns)
+    )
 
 
 def language_for(path: str) -> str | None:
@@ -258,8 +265,10 @@ def python_candidates(root: Path, relative: str, repository_url: str, revision: 
     for node in tree.body:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or node.name.startswith("_"):
             continue
-        start = int(getattr(node, "lineno", 1) or 1)
-        end = int(getattr(node, "end_lineno", start) or start)
+        node_line = int(getattr(node, "lineno", 1) or 1)
+        decorator_lines = [int(getattr(item, "lineno", node_line) or node_line) for item in getattr(node, "decorator_list", [])]
+        start = min([node_line, *decorator_lines])
+        end = int(getattr(node, "end_lineno", node_line) or node_line)
         chunk_type = "class" if isinstance(node, ast.ClassDef) else "function"
         material = f"{revision}\0{relative}\0{node.name}\0{start}\0{end}"
         problem = (ast.get_docstring(node, clean=True) or "UNRESOLVED").splitlines()[0][:240]
@@ -275,7 +284,7 @@ def python_candidates(root: Path, relative: str, repository_url: str, revision: 
             "source_repo_project": repo_slug(repository_url),
             "source_revision": revision,
             "language": "Python",
-            "runtime": "Python >=3.10",
+            "runtime": "Python (minimum compatible version UNRESOLVED)",
             "framework": "None",
             "chunk_type": chunk_type,
             "use_domain": "repository-intake",
@@ -294,9 +303,11 @@ def python_candidates(root: Path, relative: str, repository_url: str, revision: 
             "project_scope": scope_id,
             "tags": ["repository-intake", "python", chunk_type, "generalized-parser"],
             "known_limits_suppress_when": ["Python AST top-level boundary only in v0.1.",
+                                            "Minimum Python runtime compatibility is unresolved.",
                                             "No transitive dependency resolution is performed."],
             "source_evidence": {"path": relative, "symbol": node.name, "start_line": start,
-                                "end_line": end, "extractor_class": "GENERALIZED_PARSER"},
+                                "end_line": end, "extractor_class": "GENERALIZED_PARSER",
+                                "parser_version": f"{sys.version_info.major}.{sys.version_info.minor}"},
             "code_store_pointer": None,
             "last_reviewed": retrieved_at,
             "notes": ["Metadata only; source bytes are not copied into the registry record.",
@@ -344,6 +355,7 @@ def intake(*, root: Path, repository_url: str, revision: str, branch: str | None
     warnings: list[str] = []
     unsupported: set[str] = set()
     excluded_count = 0
+    candidate_limit_reached = False
 
     for relative in paths:
         lang = language_for(relative)
@@ -355,15 +367,19 @@ def intake(*, root: Path, repository_url: str, revision: str, branch: str | None
         if not lang or (allowlist and lang.lower() not in allowlist):
             continue
         if lang == "Python":
-            found, local = python_candidates(root, relative, repository_url, actual, scope_id, license_info, retrieved_at)
-            candidates.extend(found)
-            warnings.extend(local)
+            if len(candidates) < max_candidates:
+                found, local = python_candidates(root, relative, repository_url, actual, scope_id, license_info, retrieved_at)
+                remaining = max_candidates - len(candidates)
+                candidates.extend(found[:remaining])
+                warnings.extend(local)
+                if len(found) > remaining or len(candidates) >= max_candidates:
+                    candidate_limit_reached = True
+            else:
+                candidate_limit_reached = True
         else:
             unsupported.add(lang)
-        if len(candidates) >= max_candidates:
-            candidates = candidates[:max_candidates]
-            warnings.append(f"CANDIDATE_LIMIT_REACHED:{max_candidates}")
-            break
+    if candidate_limit_reached:
+        warnings.append(f"CANDIDATE_LIMIT_REACHED:{max_candidates}")
     warnings.extend(f"STRUCTURAL_EXTRACTOR_UNAVAILABLE:{lang}" for lang in sorted(unsupported))
 
     logical = {"repository_url": normalize_repo_url(repository_url), "resolved_revision": actual,
