@@ -2,6 +2,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 function workflowFiles(args) {
   if (args.length) return args.map((value) => resolve(value));
@@ -43,18 +44,24 @@ export function inspectWorkflowText(text, filePath = "<memory>") {
   return findings;
 }
 
-const args = process.argv.slice(2);
-const findings = [];
-for (const filePath of workflowFiles(args)) {
-  const text = readFileSync(filePath, "utf8");
-  findings.push(...inspectWorkflowText(text, filePath));
-}
-
-if (findings.length) {
-  for (const finding of findings) {
-    console.error(JSON.stringify(finding));
+export function inspectWorkflowFiles(args = []) {
+  const files = workflowFiles(args);
+  const findings = [];
+  for (const filePath of files) {
+    findings.push(...inspectWorkflowText(readFileSync(filePath, "utf8"), filePath));
   }
-  process.exit(2);
+  return { files, findings };
 }
 
-console.log(`workflow-policy: PASS (${workflowFiles(args).length} file(s))`);
+function main() {
+  const { files, findings } = inspectWorkflowFiles(process.argv.slice(2));
+  if (findings.length) {
+    for (const finding of findings) console.error(JSON.stringify(finding));
+    process.exit(2);
+  }
+  console.log(`workflow-policy: PASS (${files.length} file(s))`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main();
+}
