@@ -2,12 +2,64 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  workflow-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Check workflow policy
+        run: npm run harness:workflow
+
+      - name: Prove negative harness fixtures are detected
+        run: npm run harness:self-test
+
+  fast-static:
+    needs: workflow-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run fast coding harness
+        run: npm run harness:fast
+
+      - name: Compile Python workers
+        run: |
+          python3 -m py_compile worker/gog-sam3d-body/server.py
+          python3 -m py_compile worker/aios-chatgpt-app/server.py
+          python3 -m py_compile worker/aios-chatgpt-app/smoke_test.py
+          python3 -m py_compile worker/aios-chatgpt-app/remote_smoke_test.py
+
   build-and-test:
+    needs: fast-static
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -15,20 +67,13 @@ jobs:
       PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Use Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
-
-      - name: Validate Python workers
-        run: |
-          python3 -m py_compile worker/gog-sam3d-body/server.py
-          python3 -m py_compile worker/aios-chatgpt-app/server.py
-          python3 -m py_compile worker/aios-chatgpt-app/smoke_test.py
-          python3 -m py_compile worker/aios-chatgpt-app/remote_smoke_test.py
 
       - name: Install MCP bridge dependencies
         run: python3 -m pip install -r worker/aios-chatgpt-app/requirements.txt
@@ -39,10 +84,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and test
-        run: npm test
+      - name: Build and run core tests
+        run: npm run test:core
 
   public-release-boundary:
+    needs: workflow-policy
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -50,10 +96,12 @@ jobs:
       PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Use Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
 
       - name: Test public release contracts
         run: |
@@ -66,10 +114,57 @@ jobs:
 
       - name: Upload public release diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: public-release-boundary-report
           path: |
             outputs/public-release-tests.tap
             outputs/public-release-report.json
           if-no-files-found: warn
+
+  evidence-summary:
+    if: always()
+    needs:
+      - workflow-policy
+      - fast-static
+      - build-and-test
+      - public-release-boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HARNESS_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      HARNESS_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      HARNESS_PROFILE: PR
+      HARNESS_CHECKS_JSON: >-
+        [{"id":"workflow-policy","result":"${{ needs.workflow-policy.result }}"},{"id":"fast-static","result":"${{ needs.fast-static.result }}"},{"id":"build-and-test","result":"${{ needs.build-and-test.result }}"},{"id":"public-release-boundary","result":"${{ needs.public-release-boundary.result }}"}]
+      HARNESS_TERMINAL_STATUS: ${{ (needs.workflow-policy.result == 'success' && needs.fast-static.result == 'success' && needs.build-and-test.result == 'success' && needs.public-release-boundary.result == 'success') && 'PASS' || 'FAIL' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Write exact-head coding harness receipt
+        run: node scripts/coding-harness/write-receipt.mjs
+
+      - name: Add harness summary
+        run: |
+          echo '## Coding Harness Receipt' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat outputs/coding-harness-receipt.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coding harness receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coding-harness-receipt
+          path: outputs/coding-harness-receipt.json
+          if-no-files-found: error
+
+      - name: Enforce aggregate harness result
+        if: env.HARNESS_TERMINAL_STATUS != 'PASS'
+        run: exit 1
