@@ -47,6 +47,7 @@ BINARY_SUFFIXES = {
     ".woff", ".woff2", ".ttf", ".otf", ".mp3", ".wav", ".mp4", ".mov", ".wasm",
     ".bin", ".exe", ".dll", ".so", ".dylib",
 }
+KNOWN_LICENSE_IDS = {"MIT", "Apache-2.0", "AGPL-3.0", "GPL-3.0", "MPL-2.0"}
 LICENSE_PATTERNS = (
     ("MIT", re.compile(r"permission is hereby granted, free of charge", re.I)),
     ("Apache-2.0", re.compile(r"apache license\s+version\s+2\.0", re.I)),
@@ -139,8 +140,10 @@ def detect_license(root: Path, paths: list[str], manifests: list[str]) -> dict[s
         except json.JSONDecodeError:
             value = None
         if isinstance(value, str) and value.strip():
-            ids.append(value.strip())
+            declared = value.strip()
             evidence.append(relative + "#license")
+            if declared in KNOWN_LICENSE_IDS:
+                ids.append(declared)
     unique = sorted(set(ids))
     state = "PASS" if len(unique) == 1 else "REVIEW" if unique else "BLOCKED"
     return {"state": state, "spdx": unique[0] if len(unique) == 1 else None,
@@ -270,6 +273,10 @@ def intake(*, root: Path, repository_url: str, revision: str, branch: str | None
     root = root.resolve()
     if not root.is_dir():
         raise IntakeError("SOURCE_UNRESOLVED", f"repo root does not exist: {root}")
+    claimed_url = normalize_repo_url(repository_url)
+    origin_url = normalize_repo_url(git(root, "config", "--get", "remote.origin.url"))
+    if origin_url != claimed_url:
+        raise IntakeError("SOURCE_UNRESOLVED", f"claimed repository {claimed_url} does not match origin {origin_url}")
     actual = git(root, "rev-parse", "HEAD")
     if actual != revision:
         raise IntakeError("REVISION_UNRESOLVED", f"requested {revision} but local HEAD is {actual}")
