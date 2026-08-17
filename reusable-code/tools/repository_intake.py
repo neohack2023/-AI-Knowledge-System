@@ -20,7 +20,7 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 RECEIPT_SCHEMA = "repository-intake-receipt/v0.1"
@@ -67,6 +67,54 @@ class IntakeError(RuntimeError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
+
+
+class StructuralExtractor(Protocol):
+    """Stable socket for deterministic language-specific structural extractors."""
+
+    language: str
+    extractor_id: str
+    extractor_class: str
+
+    def extract(
+        self,
+        *,
+        root: Path,
+        relative: str,
+        repository_url: str,
+        revision: str,
+        scope_id: str,
+        license_info: dict[str, Any],
+        retrieved_at: str,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        ...
+
+
+class ExtractorRegistry:
+    """Map normalized language labels to isolated structural extractors."""
+
+    def __init__(self) -> None:
+        self._extractors: dict[str, StructuralExtractor] = {}
+
+    def register(self, extractor: StructuralExtractor) -> None:
+        language = extractor.language.strip()
+        if not language:
+            raise ValueError("extractor language must be non-empty")
+        if language in self._extractors:
+            raise ValueError(f"extractor already registered for {language}")
+        self._extractors[language] = extractor
+
+    def get(self, language: str) -> StructuralExtractor | None:
+        return self._extractors.get(language)
+
+    def extract(self, language: str, **kwargs: Any) -> tuple[list[dict[str, Any]], list[str]]:
+        extractor = self.get(language)
+        if extractor is None:
+            raise KeyError(language)
+        return extractor.extract(**kwargs)
+
+    def supported_languages(self) -> tuple[str, ...]:
+        return tuple(sorted(self._extractors))
 
 
 def git(root: Path, *args: str) -> str:
@@ -316,6 +364,39 @@ def python_candidates(root: Path, relative: str, repository_url: str, revision: 
     return records, []
 
 
+class PythonAstExtractor:
+    """Existing Python AST behavior behind the 02B shared extractor socket."""
+
+    language = "Python"
+    extractor_id = "python-stdlib-ast-v0.1"
+    extractor_class = "GENERALIZED_PARSER"
+
+    def extract(
+        self,
+        *,
+        root: Path,
+        relative: str,
+        repository_url: str,
+        revision: str,
+        scope_id: str,
+        license_info: dict[str, Any],
+        retrieved_at: str,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        return python_candidates(
+            root=root,
+            relative=relative,
+            repository_url=repository_url,
+            revision=revision,
+            scope_id=scope_id,
+            license_info=license_info,
+            retrieved_at=retrieved_at,
+        )
+
+
+EXTRACTOR_REGISTRY = ExtractorRegistry()
+EXTRACTOR_REGISTRY.register(PythonAstExtractor())
+
+
 def failure(repository_url: str, revision: str, retrieved_at: str, code: str, message: str) -> dict[str, Any]:
     digest = hashlib.sha256(f"{repository_url}\0{revision}\0{code}".encode()).hexdigest()[:12].upper()
     return {"receipt": {"schema_version": RECEIPT_SCHEMA, "run_id": "CRI-INTAKE-FAILED-" + digest,
@@ -366,9 +447,18 @@ def intake(*, root: Path, repository_url: str, revision: str, branch: str | None
             continue
         if not lang or (allowlist and lang.lower() not in allowlist):
             continue
-        if lang == "Python":
+        extractor = EXTRACTOR_REGISTRY.get(lang)
+        if extractor is not None:
             if len(candidates) < max_candidates:
-                found, local = python_candidates(root, relative, repository_url, actual, scope_id, license_info, retrieved_at)
+                found, local = extractor.extract(
+                    root=root,
+                    relative=relative,
+                    repository_url=repository_url,
+                    revision=actual,
+                    scope_id=scope_id,
+                    license_info=license_info,
+                    retrieved_at=retrieved_at,
+                )
                 remaining = max_candidates - len(candidates)
                 candidates.extend(found[:remaining])
                 warnings.extend(local)
