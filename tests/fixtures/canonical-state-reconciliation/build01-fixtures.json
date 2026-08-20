@@ -1,0 +1,153 @@
+{
+  "fixtures": [
+    {
+      "id": "FX-01_HEALTHY_BASELINE",
+      "projection_mutations": {},
+      "expected": {
+        "overall_state": "HEALTHY",
+        "fail_visible": false,
+        "blocked_current_state_claim": false,
+        "reason_codes": ["NO_DRIFT"],
+        "finding_classes": ["NO_DRIFT"],
+        "affected_projection_classes": ["scope", "handoff", "runtime", "ledger", "interface", "registry"]
+      }
+    },
+    {
+      "id": "FX-02_HANDOFF_STALE",
+      "projection_mutations": {
+        "handoff": {"status": "STALE", "reason_codes": ["HANDOFF_STALE"]}
+      },
+      "expected": {
+        "overall_state": "DRIFTED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["HANDOFF_STALE"],
+        "finding_classes": ["STALE_PROJECTION"],
+        "affected_projection_classes": ["handoff"]
+      }
+    },
+    {
+      "id": "FX-03_AUTHORITY_CONFLICT",
+      "projection_mutations": {
+        "runtime": {
+          "authority_domain": "project_memory_current_state",
+          "authority_owner": "Drive runtime control plane",
+          "authority_state": "authoritative"
+        }
+      },
+      "expected": {
+        "overall_state": "BLOCKED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["AUTHORITY_DOMAIN_CONFLICT"],
+        "finding_classes": ["AUTHORITY_DRIFT"],
+        "affected_projection_classes": ["handoff", "runtime"]
+      }
+    },
+    {
+      "id": "FX-04_LEDGER_COVERAGE_OVERCLAIM",
+      "projection_mutations": {
+        "ledger": {"status": "DRIFTED", "reason_codes": ["LEDGER_COVERAGE_OVERCLAIM"]}
+      },
+      "expected": {
+        "overall_state": "DRIFTED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["LEDGER_COVERAGE_OVERCLAIM"],
+        "finding_classes": ["PROJECTION_DRIFT"],
+        "affected_projection_classes": ["ledger"]
+      }
+    },
+    {
+      "id": "FX-05_INTERFACE_MODE_DRIFT",
+      "projection_mutations": {
+        "interface": {"status": "DRIFTED", "reason_codes": ["INTERFACE_MODE_DRIFT"]}
+      },
+      "expected": {
+        "overall_state": "DRIFTED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["INTERFACE_MODE_DRIFT"],
+        "finding_classes": ["PROJECTION_DRIFT"],
+        "affected_projection_classes": ["interface"]
+      }
+    },
+    {
+      "id": "FX-06_REGISTRY_STATUS_DRIFT",
+      "projection_mutations": {
+        "registry": {"status": "DRIFTED", "reason_codes": ["REGISTRY_STATUS_DRIFT"]}
+      },
+      "expected": {
+        "overall_state": "DRIFTED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["REGISTRY_STATUS_DRIFT"],
+        "finding_classes": ["PROJECTION_DRIFT"],
+        "affected_projection_classes": ["registry"]
+      }
+    },
+    {
+      "id": "FX-07_SCOPE_LEAK",
+      "projection_mutations": {
+        "scope": {"status": "DRIFTED", "reason_codes": ["SIBLING_SCOPE_LEAK"]}
+      },
+      "expected": {
+        "overall_state": "BLOCKED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["SIBLING_SCOPE_LEAK"],
+        "finding_classes": ["SCOPE_ISOLATION_VIOLATION"],
+        "affected_projection_classes": ["scope"]
+      }
+    },
+    {
+      "id": "FX-08_SCHEMA_DRIFT",
+      "projection_mutations": {
+        "runtime": {"status": "DRIFTED", "reason_codes": ["RUNTIME_SCHEMA_DRIFT"]}
+      },
+      "expected": {
+        "overall_state": "BLOCKED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["RUNTIME_SCHEMA_DRIFT"],
+        "finding_classes": ["SCHEMA_DRIFT"],
+        "affected_projection_classes": ["runtime"]
+      }
+    },
+    {
+      "id": "FX-09_PROVIDER_UNAVAILABLE",
+      "projection_mutations": {
+        "runtime": {
+          "status": "UNAVAILABLE",
+          "reason_codes": ["SOURCE_UNAVAILABLE"],
+          "provenance_envelope_id": null,
+          "missing_provenance_reason": "runtime provider unavailable during deterministic fixture"
+        }
+      },
+      "expected": {
+        "overall_state": "DEGRADED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["SOURCE_UNAVAILABLE"],
+        "finding_classes": ["UNAVAILABLE"],
+        "affected_projection_classes": ["runtime"]
+      }
+    },
+    {
+      "id": "FX-10_MULTI_PROJECTION_DRIFT",
+      "projection_mutations": {
+        "handoff": {"status": "STALE", "reason_codes": ["HANDOFF_STALE"]},
+        "ledger": {"status": "DRIFTED", "reason_codes": ["LEDGER_COVERAGE_OVERCLAIM"]},
+        "interface": {"status": "DRIFTED", "reason_codes": ["INTERFACE_AUTHORITY_DRIFT"]}
+      },
+      "expected": {
+        "overall_state": "BLOCKED",
+        "fail_visible": true,
+        "blocked_current_state_claim": true,
+        "reason_codes": ["INTERFACE_AUTHORITY_DRIFT", "LEDGER_COVERAGE_OVERCLAIM", "HANDOFF_STALE"],
+        "finding_classes": ["AUTHORITY_DRIFT", "PROJECTION_DRIFT", "STALE_PROJECTION"],
+        "affected_projection_classes": ["handoff", "ledger", "interface"]
+      }
+    }
+  ]
+}
