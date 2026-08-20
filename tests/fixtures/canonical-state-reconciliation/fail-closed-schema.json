@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "FX-B01-SCHEMA-01-WRITE-AUTHORIZATION",
+      "path": "write_authorization",
+      "value": "LIVE",
+      "expected_issue": "write_authorization must remain \"NONE\""
+    },
+    {
+      "id": "FX-B01-SCHEMA-02-MUTATION-FLAG",
+      "path": "mutation_performed",
+      "value": true,
+      "expected_issue": "mutation_performed must be false"
+    },
+    {
+      "id": "FX-B01-SCHEMA-03-STALE-AS-HEALTHY",
+      "path": "projections.1.status",
+      "value": "STALE",
+      "expected_issue": "overall_state cannot be HEALTHY"
+    },
+    {
+      "id": "FX-B01-SCHEMA-04-MISSING-PROVENANCE",
+      "path": "projections.2.provenance_envelope_id",
+      "value": null,
+      "expected_issue": "missing_provenance_reason is required"
+    },
+    {
+      "id": "FX-B01-SCHEMA-05-WRONG-SCHEMA",
+      "path": "schema",
+      "value": "aios_canonical_state_reconciliation_v9",
+      "expected_issue": "schema must be aios_canonical_state_reconciliation_v0_1"
+    }
+  ]
+}
