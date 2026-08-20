@@ -1,0 +1,25 @@
+{
+  "source_system": "Notion",
+  "source_id": "handoff:global-working-memory",
+  "source_version": "2026-08-20T22:15:43Z",
+  "source_fingerprint": "sha256:handoff-stale-fixture",
+  "provenance_envelope_id": "prov-handoff-stale-20260820",
+  "missing_provenance_reason": null,
+  "authority_owner": "Notion migrated project memory",
+  "authority_domain": "project-current-state",
+  "authority_state": "authoritative",
+  "freshness_anchor": "github-main-observed-2026-08-20",
+  "supersedes": "handoff-projection-2026-08-08",
+  "source_available": true,
+  "freshness_proven": true,
+  "observed_claims": {
+    "observation_class": "HANDOFF_REPOSITORY_PROJECTION_STALE"
+  },
+  "stored_repository_head_sha": "f63c79434e6010782960eea33b391fb3138c6906",
+  "live_repository_head_sha": "9e65443ec649b798158b2c75bc32331a83b36ccc",
+  "handoff_property_state_id": "current-state-2026-08-20",
+  "current_state_block_state_id": "current-state-2026-08-20",
+  "supersession_required": false,
+  "supersession_anchor": null,
+  "historical_state_presented_as_current": false
+}
