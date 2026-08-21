@@ -35,6 +35,8 @@ const createStore = async (): Promise<ExecutionHistoryStore> => {
 const storePromise = runtimeGlobal.__aiKnowledgeDurableExecutionHistoryStorePromise ??=
   createStore();
 
+export const getExecutionHistoryStore = () => storePromise;
+
 export const getDurableWorkflowRuntime = async () => {
   runtimeGlobal.__aiKnowledgeDurableWorkflowRuntimePromise ??= storePromise.then((store) =>
     new DurableWorkflowRuntime(
