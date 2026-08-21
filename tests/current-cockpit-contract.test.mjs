@@ -51,6 +51,18 @@ test("durable history list endpoint fails visibly when D1 is unavailable", () =>
   assert.match(historyRoute, /"cache-control": "no-store"/);
 });
 
+test("durable history route rejects sibling scopes before querying D1", () => {
+  assert.match(historyRoute, /const ALLOWED_SCOPE_KEY = "global-working-memory"/);
+  assert.match(historyRoute, /requestedScopeKey && requestedScopeKey !== ALLOWED_SCOPE_KEY/);
+  assert.match(historyRoute, /"EXECUTION_HISTORY_SCOPE_FORBIDDEN"/);
+  assert.match(historyRoute, /}, 403, state\);/);
+  assert.match(historyRoute, /const scopeKey = ALLOWED_SCOPE_KEY/);
+
+  const rejectionIndex = historyRoute.indexOf("EXECUTION_HISTORY_SCOPE_FORBIDDEN");
+  const listIndex = historyRoute.indexOf("listDurableExecutionHistory(store");
+  assert.ok(rejectionIndex > -1 && listIndex > -1 && rejectionIndex < listIndex, "scope rejection must occur before durable history listing");
+});
+
 test("aspirational domains are explicitly deferred instead of rendered as fake pages", () => {
   for (const label of ["Memory", "Research", "Assets", "Sources", "Project Scope", "Memory Objects", "Migration Ledger", "MASON Episodes", "Agent Traces"]) {
     assert.ok(cockpit.includes(`["${label}"`) || cockpit.includes(`[\"${label}\"`), `${label} should be listed in the deferred-domain contract`);
