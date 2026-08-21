@@ -14,6 +14,15 @@ export type ExecutionHistoryListQuery = {
   limit?: number;
 };
 
+export class ExecutionHistoryConflictError extends Error {
+  readonly code = "EXECUTION_HISTORY_CONFLICT" as const;
+
+  constructor(message = "Durable execution history changed concurrently; refresh and retry from the latest durable state.") {
+    super(message);
+    this.name = "ExecutionHistoryConflictError";
+  }
+}
+
 export interface ExecutionHistoryStore {
   readonly backend: "D1";
   getBackendState(): ExecutionHistoryBackendState;
