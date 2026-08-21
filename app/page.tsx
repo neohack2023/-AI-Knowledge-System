@@ -1,22 +1,16 @@
-// Internal workspace sites can read the authenticated OpenAI user from the
-// forwarded request headers:
-//
-// import { headers } from "next/headers";
-//
-// export default async function Home() {
-//   const requestHeaders = await headers();
-//   const email = requestHeaders.get("oai-authenticated-user-email");
-//   const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-//   const fullName =
-//     encodedFullName &&
-//     requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-//       "percent-encoded-utf-8"
-//       ? decodeURIComponent(encodedFullName)
-//       : null;
-//   const displayName = fullName ?? email;
-//   // ...
-// }
+import { headers } from "next/headers";
+import CurrentCockpit from "./current-cockpit";
 
-import Cockpit from "./cockpit";
+export const dynamic = "force-dynamic";
 
-export default function Home() { return <Cockpit />; }
+export default async function Home() {
+  const requestHeaders = await headers();
+  const email = requestHeaders.get("oai-authenticated-user-email");
+  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
+  const fullName = encodedFullName
+    && requestHeaders.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8"
+    ? decodeURIComponent(encodedFullName)
+    : null;
+
+  return <CurrentCockpit viewer={fullName ?? email} />;
+}
