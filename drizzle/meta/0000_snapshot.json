@@ -1,0 +1,95 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "7a9f4d96-8421-4d1f-8b80-96572f21c401",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "workflow_executions": {
+      "name": "workflow_executions",
+      "columns": {
+        "execution_id": {"name":"execution_id","type":"text","primaryKey":true,"notNull":true,"autoincrement":false},
+        "scope_key": {"name":"scope_key","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "capability_id": {"name":"capability_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "workflow_id": {"name":"workflow_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "trace_id": {"name":"trace_id","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "requested_by": {"name":"requested_by","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "parent_execution_id": {"name":"parent_execution_id","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "mode": {"name":"mode","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "status": {"name":"status","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "created_at": {"name":"created_at","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "started_at": {"name":"started_at","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "completed_at": {"name":"completed_at","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "current_stage": {"name":"current_stage","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "input_json": {"name":"input_json","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "output_json": {"name":"output_json","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "error_json": {"name":"error_json","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "result_class": {"name":"result_class","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "authority_owner": {"name":"authority_owner","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "authority_domain": {"name":"authority_domain","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "authority_state": {"name":"authority_state","type":"text","primaryKey":false,"notNull":true,"autoincrement":false}
+      },
+      "indexes": {
+        "workflow_executions_identity_idx": {"name":"workflow_executions_identity_idx","columns":["execution_id","scope_key","capability_id"],"isUnique":true},
+        "workflow_executions_scope_created_idx": {"name":"workflow_executions_scope_created_idx","columns":["scope_key","created_at"],"isUnique":false},
+        "workflow_executions_capability_created_idx": {"name":"workflow_executions_capability_created_idx","columns":["capability_id","created_at"],"isUnique":false}
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workflow_execution_events": {
+      "name": "workflow_execution_events",
+      "columns": {
+        "event_id": {"name":"event_id","type":"text","primaryKey":true,"notNull":true,"autoincrement":false},
+        "execution_id": {"name":"execution_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "scope_key": {"name":"scope_key","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "capability_id": {"name":"capability_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "workflow_id": {"name":"workflow_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "event_type": {"name":"event_type","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "status": {"name":"status","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "stage": {"name":"stage","type":"text","primaryKey":false,"notNull":false,"autoincrement":false},
+        "sequence": {"name":"sequence","type":"integer","primaryKey":false,"notNull":true,"autoincrement":false},
+        "emitted_at": {"name":"emitted_at","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "data_json": {"name":"data_json","type":"text","primaryKey":false,"notNull":false,"autoincrement":false}
+      },
+      "indexes": {
+        "workflow_execution_events_sequence_idx": {"name":"workflow_execution_events_sequence_idx","columns":["execution_id","sequence"],"isUnique":true},
+        "workflow_execution_events_identity_idx": {"name":"workflow_execution_events_identity_idx","columns":["execution_id","scope_key","capability_id"],"isUnique":false}
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "workflow_execution_links": {
+      "name": "workflow_execution_links",
+      "columns": {
+        "link_id": {"name":"link_id","type":"text","primaryKey":true,"notNull":true,"autoincrement":false},
+        "execution_id": {"name":"execution_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "scope_key": {"name":"scope_key","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "capability_id": {"name":"capability_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "link_type": {"name":"link_type","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "target_id": {"name":"target_id","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "source_system": {"name":"source_system","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "authority_owner": {"name":"authority_owner","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "authority_domain": {"name":"authority_domain","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "authority_state": {"name":"authority_state","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "created_at": {"name":"created_at","type":"text","primaryKey":false,"notNull":true,"autoincrement":false},
+        "metadata_json": {"name":"metadata_json","type":"text","primaryKey":false,"notNull":true,"autoincrement":false}
+      },
+      "indexes": {
+        "workflow_execution_links_identity_idx": {"name":"workflow_execution_links_identity_idx","columns":["execution_id","scope_key","capability_id"],"isUnique":false},
+        "workflow_execution_links_type_idx": {"name":"workflow_execution_links_type_idx","columns":["link_type","target_id"],"isUnique":false}
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {"schemas": {}, "tables": {}, "columns": {}},
+  "internal": {"indexes": {}}
+}
