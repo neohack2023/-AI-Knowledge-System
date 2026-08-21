@@ -117,6 +117,65 @@ export class WorkflowExecutionKernel {
     return this.snapshot(executionId);
   }
 
+  restoreExecution(snapshot: ExecutionSnapshot): ExecutionSnapshot {
+    const restored = structuredClone(snapshot);
+    const { execution, events, provenance_envelopes: provenance } = restored;
+    if (execution.mode !== "LIVE") {
+      throw new WorkflowKernelError(
+        "RESTORE_MODE_INVALID",
+        "Only LIVE workflow executions can be restored into the server kernel.",
+        409,
+      );
+    }
+    const eventIds = new Set<string>();
+    for (let index = 0; index < events.length; index += 1) {
+      const event = events[index];
+      if (
+        event.execution_id !== execution.execution_id
+        || event.workflow_id !== execution.workflow_id
+        || event.scope_key !== execution.scope_key
+      ) {
+        throw new WorkflowKernelError(
+          "RESTORE_EVENT_BINDING_MISMATCH",
+          "Persisted execution event binding does not match the execution being restored.",
+          409,
+        );
+      }
+      if (event.sequence !== index + 1 || eventIds.has(event.event_id)) {
+        throw new WorkflowKernelError(
+          "RESTORE_EVENT_SEQUENCE_INVALID",
+          "Persisted execution events must have unique IDs and contiguous sequence positions.",
+          409,
+        );
+      }
+      eventIds.add(event.event_id);
+    }
+    for (const envelope of provenance) {
+      if (
+        envelope.used_by_execution_id !== execution.execution_id
+        || envelope.workflow_id !== execution.workflow_id
+        || envelope.scope_key !== execution.scope_key
+        || this.provenanceService.validate(envelope).length > 0
+      ) {
+        throw new WorkflowKernelError(
+          "RESTORE_PROVENANCE_INVALID",
+          "Persisted provenance failed execution binding or current validation during restore.",
+          409,
+        );
+      }
+    }
+    this.executions.set(execution.execution_id, execution);
+    this.events.set(execution.execution_id, events);
+    this.provenance.set(execution.execution_id, provenance);
+    return this.snapshot(execution.execution_id);
+  }
+
+  discardExecution(executionId: string): void {
+    this.executions.delete(executionId);
+    this.events.delete(executionId);
+    this.provenance.delete(executionId);
+  }
+
   getProvenanceEnvelope(
     executionId: string,
     provenanceEnvelopeId: string,

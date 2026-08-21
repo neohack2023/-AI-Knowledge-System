@@ -8,7 +8,8 @@ import {
   evaluateChatBridgeWorkflow,
   listChatBridgeExecutableWorkflows,
 } from "../../../server/chat-bridge/execution-policy.ts";
-import { workflowExecutionKernel, WorkflowKernelError } from "../../../server/workflows/kernel.ts";
+import { WorkflowKernelError } from "../../../server/workflows/kernel.ts";
+import { getDurableWorkflowRuntime } from "../../../server/workflows/durable-runtime-instance.ts";
 import { capabilityDiscoveryRuntime } from "../../../server/capabilities/index.ts";
 import type { JsonObject } from "../../../server/workflows/types.ts";
 
@@ -45,6 +46,8 @@ function rejectUnauthorized() {
 
 export async function GET(request: Request) {
   if (!authorized(request)) return rejectUnauthorized();
+  const durableRuntime = await getDurableWorkflowRuntime();
+  const executionHistory = durableRuntime.getBackendState();
 
   const records = listRepositoryKnowledge();
   return NextResponse.json({
@@ -54,9 +57,10 @@ export async function GET(request: Request) {
     coverage: "REPOSITORY_EXECUTION_TRUTH_ONLY",
     authority: "GITHUB_EXECUTION_TRUTH",
     write_authorization: "NONE",
-    persistence: "PROCESS_LOCAL_READ_PROJECTION",
+    persistence: executionHistory.state === "DURABLE_AVAILABLE" ? "D1_DURABLE" : "PROCESS_LOCAL_DEGRADED",
+    execution_history: executionHistory,
     records: records.length,
-    live_workflows: workflowExecutionKernel.listLiveWorkflows(),
+    live_workflows: durableRuntime.listLiveWorkflows(),
     executable_workflows: listChatBridgeExecutableWorkflows(),
     capabilities: capabilityDiscoveryRuntime.listCapabilities().map((capability) => ({
       capability_id: capability.capability_id,
@@ -94,6 +98,8 @@ export async function GET(request: Request) {
       "This bridge exposes repository execution truth, not the full Notion or Drive memory authority surface.",
       "Search and fetch are read-only.",
       "Workflow execution is admitted only when the capability satisfies the bridge's A0 process-local policy.",
+      "D1 is authoritative for durable execution history only when execution_history.state is DURABLE_AVAILABLE.",
+      "A missing D1 binding is reported as PROCESS_LOCAL_DEGRADED and is never described as durable.",
       "The governed write probe is blocked even for otherwise admitted diagnostic workflows.",
       "No bridge result is automatically promoted to memory, canon, or destination-write authority.",
     ],
@@ -102,6 +108,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!authorized(request)) return rejectUnauthorized();
+  const durableRuntime = await getDurableWorkflowRuntime();
 
   try {
     const body = await request.json() as BridgeBody;
@@ -172,7 +179,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      const snapshot = workflowExecutionKernel.getExecution(executionId);
+      const snapshot = await durableRuntime.getExecution(executionId);
       if (snapshot.execution.scope_key !== SCOPE) {
         return NextResponse.json(
           { error: { code: "BRIDGE_SCOPE_UNAVAILABLE", message: `The initial bridge exposes only '${SCOPE}'.` } },
@@ -184,6 +191,7 @@ export async function POST(request: Request) {
         scope_key: SCOPE,
         authority: "WORKFLOW_EXECUTION_KERNEL",
         write_authorization: "NONE",
+        execution_history: durableRuntime.getBackendState(),
         snapshot,
       });
     }
@@ -197,12 +205,13 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      const provenance = workflowExecutionKernel.getProvenanceEnvelope(executionId, envelopeId, SCOPE);
+      const provenance = await durableRuntime.getProvenanceEnvelope(executionId, envelopeId, SCOPE);
       return NextResponse.json({
         contract: CONTRACT,
         scope_key: SCOPE,
         authority: "WORKFLOW_EXECUTION_KERNEL",
         write_authorization: "NONE",
+        execution_history: durableRuntime.getBackendState(),
         provenance,
       });
     }
@@ -223,7 +232,7 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
-      const created = workflowExecutionKernel.createExecution({
+      const created = await durableRuntime.createExecution({
         workflow_id: workflowId,
         scope_key: SCOPE,
         requested_by: "chatgpt-mcp-bridge",
@@ -233,13 +242,14 @@ export async function POST(request: Request) {
       if (created.execution.status === "FAILED") {
         return NextResponse.json({ contract: CONTRACT, mode: "LIVE", snapshot: created }, { status: 409 });
       }
-      const completed = await workflowExecutionKernel.runToCompletion(created.execution.execution_id);
+      const completed = await durableRuntime.runToCompletion(created.execution.execution_id);
       return NextResponse.json({
         contract: CONTRACT,
         mode: "LIVE",
         bridge_policy: "A0_PROCESS_LOCAL_EXECUTION_ONLY",
         capability_id: policy.capability_id,
         write_authorization: "NONE",
+        execution_history: durableRuntime.getBackendState(),
         snapshot: completed,
       }, { status: completed.execution.status === "FAILED" ? 409 : 201 });
     }

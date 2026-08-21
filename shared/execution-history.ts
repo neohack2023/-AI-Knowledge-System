@@ -114,7 +114,7 @@ export type DurableExecutionHistoryBundle = {
 export type ExecutionHistoryBackendState = {
   backend: "D1";
   state: ExecutionHistoryPersistenceState;
-  reason_code: null | "D1_BINDING_UNAVAILABLE" | "D1_WRITE_FAILED" | "D1_READ_FAILED";
+  reason_code: null | "D1_BINDING_UNAVAILABLE" | "D1_SCHEMA_UNAVAILABLE" | "D1_WRITE_FAILED" | "D1_READ_FAILED";
 };
 
 export const executionHistoryErrorCodes = [
