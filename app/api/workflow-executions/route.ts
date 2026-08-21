@@ -59,7 +59,6 @@ const requestedBy = (request: Request) => {
 
 export async function GET(request: Request) {
   const durableRuntime = await getDurableWorkflowRuntime();
-  const backendState = durableRuntime.getBackendState();
   const url = new URL(request.url);
   const executionId = url.searchParams.get("execution_id");
   const cockpitView = url.searchParams.get("view") === "cockpit";
@@ -76,9 +75,16 @@ export async function GET(request: Request) {
       const afterSequence = parseAfterSequence(url, request);
       const snapshot = await durableRuntime.getExecution(executionId);
       if (eventStream) return cockpitEventStream(request, durableRuntime, executionId, afterSequence);
-      return cockpitJson(projectCockpitLiveRead(snapshot, afterSequence), backendState);
+      return cockpitJson(
+        projectCockpitLiveRead(snapshot, afterSequence),
+        durableRuntime.getBackendState(),
+      );
     }
-    if (executionId) return json(await durableRuntime.getExecution(executionId), 200, backendState);
+    if (executionId) {
+      const snapshot = await durableRuntime.getExecution(executionId);
+      return json(snapshot, 200, durableRuntime.getBackendState());
+    }
+    const backendState = durableRuntime.getBackendState();
     return json({
       live_workflows: durableRuntime.listLiveWorkflows(),
       simulation_transport: "client-only",
@@ -100,13 +106,12 @@ export async function GET(request: Request) {
       capability_execution_authority: "NONE",
     }, 200, backendState);
   } catch (error) {
-    return handleError(error, backendState);
+    return handleError(error, durableRuntime.getBackendState());
   }
 }
 
 export async function POST(request: Request) {
   const durableRuntime = await getDurableWorkflowRuntime();
-  const backendState = durableRuntime.getBackendState();
   try {
     const body = await request.json() as OperationBody;
     switch (body.action) {
