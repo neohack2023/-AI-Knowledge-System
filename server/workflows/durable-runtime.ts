@@ -139,6 +139,13 @@ export const durableHistoryToSnapshot = (
   bundle: DurableExecutionHistoryBundle,
 ): ExecutionSnapshot => {
   assertDurableExecutionHistoryBundle(bundle);
+  if (bundle.execution.mode !== "LIVE") {
+    throw new WorkflowKernelError(
+      "DURABLE_MODE_NOT_LIVE",
+      "SIMULATION history cannot be hydrated into the LIVE workflow kernel.",
+      409,
+    );
+  }
   const runtimeState = bundle.links.find((link) =>
     link.link_type === "RELATED_EXECUTION"
     && link.target_id === bundle.execution.execution_id
