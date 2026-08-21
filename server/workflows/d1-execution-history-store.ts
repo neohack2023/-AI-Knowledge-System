@@ -11,6 +11,7 @@ import {
   type JsonObject,
 } from "../../shared/execution-history.ts";
 import {
+  ExecutionHistoryConflictError,
   assertExecutionHistoryListQuery,
   type ExecutionHistoryListQuery,
   type ExecutionHistoryStore,
@@ -134,6 +135,8 @@ type EventRow = {
   emitted_at: string;
   data_json: string | null;
 };
+
+type EventHeadRow = { event_id: string; sequence: number };
 
 type LinkRow = {
   link_id: string;
@@ -303,13 +306,32 @@ INSERT INTO workflow_execution_events (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
-const INSERT_LINK_SQL = `
+const UPSERT_LINK_SQL = `
 INSERT INTO workflow_execution_links (
   link_id, execution_id, scope_key, capability_id, link_type, target_id,
   source_system, authority_owner, authority_domain, authority_state,
   created_at, metadata_json
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(link_id) DO UPDATE SET
+  execution_id=excluded.execution_id,
+  scope_key=excluded.scope_key,
+  capability_id=excluded.capability_id,
+  link_type=excluded.link_type,
+  target_id=excluded.target_id,
+  source_system=excluded.source_system,
+  authority_owner=excluded.authority_owner,
+  authority_domain=excluded.authority_domain,
+  authority_state=excluded.authority_state,
+  created_at=excluded.created_at,
+  metadata_json=excluded.metadata_json
 `;
+
+const isSequenceConflict = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /UNIQUE constraint failed/i.test(message)
+    && /workflow_execution_events/i.test(message)
+    && /(sequence|execution_id)/i.test(message);
+};
 
 export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
   readonly backend = "D1" as const;
@@ -343,29 +365,48 @@ export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
     if (this.state.state !== "DURABLE_AVAILABLE") {
       throw new Error(`D1 durable execution history is unavailable (${this.state.reason_code ?? "UNKNOWN"}).`);
     }
+
+    const previousSequences = new Map<string, number>();
     try {
       for (const bundle of bundles) {
         assertDurableExecutionHistoryBundle(bundle);
         const existing = await this.readExecutionRecord(bundle.execution.execution_id);
-        if (existing) assertExecutionHistoryModeConsistency(existing, bundle.execution);
+        const head = await this.readEventHead(bundle.execution.execution_id);
+        if (existing) {
+          assertExecutionHistoryModeConsistency(existing, bundle.execution);
+          const sequence = head?.sequence ?? 0;
+          const matchingPrefix = sequence === 0
+            || bundle.events[sequence - 1]?.event_id === head?.event_id;
+          if (!matchingPrefix || bundle.events.length <= sequence) {
+            throw new ExecutionHistoryConflictError();
+          }
+          previousSequences.set(bundle.execution.execution_id, sequence);
+        } else {
+          if (head) throw new ExecutionHistoryConflictError("Event history exists without its parent execution record.");
+          previousSequences.set(bundle.execution.execution_id, 0);
+        }
       }
 
       const statements: D1PreparedStatementLike[] = [];
       for (const bundle of bundles) {
+        const previousSequence = previousSequences.get(bundle.execution.execution_id) ?? 0;
         statements.push(this.db.prepare(UPSERT_EXECUTION_SQL).bind(...executionValues(bundle.execution)));
-        statements.push(
-          this.db.prepare("DELETE FROM workflow_execution_events WHERE execution_id = ?").bind(bundle.execution.execution_id),
-          this.db.prepare("DELETE FROM workflow_execution_links WHERE execution_id = ?").bind(bundle.execution.execution_id),
-        );
-        bundle.events.forEach((event) => {
-          statements.push(this.db.prepare(INSERT_EVENT_SQL).bind(...eventValues(event)));
-        });
         bundle.links.forEach((link) => {
-          statements.push(this.db.prepare(INSERT_LINK_SQL).bind(...linkValues(link)));
+          statements.push(this.db.prepare(UPSERT_LINK_SQL).bind(...linkValues(link)));
         });
+        bundle.events
+          .filter((event) => event.sequence > previousSequence)
+          .forEach((event) => {
+            statements.push(this.db.prepare(INSERT_EVENT_SQL).bind(...eventValues(event)));
+          });
       }
+
       await this.db.batch(statements);
     } catch (error) {
+      if (error instanceof ExecutionHistoryConflictError) throw error;
+      if (isSequenceConflict(error)) {
+        throw new ExecutionHistoryConflictError();
+      }
       this.state = { backend: "D1", state: "DURABLE_UNAVAILABLE", reason_code: "D1_WRITE_FAILED" };
       throw error;
     }
@@ -436,5 +477,12 @@ export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
       .bind(executionId)
       .first<ExecutionRow>();
     return row ? executionRecordFromRow(row) : null;
+  }
+
+  private async readEventHead(executionId: string) {
+    return this.db
+      .prepare("SELECT event_id, sequence FROM workflow_execution_events WHERE execution_id = ? ORDER BY sequence DESC LIMIT 1")
+      .bind(executionId)
+      .first<EventHeadRow>();
   }
 }
