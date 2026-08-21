@@ -25,11 +25,7 @@ const createStore = async (): Promise<ExecutionHistoryStore> => {
   const runtimeEnv = await loadRuntimeEnv();
   const db = runtimeEnv.DB;
   if (!db) return new UnavailableExecutionHistoryStore("D1_BINDING_UNAVAILABLE");
-  const store = await new D1ExecutionHistoryStore(db).initialize();
-  if (store.getBackendState().state !== "DURABLE_AVAILABLE") {
-    return new UnavailableExecutionHistoryStore("D1_SCHEMA_UNAVAILABLE");
-  }
-  return store;
+  return new D1ExecutionHistoryStore(db).initialize();
 };
 
 const storePromise = runtimeGlobal.__aiKnowledgeDurableExecutionHistoryStorePromise ??=
