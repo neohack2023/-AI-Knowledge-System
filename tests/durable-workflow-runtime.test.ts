@@ -10,6 +10,7 @@ import {
   type ExecutionHistoryIdentity,
 } from "../shared/execution-history.ts";
 import {
+  ExecutionHistoryConflictError,
   UnavailableExecutionHistoryStore,
   type ExecutionHistoryListQuery,
   type ExecutionHistoryStore,
@@ -30,6 +31,7 @@ class MemoryExecutionHistoryStore implements ExecutionHistoryStore {
   readonly bundles = new Map<string, DurableExecutionHistoryBundle>();
   persistManyCallSizes: number[] = [];
   failWrites = false;
+  conflictWrites = false;
 
   getBackendState(): ExecutionHistoryBackendState {
     return { backend: "D1", state: "DURABLE_AVAILABLE", reason_code: null };
@@ -41,6 +43,7 @@ class MemoryExecutionHistoryStore implements ExecutionHistoryStore {
 
   async persistMany(bundles: DurableExecutionHistoryBundle[]) {
     this.persistManyCallSizes.push(bundles.length);
+    if (this.conflictWrites) throw new ExecutionHistoryConflictError();
     if (this.failWrites) throw new Error("D1 synthetic write failure");
     for (const bundle of bundles) {
       assertDurableExecutionHistoryBundle(bundle);
@@ -198,6 +201,58 @@ test("B02.2 D1 write failure rolls a kernel transition back to the last durable 
     (error: unknown) => error instanceof WorkflowKernelError && error.code === "DURABLE_HISTORY_WRITE_FAILED",
   );
   assert.deepEqual(kernel.getExecution(created.execution.execution_id), before);
+});
+
+test("B02.2 refreshes durable state before mutation so a stale isolate cannot regress a newer execution", async () => {
+  const store = new MemoryExecutionHistoryStore();
+  const kernelA = new WorkflowExecutionKernel();
+  const runtimeA = createRuntime(store, kernelA);
+  const runtimeB = createRuntime(store, new WorkflowExecutionKernel());
+
+  const created = await runtimeA.createExecution({
+    workflow_id: "internal-runtime-diagnostic",
+    scope_key: "global-working-memory",
+    mode: "LIVE",
+    input: { isolate: "A" },
+  });
+  const runningA = await runtimeA.start(created.execution.execution_id);
+  assert.equal(runningA.execution.status, "RUNNING");
+
+  let currentB = await runtimeB.getExecution(created.execution.execution_id);
+  while (currentB.execution.status === "RUNNING") {
+    currentB = await runtimeB.advance(created.execution.execution_id);
+  }
+  assert.equal(currentB.execution.status, "COMPLETED");
+
+  await assert.rejects(
+    () => runtimeA.pause(created.execution.execution_id),
+    (error: unknown) => error instanceof WorkflowKernelError && error.code === "INVALID_TRANSITION",
+  );
+  assert.equal(store.bundles.get(created.execution.execution_id)?.execution.status, "COMPLETED");
+  assert.equal(kernelA.getExecution(created.execution.execution_id).execution.status, "COMPLETED");
+});
+
+test("B02.2 optimistic concurrency conflicts stay fail-visible and restore the latest durable snapshot", async () => {
+  const store = new MemoryExecutionHistoryStore();
+  const kernel = new WorkflowExecutionKernel();
+  const runtime = createRuntime(store, kernel);
+  const created = await runtime.createExecution({
+    workflow_id: "internal-runtime-diagnostic",
+    scope_key: "global-working-memory",
+    mode: "LIVE",
+  });
+  const started = await runtime.start(created.execution.execution_id);
+  assert.equal(started.execution.status, "RUNNING");
+  store.conflictWrites = true;
+
+  await assert.rejects(
+    () => runtime.pause(created.execution.execution_id),
+    (error: unknown) => error instanceof WorkflowKernelError
+      && error.code === "DURABLE_HISTORY_CONFLICT"
+      && error.httpStatus === 409,
+  );
+  assert.equal(store.bundles.get(created.execution.execution_id)?.execution.status, "RUNNING");
+  assert.equal(kernel.getExecution(created.execution.execution_id).execution.status, "RUNNING");
 });
 
 test("B02.2 missing D1 binding is explicit degraded mode and is never mistaken for restart-safe history", async () => {
