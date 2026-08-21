@@ -1,4 +1,6 @@
-import { workflowExecutionKernel, WorkflowKernelError } from "../../../server/workflows/kernel.ts";
+import { WorkflowKernelError } from "../../../server/workflows/kernel.ts";
+import { getDurableWorkflowRuntime } from "../../../server/workflows/durable-runtime-instance.ts";
+import type { DurableWorkflowRuntime } from "../../../server/workflows/durable-runtime.ts";
 import {
   cockpitLiveReadSchema,
   projectCockpitLiveRead,
@@ -20,11 +22,29 @@ type OperationBody = {
   error?: { code?: string; message?: string };
 };
 
-const json = (body: unknown, status = 200) => Response.json(body, { status });
-const cockpitJson = (body: unknown) => Response.json(body, {
+const historyHeaders = (runtimeState: ReturnType<DurableWorkflowRuntime["getBackendState"]>) => ({
+  "x-aios-execution-history": runtimeState.state,
+  "x-aios-execution-history-backend": runtimeState.backend,
+  ...(runtimeState.reason_code ? { "x-aios-execution-history-reason": runtimeState.reason_code } : {}),
+});
+
+const json = (
+  body: unknown,
+  status = 200,
+  runtimeState?: ReturnType<DurableWorkflowRuntime["getBackendState"]>,
+) => Response.json(body, {
+  status,
+  ...(runtimeState ? { headers: historyHeaders(runtimeState) } : {}),
+});
+
+const cockpitJson = (
+  body: unknown,
+  runtimeState: ReturnType<DurableWorkflowRuntime["getBackendState"]>,
+) => Response.json(body, {
   headers: {
     "cache-control": "no-store",
     "x-aios-event-contract": `${cockpitLiveReadSchema.name}/${cockpitLiveReadSchema.version}`,
+    ...historyHeaders(runtimeState),
   },
 });
 
@@ -38,6 +58,8 @@ const requestedBy = (request: Request) => {
 };
 
 export async function GET(request: Request) {
+  const durableRuntime = await getDurableWorkflowRuntime();
+  const backendState = durableRuntime.getBackendState();
   const url = new URL(request.url);
   const executionId = url.searchParams.get("execution_id");
   const cockpitView = url.searchParams.get("view") === "cockpit";
@@ -52,20 +74,23 @@ export async function GET(request: Request) {
         );
       }
       const afterSequence = parseAfterSequence(url, request);
-      const snapshot = workflowExecutionKernel.getExecution(executionId);
-      if (eventStream) return cockpitEventStream(request, executionId, afterSequence);
-      return cockpitJson(projectCockpitLiveRead(snapshot, afterSequence));
+      const snapshot = await durableRuntime.getExecution(executionId);
+      if (eventStream) return cockpitEventStream(request, durableRuntime, executionId, afterSequence);
+      return cockpitJson(projectCockpitLiveRead(snapshot, afterSequence), backendState);
     }
-    if (executionId) return json(workflowExecutionKernel.getExecution(executionId));
+    if (executionId) return json(await durableRuntime.getExecution(executionId), 200, backendState);
     return json({
-      live_workflows: workflowExecutionKernel.listLiveWorkflows(),
+      live_workflows: durableRuntime.listLiveWorkflows(),
       simulation_transport: "client-only",
+      execution_history: backendState,
+      persistence: backendState.state === "DURABLE_AVAILABLE" ? "D1_DURABLE" : "PROCESS_LOCAL_DEGRADED",
       cockpit_live_read: {
         schema_name: cockpitLiveReadSchema.name,
         schema_version: cockpitLiveReadSchema.version,
         endpoint: "/api/workflow-executions?view=cockpit&execution_id={execution_id}&after_sequence={sequence}",
         transports: ["json-poll", "sse"],
         execution_authority: "WorkflowExecutionKernel",
+        durable_history_authority: "D1 when execution_history.state=DURABLE_AVAILABLE",
         connector_write_authorization: "NONE",
       },
       next_action_contract: "registry-backed",
@@ -73,13 +98,15 @@ export async function GET(request: Request) {
       capability_discovery_contract: "CapabilityDiscoveryEnvelope/1.0",
       capability_materialization_contract: "MaterializedCapability/1.0",
       capability_execution_authority: "NONE",
-    });
+    }, 200, backendState);
   } catch (error) {
-    return handleError(error);
+    return handleError(error, backendState);
   }
 }
 
 export async function POST(request: Request) {
+  const durableRuntime = await getDurableWorkflowRuntime();
+  const backendState = durableRuntime.getBackendState();
   try {
     const body = await request.json() as OperationBody;
     switch (body.action) {
@@ -94,44 +121,44 @@ export async function POST(request: Request) {
           mode: body.mode,
           input: body.input ?? {},
         };
-        const snapshot = workflowExecutionKernel.createExecution(createRequest);
-        return json(snapshot, snapshot.execution.status === "FAILED" ? 409 : 201);
+        const snapshot = await durableRuntime.createExecution(createRequest);
+        return json(snapshot, snapshot.execution.status === "FAILED" ? 409 : 201, durableRuntime.getBackendState());
       }
       case "execute": {
         if (!body.workflow_id || !body.scope_key || !body.mode) {
           throw new WorkflowKernelError("INVALID_REQUEST", "workflow_id, scope_key, and mode are required.");
         }
-        const created = workflowExecutionKernel.createExecution({
+        const created = await durableRuntime.createExecution({
           workflow_id: body.workflow_id,
           scope_key: body.scope_key,
           requested_by: requestedBy(request),
           mode: body.mode,
           input: body.input ?? {},
         });
-        if (created.execution.status === "FAILED") return json(created, 409);
-        return json(await workflowExecutionKernel.runToCompletion(created.execution.execution_id), 201);
+        if (created.execution.status === "FAILED") return json(created, 409, durableRuntime.getBackendState());
+        return json(await durableRuntime.runToCompletion(created.execution.execution_id), 201, durableRuntime.getBackendState());
       }
-      case "start": return json(await workflowExecutionKernel.start(requireId(body)));
-      case "advance": return json(await workflowExecutionKernel.advance(requireId(body)));
-      case "pause": return json(workflowExecutionKernel.pause(requireId(body)));
-      case "resume": return json(workflowExecutionKernel.resume(requireId(body)));
-      case "cancel": return json(workflowExecutionKernel.cancel(requireId(body)));
-      case "fail": return json(workflowExecutionKernel.fail(requireId(body), {
+      case "start": return json(await durableRuntime.start(requireId(body)), 200, durableRuntime.getBackendState());
+      case "advance": return json(await durableRuntime.advance(requireId(body)), 200, durableRuntime.getBackendState());
+      case "pause": return json(await durableRuntime.pause(requireId(body)), 200, durableRuntime.getBackendState());
+      case "resume": return json(await durableRuntime.resume(requireId(body)), 200, durableRuntime.getBackendState());
+      case "cancel": return json(await durableRuntime.cancel(requireId(body)), 200, durableRuntime.getBackendState());
+      case "fail": return json(await durableRuntime.fail(requireId(body), {
         code: body.error?.code ?? "MANUAL_FAILURE",
         message: body.error?.message ?? "Execution failed by request.",
-      }));
-      case "complete": return json(workflowExecutionKernel.complete(requireId(body), body.output ?? {}));
+      }), 200, durableRuntime.getBackendState());
+      case "complete": return json(await durableRuntime.complete(requireId(body), body.output ?? {}), 200, durableRuntime.getBackendState());
       case "select_next_action": {
         if (!body.command) throw new WorkflowKernelError("INVALID_REQUEST", "command is required.");
-        return json(workflowExecutionKernel.selectNextAction(requireId(body), body.command));
+        return json(await durableRuntime.selectNextAction(requireId(body), body.command), 200, durableRuntime.getBackendState());
       }
-      case "approve_next_action": return json(workflowExecutionKernel.approveNextAction(requireId(body)));
-      case "reject_next_action": return json(workflowExecutionKernel.rejectNextAction(requireId(body)));
-      case "spawn_next_action": return json(workflowExecutionKernel.spawnSelectedNextAction(requireId(body), body.input ?? {}), 201);
+      case "approve_next_action": return json(await durableRuntime.approveNextAction(requireId(body)), 200, durableRuntime.getBackendState());
+      case "reject_next_action": return json(await durableRuntime.rejectNextAction(requireId(body)), 200, durableRuntime.getBackendState());
+      case "spawn_next_action": return json(await durableRuntime.spawnSelectedNextAction(requireId(body), body.input ?? {}), 201, durableRuntime.getBackendState());
       default: throw new WorkflowKernelError("UNKNOWN_OPERATION", "Unknown workflow execution operation.");
     }
   } catch (error) {
-    return handleError(error);
+    return handleError(error, durableRuntime.getBackendState());
   }
 }
 
@@ -152,7 +179,12 @@ const parseAfterSequence = (url: URL, request: Request) => {
   return sequence;
 };
 
-const cockpitEventStream = (request: Request, executionId: string, initialSequence: number) => {
+const cockpitEventStream = (
+  request: Request,
+  durableRuntime: DurableWorkflowRuntime,
+  executionId: string,
+  initialSequence: number,
+) => {
   const encoder = new TextEncoder();
   let cursor = initialSequence;
   let cancelled = false;
@@ -164,7 +196,7 @@ const cockpitEventStream = (request: Request, executionId: string, initialSequen
       try {
         while (!cancelled && !request.signal.aborted) {
           const projection = projectCockpitLiveRead(
-            workflowExecutionKernel.getExecution(executionId),
+            await durableRuntime.getExecution(executionId),
             cursor,
           );
           for (const event of projection.events) {
@@ -190,13 +222,17 @@ const cockpitEventStream = (request: Request, executionId: string, initialSequen
       connection: "keep-alive",
       "x-accel-buffering": "no",
       "x-aios-event-contract": `${cockpitLiveReadSchema.name}/${cockpitLiveReadSchema.version}`,
+      ...historyHeaders(durableRuntime.getBackendState()),
     },
   });
 };
 
-const handleError = (error: unknown) => {
+const handleError = (
+  error: unknown,
+  runtimeState?: ReturnType<DurableWorkflowRuntime["getBackendState"]>,
+) => {
   if (error instanceof WorkflowKernelError) {
-    return json({ error: { code: error.code, message: error.message } }, error.httpStatus);
+    return json({ error: { code: error.code, message: error.message } }, error.httpStatus, runtimeState);
   }
-  return json({ error: { code: "INTERNAL_ERROR", message: "Workflow kernel request failed." } }, 500);
+  return json({ error: { code: "INTERNAL_ERROR", message: "Workflow kernel request failed." } }, 500, runtimeState);
 };
