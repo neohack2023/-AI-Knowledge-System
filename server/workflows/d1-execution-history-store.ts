@@ -29,8 +29,19 @@ export type D1DatabaseLike = {
   exec: (query: string) => Promise<unknown>;
 };
 
-const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS workflow_executions (
+export type D1SchemaFailureDetail =
+  | "SQLITE_SYNTAX_ERROR"
+  | "SQLITE_SCHEMA_OBJECT_CONFLICT"
+  | "SQLITE_PERMISSION_DENIED"
+  | "SQLITE_MISSING_OBJECT"
+  | "D1_SCHEMA_BATCH_FAILED";
+
+type D1ExecutionHistoryBackendState = ExecutionHistoryBackendState & {
+  reason_detail?: D1SchemaFailureDetail | null;
+};
+
+export const executionHistorySchemaStatements = [
+  `CREATE TABLE IF NOT EXISTS workflow_executions (
   execution_id TEXT PRIMARY KEY NOT NULL,
   scope_key TEXT NOT NULL,
   capability_id TEXT NOT NULL,
@@ -51,15 +62,14 @@ CREATE TABLE IF NOT EXISTS workflow_executions (
   authority_owner TEXT NOT NULL,
   authority_domain TEXT NOT NULL,
   authority_state TEXT NOT NULL
-);
-CREATE UNIQUE INDEX IF NOT EXISTS workflow_executions_identity_idx
-  ON workflow_executions (execution_id, scope_key, capability_id);
-CREATE INDEX IF NOT EXISTS workflow_executions_scope_created_idx
-  ON workflow_executions (scope_key, created_at);
-CREATE INDEX IF NOT EXISTS workflow_executions_capability_created_idx
-  ON workflow_executions (capability_id, created_at);
-
-CREATE TABLE IF NOT EXISTS workflow_execution_events (
+)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS workflow_executions_identity_idx
+  ON workflow_executions (execution_id, scope_key, capability_id)`,
+  `CREATE INDEX IF NOT EXISTS workflow_executions_scope_created_idx
+  ON workflow_executions (scope_key, created_at)`,
+  `CREATE INDEX IF NOT EXISTS workflow_executions_capability_created_idx
+  ON workflow_executions (capability_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS workflow_execution_events (
   event_id TEXT PRIMARY KEY NOT NULL,
   execution_id TEXT NOT NULL,
   scope_key TEXT NOT NULL,
@@ -71,13 +81,12 @@ CREATE TABLE IF NOT EXISTS workflow_execution_events (
   sequence INTEGER NOT NULL,
   emitted_at TEXT NOT NULL,
   data_json TEXT
-);
-CREATE UNIQUE INDEX IF NOT EXISTS workflow_execution_events_sequence_idx
-  ON workflow_execution_events (execution_id, sequence);
-CREATE INDEX IF NOT EXISTS workflow_execution_events_identity_idx
-  ON workflow_execution_events (execution_id, scope_key, capability_id);
-
-CREATE TABLE IF NOT EXISTS workflow_execution_links (
+)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS workflow_execution_events_sequence_idx
+  ON workflow_execution_events (execution_id, sequence)`,
+  `CREATE INDEX IF NOT EXISTS workflow_execution_events_identity_idx
+  ON workflow_execution_events (execution_id, scope_key, capability_id)`,
+  `CREATE TABLE IF NOT EXISTS workflow_execution_links (
   link_id TEXT PRIMARY KEY NOT NULL,
   execution_id TEXT NOT NULL,
   scope_key TEXT NOT NULL,
@@ -90,14 +99,23 @@ CREATE TABLE IF NOT EXISTS workflow_execution_links (
   authority_state TEXT NOT NULL,
   created_at TEXT NOT NULL,
   metadata_json TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS workflow_execution_links_identity_idx
-  ON workflow_execution_links (execution_id, scope_key, capability_id);
-CREATE INDEX IF NOT EXISTS workflow_execution_links_type_idx
-  ON workflow_execution_links (link_type, target_id);
-`;
+)`,
+  `CREATE INDEX IF NOT EXISTS workflow_execution_links_identity_idx
+  ON workflow_execution_links (execution_id, scope_key, capability_id)`,
+  `CREATE INDEX IF NOT EXISTS workflow_execution_links_type_idx
+  ON workflow_execution_links (link_type, target_id)`,
+] as const;
 
-export const executionHistorySchemaSql = SCHEMA_SQL;
+export const executionHistorySchemaSql = `${executionHistorySchemaStatements.join(";\n")}\n`;
+
+export const sanitizeD1SchemaFailure = (error: unknown): D1SchemaFailureDetail => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/syntax error|near\s+.+syntax/i.test(message)) return "SQLITE_SYNTAX_ERROR";
+  if (/already exists|duplicate|constraint/i.test(message)) return "SQLITE_SCHEMA_OBJECT_CONFLICT";
+  if (/permission|not authorized|unauthorized|forbidden/i.test(message)) return "SQLITE_PERMISSION_DENIED";
+  if (/no such (table|index)|missing (table|index)/i.test(message)) return "SQLITE_MISSING_OBJECT";
+  return "D1_SCHEMA_BATCH_FAILED";
+};
 
 type ExecutionRow = {
   execution_id: string;
@@ -335,7 +353,7 @@ const isSequenceConflict = (error: unknown) => {
 
 export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
   readonly backend = "D1" as const;
-  private state: ExecutionHistoryBackendState = {
+  private state: D1ExecutionHistoryBackendState = {
     backend: "D1",
     state: "DURABLE_UNAVAILABLE",
     reason_code: "D1_SCHEMA_UNAVAILABLE",
@@ -345,15 +363,20 @@ export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
 
   async initialize() {
     try {
-      await this.db.exec(SCHEMA_SQL);
+      await this.db.batch(executionHistorySchemaStatements.map((sql) => this.db.prepare(sql)));
       this.state = { backend: "D1", state: "DURABLE_AVAILABLE", reason_code: null };
-    } catch {
-      this.state = { backend: "D1", state: "DURABLE_UNAVAILABLE", reason_code: "D1_SCHEMA_UNAVAILABLE" };
+    } catch (error) {
+      this.state = {
+        backend: "D1",
+        state: "DURABLE_UNAVAILABLE",
+        reason_code: "D1_SCHEMA_UNAVAILABLE",
+        reason_detail: sanitizeD1SchemaFailure(error),
+      };
     }
     return this;
   }
 
-  getBackendState(): ExecutionHistoryBackendState {
+  getBackendState(): D1ExecutionHistoryBackendState {
     return { ...this.state };
   }
 

@@ -4,20 +4,27 @@ import { listDurableExecutionHistory } from "../../../server/workflows/execution
 export const runtime = "edge";
 
 const ALLOWED_SCOPE_KEY = "global-working-memory";
+type HistoryState = {
+  backend: string;
+  state: string;
+  reason_code: string | null;
+  reason_detail?: string | null;
+};
 
-const historyHeaders = (state: { backend: string; state: string; reason_code: string | null }) => ({
+const historyHeaders = (state: HistoryState) => ({
   "cache-control": "no-store",
   "x-aios-execution-history": state.state,
   "x-aios-execution-history-backend": state.backend,
   ...(state.reason_code ? { "x-aios-execution-history-reason": state.reason_code } : {}),
+  ...(state.reason_detail ? { "x-aios-execution-history-detail": state.reason_detail } : {}),
 });
 
-const json = (body: unknown, status: number, state: { backend: string; state: string; reason_code: string | null }) =>
+const json = (body: unknown, status: number, state: HistoryState) =>
   Response.json(body, { status, headers: historyHeaders(state) });
 
 export async function GET(request: Request) {
   const store = await getExecutionHistoryStore();
-  const state = store.getBackendState();
+  const state = store.getBackendState() as HistoryState;
   const url = new URL(request.url);
   const requestedScopeKey = url.searchParams.get("scope_key")?.trim();
   const capabilityId = url.searchParams.get("capability_id")?.trim() || undefined;
@@ -64,7 +71,7 @@ export async function GET(request: Request) {
       ...(modeRaw ? { mode: modeRaw } : {}),
       limit,
     });
-    const latestState = store.getBackendState();
+    const latestState = store.getBackendState() as HistoryState;
     return json({
       execution_history: latestState,
       persistence: "D1_DURABLE",
@@ -72,7 +79,7 @@ export async function GET(request: Request) {
       executions,
     }, 200, latestState);
   } catch (error) {
-    const latestState = store.getBackendState();
+    const latestState = store.getBackendState() as HistoryState;
     return json({
       execution_history: latestState,
       persistence: "PROCESS_LOCAL_DEGRADED",
