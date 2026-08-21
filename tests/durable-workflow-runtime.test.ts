@@ -137,14 +137,31 @@ test("B02.2 hydrated execution can continue through the same kernel transition r
   });
 
   const restartedRuntime = createRuntime(store, new WorkflowExecutionKernel());
-  const started = await restartedRuntime.start(created.execution.execution_id);
-  assert.equal(started.execution.status, "RUNNING");
-  assert.equal(started.events[0].sequence, 1);
-  assert.equal(started.events[1].sequence, 2);
+  let current = await restartedRuntime.start(created.execution.execution_id);
+  assert.equal(current.execution.status, "RUNNING");
+  assert.equal(current.events[0].sequence, 1);
+  assert.equal(current.events[1].sequence, 2);
 
-  const completed = await restartedRuntime.runToCompletion(created.execution.execution_id);
-  assert.equal(completed.execution.status, "COMPLETED");
-  assert.equal(completed.execution.output?.diagnostic, "PASS");
+  while (current.execution.status === "RUNNING") {
+    current = await restartedRuntime.advance(created.execution.execution_id);
+  }
+  assert.equal(current.execution.status, "COMPLETED");
+  assert.equal(current.execution.output?.diagnostic, "PASS");
+});
+
+test("B02.2 refuses to hydrate SIMULATION history into the LIVE server kernel", async () => {
+  const store = new MemoryExecutionHistoryStore();
+  const liveRuntime = createRuntime(store);
+  const completed = await executeDiagnostic(liveRuntime);
+  const simulationBundle = structuredClone(store.bundles.get(completed.execution.execution_id)!);
+  simulationBundle.execution.mode = "SIMULATION";
+  store.bundles.set(completed.execution.execution_id, simulationBundle);
+
+  const restartedRuntime = createRuntime(store, new WorkflowExecutionKernel());
+  await assert.rejects(
+    () => restartedRuntime.getExecution(completed.execution.execution_id),
+    (error: unknown) => error instanceof WorkflowKernelError && error.code === "DURABLE_MODE_NOT_LIVE",
+  );
 });
 
 test("B02.2 follow-up creation persists parent and child in one store transaction boundary", async () => {
