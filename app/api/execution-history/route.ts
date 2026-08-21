@@ -3,6 +3,8 @@ import { listDurableExecutionHistory } from "../../../server/workflows/execution
 
 export const runtime = "edge";
 
+const ALLOWED_SCOPE_KEY = "global-working-memory";
+
 const historyHeaders = (state: { backend: string; state: string; reason_code: string | null }) => ({
   "cache-control": "no-store",
   "x-aios-execution-history": state.state,
@@ -17,10 +19,21 @@ export async function GET(request: Request) {
   const store = await getExecutionHistoryStore();
   const state = store.getBackendState();
   const url = new URL(request.url);
-  const scopeKey = url.searchParams.get("scope_key")?.trim() || "global-working-memory";
+  const requestedScopeKey = url.searchParams.get("scope_key")?.trim();
   const capabilityId = url.searchParams.get("capability_id")?.trim() || undefined;
   const modeRaw = url.searchParams.get("mode")?.trim() || undefined;
   const limitRaw = url.searchParams.get("limit")?.trim() || "25";
+
+  if (requestedScopeKey && requestedScopeKey !== ALLOWED_SCOPE_KEY) {
+    return json({
+      error: {
+        code: "EXECUTION_HISTORY_SCOPE_FORBIDDEN",
+        message: `This cockpit history surface is restricted to ${ALLOWED_SCOPE_KEY}.`,
+      },
+      scope_key: ALLOWED_SCOPE_KEY,
+    }, 403, state);
+  }
+  const scopeKey = ALLOWED_SCOPE_KEY;
 
   if (modeRaw !== undefined && modeRaw !== "LIVE" && modeRaw !== "SIMULATION") {
     return json({ error: { code: "INVALID_HISTORY_MODE", message: "mode must be LIVE or SIMULATION." } }, 400, state);
