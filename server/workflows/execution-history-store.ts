@@ -18,7 +18,9 @@ export interface ExecutionHistoryStore {
   readonly backend: "D1";
   getBackendState(): ExecutionHistoryBackendState;
   persist(bundle: DurableExecutionHistoryBundle): Promise<void>;
+  persistMany(bundles: DurableExecutionHistoryBundle[]): Promise<void>;
   get(identity: ExecutionHistoryIdentity): Promise<DurableExecutionHistoryBundle | null>;
+  getByExecutionId(executionId: string): Promise<DurableExecutionHistoryBundle | null>;
   list(query: ExecutionHistoryListQuery): Promise<DurableExecutionRecord[]>;
 }
 
@@ -42,7 +44,16 @@ export class UnavailableExecutionHistoryStore implements ExecutionHistoryStore {
     assertDurablePersistenceAvailable(this.getBackendState());
   }
 
+  async persistMany(_bundles: DurableExecutionHistoryBundle[]): Promise<void> {
+    assertDurablePersistenceAvailable(this.getBackendState());
+  }
+
   async get(_identity: ExecutionHistoryIdentity): Promise<DurableExecutionHistoryBundle | null> {
+    assertDurablePersistenceAvailable(this.getBackendState());
+    return null;
+  }
+
+  async getByExecutionId(_executionId: string): Promise<DurableExecutionHistoryBundle | null> {
     assertDurablePersistenceAvailable(this.getBackendState());
     return null;
   }
@@ -83,12 +94,35 @@ export const persistDurableExecutionHistory = async (
   await store.persist(structuredClone(bundle));
 };
 
+export const persistManyDurableExecutionHistories = async (
+  store: ExecutionHistoryStore,
+  bundles: DurableExecutionHistoryBundle[],
+) => {
+  assertDurablePersistenceAvailable(store.getBackendState());
+  bundles.forEach(assertDurableExecutionHistoryBundle);
+  await store.persistMany(structuredClone(bundles));
+};
+
 export const readDurableExecutionHistory = async (
   store: ExecutionHistoryStore,
   identity: ExecutionHistoryIdentity,
 ) => {
   assertDurablePersistenceAvailable(store.getBackendState());
   const result = await store.get(structuredClone(identity));
+  if (result === null) return null;
+  assertDurableExecutionHistoryBundle(result);
+  return structuredClone(result);
+};
+
+export const readDurableExecutionHistoryById = async (
+  store: ExecutionHistoryStore,
+  executionId: string,
+) => {
+  assertDurablePersistenceAvailable(store.getBackendState());
+  if (typeof executionId !== "string" || executionId.trim().length === 0) {
+    throw new TypeError("execution_id must be a non-empty string.");
+  }
+  const result = await store.getByExecutionId(executionId);
   if (result === null) return null;
   assertDurableExecutionHistoryBundle(result);
   return structuredClone(result);
