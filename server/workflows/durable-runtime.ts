@@ -9,6 +9,7 @@ import type { NextActionEnvelope, NextActionSelection } from "../../shared/next-
 import type { ContextProvenanceEnvelope } from "../provenance/types.ts";
 import type { RuntimeCapabilityDefinition } from "../capabilities/types.ts";
 import {
+  ExecutionHistoryConflictError,
   persistManyDurableExecutionHistories,
   readDurableExecutionHistoryById,
   type ExecutionHistoryStore,
@@ -193,9 +194,6 @@ export const durableHistoryToSnapshot = (
   };
 };
 
-const isMissingExecution = (error: unknown) =>
-  error instanceof WorkflowKernelError && error.code === "EXECUTION_NOT_FOUND";
-
 export class DurableWorkflowRuntime {
   constructor(
     private readonly kernel: WorkflowExecutionKernel,
@@ -226,19 +224,16 @@ export class DurableWorkflowRuntime {
   }
 
   async getExecution(executionId: string): Promise<ExecutionSnapshot> {
-    try {
-      return this.kernel.getExecution(executionId);
-    } catch (error) {
-      if (!isMissingExecution(error) || !this.persistenceAvailable()) throw error;
+    if (this.persistenceAvailable()) {
+      try {
+        const bundle = await readDurableExecutionHistoryById(this.store, executionId);
+        if (bundle) return this.kernel.restoreExecution(durableHistoryToSnapshot(bundle));
+      } catch (error) {
+        if (error instanceof WorkflowKernelError) throw error;
+        throw this.persistenceReadFailure(error);
+      }
     }
-    try {
-      const bundle = await readDurableExecutionHistoryById(this.store, executionId);
-      if (!bundle) throw new WorkflowKernelError("EXECUTION_NOT_FOUND", "Workflow execution was not found.", 404);
-      return this.kernel.restoreExecution(durableHistoryToSnapshot(bundle));
-    } catch (error) {
-      if (error instanceof WorkflowKernelError) throw error;
-      throw this.persistenceReadFailure(error);
-    }
+    return this.kernel.getExecution(executionId);
   }
 
   async getProvenanceEnvelope(executionId: string, envelopeId: string, expectedScopeKey?: string) {
@@ -307,8 +302,11 @@ export class DurableWorkflowRuntime {
       return child;
     } catch (error) {
       if (child) this.kernel.discardExecution(child.execution.execution_id);
+      if (this.isPersistenceError(error)) {
+        await this.restoreLatestDurableOrFallback(executionId, beforeParent);
+        throw this.persistenceFailure(error);
+      }
       this.kernel.restoreExecution(beforeParent);
-      if (this.isPersistenceError(error)) throw this.persistenceFailure(error);
       throw error;
     }
   }
@@ -319,10 +317,10 @@ export class DurableWorkflowRuntime {
   ): Promise<ExecutionSnapshot> {
     const before = await this.getExecution(executionId);
     const capabilityId = this.requireCapabilityId(before.execution.workflow_id);
+    let after: ExecutionSnapshot;
+
     try {
-      const after = await operation();
-      await this.persistIfAvailable([snapshotToDurableHistory(after, capabilityId)]);
-      return after;
+      after = await operation();
     } catch (error) {
       let current: ExecutionSnapshot | null = null;
       try { current = this.kernel.getExecution(executionId); } catch { current = null; }
@@ -330,12 +328,35 @@ export class DurableWorkflowRuntime {
         try {
           await this.persistIfAvailable([snapshotToDurableHistory(current, capabilityId)]);
         } catch (persistError) {
-          this.kernel.restoreExecution(before);
+          await this.restoreLatestDurableOrFallback(executionId, before);
           throw this.persistenceFailure(persistError);
         }
       }
       throw error;
     }
+
+    try {
+      await this.persistIfAvailable([snapshotToDurableHistory(after, capabilityId)]);
+      return after;
+    } catch (error) {
+      await this.restoreLatestDurableOrFallback(executionId, before);
+      throw this.persistenceFailure(error);
+    }
+  }
+
+  private async restoreLatestDurableOrFallback(executionId: string, fallback: ExecutionSnapshot) {
+    if (this.persistenceAvailable()) {
+      try {
+        const bundle = await readDurableExecutionHistoryById(this.store, executionId);
+        if (bundle) {
+          this.kernel.restoreExecution(durableHistoryToSnapshot(bundle));
+          return;
+        }
+      } catch {
+        // Preserve the last known-good local snapshot when the durable read itself is unavailable.
+      }
+    }
+    this.kernel.restoreExecution(fallback);
   }
 
   private requireCapabilityForLiveHandler(workflowId: string) {
@@ -378,14 +399,22 @@ export class DurableWorkflowRuntime {
   }
 
   private isPersistenceError(error: unknown) {
-    return error instanceof Error && (
-      error.message.includes("D1")
-      || error.message.includes("Durable execution history")
-      || error.message.includes("EXECUTION_HISTORY")
-    );
+    return error instanceof ExecutionHistoryConflictError
+      || (error instanceof Error && (
+        error.message.includes("D1")
+        || error.message.includes("Durable execution history")
+        || error.message.includes("EXECUTION_HISTORY")
+      ));
   }
 
   private persistenceFailure(error: unknown) {
+    if (error instanceof ExecutionHistoryConflictError) {
+      return new WorkflowKernelError(
+        "DURABLE_HISTORY_CONFLICT",
+        error.message,
+        409,
+      );
+    }
     return new WorkflowKernelError(
       "DURABLE_HISTORY_WRITE_FAILED",
       error instanceof Error ? error.message : "Durable execution history write failed.",
