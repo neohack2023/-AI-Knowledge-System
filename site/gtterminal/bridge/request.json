@@ -1,4 +1,4 @@
 {
-  "request_id": "bootstrap",
-  "op": "noop"
+  "request_id": "session-smoke-info-20260824T2337Z",
+  "op": "info"
 }
