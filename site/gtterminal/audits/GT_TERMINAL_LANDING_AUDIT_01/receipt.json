@@ -1,0 +1,35 @@
+{
+  "audit_id": "GT_TERMINAL_LANDING_AUDIT_01",
+  "status": "VERIFIED_CANDIDATE",
+  "completed_at": "2026-08-24T23:52:25Z",
+  "site_origin": "https://gtterminal.neocities.org",
+  "production": {
+    "path": "index.html",
+    "modified": false,
+    "sha1": "5bd7a84b5cf2c946b850a866a4389ccb031479a5",
+    "size": 19260
+  },
+  "snapshot": {
+    "path": "snapshots/GT_TERMINAL_LANDING_AUDIT_01/index.html",
+    "url": "https://gtterminal.neocities.org/snapshots/GT_TERMINAL_LANDING_AUDIT_01/index.html",
+    "sha1": "5bd7a84b5cf2c946b850a866a4389ccb031479a5",
+    "size": 19260,
+    "verified_by": "authenticated Neocities list API"
+  },
+  "candidate": {
+    "path": "index-v2.html",
+    "url": "https://gtterminal.neocities.org/index-v2.html",
+    "title": "gtterminal :: signal node v2",
+    "verified_by": "live public read after Neocities deployment"
+  },
+  "reversal_contract": {
+    "production_index_modified": false,
+    "rollback_source": "snapshots/GT_TERMINAL_LANDING_AUDIT_01/index.html",
+    "promotion_requires_explicit_review": true
+  },
+  "notes": [
+    "Snapshot SHA-1 exactly matches the pre-audit production index inventory SHA-1.",
+    "Candidate is deployed side-by-side and does not replace index.html.",
+    "No secret value was written to repository files or receipts."
+  ]
+}
