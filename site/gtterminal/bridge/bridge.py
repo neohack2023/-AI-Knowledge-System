@@ -18,7 +18,8 @@ RESULT_PATH = ROOT / os.environ.get("BRIDGE_RESULT", "site/gtterminal/bridge/res
 API_BASE = "https://neocities.org/api"
 SITE_ORIGIN = "https://gtterminal.neocities.org"
 MAX_TEXT_UPLOAD = 512_000
-ALLOWED_OPS = {"noop", "info", "list", "create_directory", "upload_text", "delete", "session_status"}
+MAX_PUBLIC_READ = 750_000
+ALLOWED_OPS = {"noop", "info", "list", "read_public", "create_directory", "upload_text", "delete", "session_status"}
 
 
 def now_iso() -> str:
@@ -83,6 +84,29 @@ def api_request(path: str, *, method: str = "GET", data: bytes | None = None, co
         raise RuntimeError(f"http_{e.code}:{body}") from None
 
 
+def public_read(remote_path: str) -> dict:
+    path = remote_path.strip().lstrip("/") or "index.html"
+    if ".." in Path(path).parts:
+        raise ValueError("unsafe_path")
+    url = SITE_ORIGIN.rstrip("/") + "/" + urllib.parse.quote(path, safe="/._-~")
+    req = urllib.request.Request(url, headers={"User-Agent": "GT_TERMINAL_NEOCITIES_BRIDGE_01", "Accept": "text/html,text/plain,text/css,application/javascript,application/json,*/*;q=0.1"})
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw = resp.read(MAX_PUBLIC_READ + 1)
+            if len(raw) > MAX_PUBLIC_READ:
+                raise ValueError("public_read_too_large")
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return {
+                "path": path,
+                "url": url,
+                "http_status": resp.status,
+                "content_type": resp.headers.get_content_type(),
+                "content": raw.decode(charset, "replace"),
+            }
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"public_http_{e.code}") from None
+
+
 def multipart_upload(remote_path: str, content: bytes, mime_type: str) -> dict:
     boundary = f"----gtterminal{int(time.time() * 1000)}"
     safe_name = remote_path.replace('"', "")
@@ -137,6 +161,9 @@ def main() -> int:
                 suffix = "?" + urllib.parse.urlencode({"path": path})
             response = api_request("/list" + suffix)
 
+        elif op == "read_public":
+            response = public_read(str(req.get("path") or "index.html"))
+
         elif op == "create_directory":
             path = validate_remote_path(str(req.get("path") or ""))
             body = urllib.parse.urlencode({"path": path}).encode()
@@ -170,7 +197,6 @@ def main() -> int:
         return 0
 
     except Exception as exc:
-        # Secret is never included in exceptions or result payloads.
         save_result({"request_id": request_id, "ok": False, "op": op, "error": str(exc)[:1200]})
         return 1
 
