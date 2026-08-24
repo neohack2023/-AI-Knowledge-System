@@ -1,4 +1,5 @@
 {
-  "request_id": "session-smoke-info-20260824T2337Z",
-  "op": "info"
+  "request_id": "session-smoke-list-root-20260824T2338Z",
+  "op": "list",
+  "path": ""
 }
