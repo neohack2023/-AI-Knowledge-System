@@ -1,0 +1,46 @@
+name: GT Terminal Neocities Bridge
+
+on:
+  push:
+    branches:
+      - gt-terminal-neocities-bridge-01
+    paths:
+      - 'site/gtterminal/bridge/request.json'
+      - 'site/gtterminal/bridge/payloads/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gt-terminal-neocities-bridge
+  cancel-in-progress: false
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEOCITIES_GTTERMINAL_API_KEY: ${{ secrets.NEOCITIES_GTTERMINAL_API_KEY }}
+      BRIDGE_REQUEST: site/gtterminal/bridge/request.json
+      BRIDGE_SESSION: site/gtterminal/bridge/session.json
+      BRIDGE_RESULT: site/gtterminal/bridge/result.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: gt-terminal-neocities-bridge-01
+
+      - name: Execute bounded Neocities request
+        run: python site/gtterminal/bridge/bridge.py
+
+      - name: Commit sanitized result
+        run: |
+          if git diff --quiet -- "$BRIDGE_RESULT"; then
+            exit 0
+          fi
+          git config user.name "gt-terminal-bridge"
+          git config user.email "actions@users.noreply.github.com"
+          git add "$BRIDGE_RESULT"
+          git commit -m "bridge: store sanitized Neocities result"
+          git push origin HEAD:gt-terminal-neocities-bridge-01
