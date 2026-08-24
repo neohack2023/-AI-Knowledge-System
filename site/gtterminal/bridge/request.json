@@ -1,5 +1,5 @@
 {
-  "request_id": "landing-audit-index-20260824T2344Z",
-  "op": "read_public",
-  "path": "index.html"
+  "request_id": "landing-audit-verify-snapshot-20260824T2352Z",
+  "op": "list",
+  "path": "snapshots/GT_TERMINAL_LANDING_AUDIT_01"
 }
