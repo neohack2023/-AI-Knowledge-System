@@ -1,9 +1,25 @@
 {
   "bridge": "GT_TERMINAL_NEOCITIES_BRIDGE_01",
-  "completed_at": "2026-08-24T23:24:03.541349+00:00",
-  "message": "bridge_ready",
+  "completed_at": "2026-08-24T23:37:50.509549+00:00",
   "ok": true,
-  "op": "noop",
-  "request_id": "bootstrap",
+  "op": "info",
+  "request_id": "session-smoke-info-20260824T2337Z",
+  "response": {
+    "info": {
+      "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
+      "domain": null,
+      "hits": 1567,
+      "last_updated": "Sun, 23 Aug 2026 16:44:36 -0000",
+      "sitename": "gtterminal",
+      "supporter": false,
+      "tags": [
+        "glitchart",
+        "programming",
+        "music"
+      ],
+      "views": 1470
+    },
+    "result": "success"
+  },
   "site_origin": "https://gtterminal.neocities.org"
 }
