@@ -1,0 +1,6 @@
+{
+  "bridge": "GT_TERMINAL_NEOCITIES_BRIDGE_01",
+  "request_id": "bootstrap",
+  "ok": false,
+  "state": "awaiting_secure_secret_and_session_enable"
+}
