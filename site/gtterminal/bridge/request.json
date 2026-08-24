@@ -1,5 +1,5 @@
 {
-  "request_id": "site-map-systems-20260824T2340Z",
-  "op": "list",
-  "path": "systems"
+  "request_id": "landing-audit-index-20260824T2344Z",
+  "op": "read_public",
+  "path": "index.html"
 }
