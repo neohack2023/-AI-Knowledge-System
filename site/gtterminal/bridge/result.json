@@ -1,9 +1,9 @@
 {
   "bridge": "GT_TERMINAL_NEOCITIES_BRIDGE_01",
-  "completed_at": "2026-08-24T23:38:15.933066+00:00",
+  "completed_at": "2026-08-24T23:39:50.927791+00:00",
   "ok": true,
   "op": "list",
-  "request_id": "session-smoke-list-root-20260824T2338Z",
+  "request_id": "site-map-root-20260824T2339Z",
   "response": {
     "files": [
       {
