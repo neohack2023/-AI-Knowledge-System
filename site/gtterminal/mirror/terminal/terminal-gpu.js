@@ -14,6 +14,14 @@ function setSignalState(label, mode) {
 async function startSignalLayer() {
   if (!canvas || !crt) return;
 
+  const hasWebGPU = Boolean(navigator.gpu);
+  const hasWebGL2 = hasWebGPU || Boolean(document.createElement("canvas").getContext("webgl2"));
+  if (!hasWebGPU && !hasWebGL2) {
+    setSignalState("CSS", "css");
+    canvas.hidden = true;
+    return;
+  }
+
   const renderer = new THREE.WebGPURenderer({
     canvas,
     alpha: true,
