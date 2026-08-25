@@ -1,5 +1,4 @@
 {
-  "request_id": "landing-v2_1-verify-20260825T0021Z",
-  "op": "read_public",
-  "path": "index.html"
+  "request_id": "gt-terminal-full-inventory-20260825T1757Z",
+  "op": "list"
 }
