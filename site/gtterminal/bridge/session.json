@@ -1,6 +1,6 @@
 {
-  "enabled": true,
+  "enabled": false,
   "expires_at": "2026-08-25T20:30:00Z",
   "scope": "gt-terminal",
-  "note": "Temporary production promotion window for terminal-channel-04 landing page. Scope limited to GT Terminal Neocities index.html deployment and immediate verification."
+  "note": "terminal-channel-04 promoted to production index.html on Neocities and bridge receipt verified successful. Temporary production promotion window closed."
 }
