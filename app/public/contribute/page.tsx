@@ -8,7 +8,7 @@ import {
   REVIEW_RECOMMENDATION,
   validatePublicContributorCandidate,
   type PublicContributorValidationResult,
-} from "../../../lib/public-contributor-schema";
+} from "../../../shared/public-contributor-schema";
 import styles from "../public-gate.module.css";
 
 export default function ContributorIntakePage() {
@@ -35,10 +35,7 @@ export default function ContributorIntakePage() {
           affectedScope: formData.get("affectedScope"),
           documentedOrObservedGap: formData.get("documentedOrObservedGap"),
           proposedImprovement: formData.get("proposedImprovement"),
-          publicSafeProvenancePointers: pointerText
-            .split("\n")
-            .map((value) => value.trim())
-            .filter(Boolean),
+          publicSafeProvenancePointers: pointerText.split("\n").map((value) => value.trim()).filter(Boolean),
           compatibilityAndRegressionSurface: formData.get("compatibilityAndRegressionSurface"),
           risksAndFailureModes: formData.get("risksAndFailureModes"),
           verificationPlan: formData.get("verificationPlan"),
@@ -56,21 +53,13 @@ export default function ContributorIntakePage() {
       <section className={styles.hero}>
         <div className={styles.eyebrow}>AIOS PUBLIC CONTRIBUTOR INTAKE · SCHEMA 01</div>
         <h1>Build a valid candidate without inheriting authority.</h1>
-        <p className={styles.lede}>
-          This form validates contributor identity, candidate shape, privacy boundaries, and public-safe provenance locally in your browser. It does not submit or persist anything.
-        </p>
-        <div className={styles.actions}>
-          <Link className={styles.secondary} href="/public">Back to public gate</Link>
-        </div>
+        <p className={styles.lede}>This form validates contributor identity, candidate shape, privacy boundaries, and public-safe provenance locally in your browser. It does not submit or persist anything.</p>
+        <div className={styles.actions}><Link className={styles.secondary} href="/public">Back to public gate</Link></div>
       </section>
 
       <form className={styles.intakeForm} onSubmit={validateCandidate}>
         <section className={styles.formSection}>
-          <div>
-            <span className={styles.kicker}>IDENTITY</span>
-            <h2>Contributor declaration</h2>
-            <p>Identity remains self-declared until a stronger attestation mechanism exists.</p>
-          </div>
+          <div><span className={styles.kicker}>IDENTITY</span><h2>Contributor declaration</h2><p>Identity remains self-declared until a stronger attestation mechanism exists.</p></div>
           <div className={styles.formGrid}>
             <label>Provider<input name="provider" required /></label>
             <label>Model<input name="model" required /></label>
@@ -82,11 +71,7 @@ export default function ContributorIntakePage() {
         </section>
 
         <section className={styles.formSection}>
-          <div>
-            <span className={styles.kicker}>CANDIDATE PAYLOAD</span>
-            <h2>One bounded proposal</h2>
-            <p>Contribute generalized learning, not private user history, source conversations, credentials, or internal control-plane material.</p>
-          </div>
+          <div><span className={styles.kicker}>CANDIDATE PAYLOAD</span><h2>One bounded proposal</h2><p>Contribute generalized learning, not private user history, source conversations, credentials, or internal control-plane material.</p></div>
           <div className={styles.formGrid}>
             <label className={styles.fullWidth}>Title<input name="title" required /></label>
             <label>Classification<select name="classification" defaultValue="OBSERVED_GAP">{CONTRIBUTION_CLASSIFICATION.map((value) => <option key={value}>{value}</option>)}</select></label>
@@ -103,11 +88,7 @@ export default function ContributorIntakePage() {
         </section>
 
         <section className={styles.validationPanel}>
-          <div>
-            <span className={styles.kicker}>LOCAL VALIDATION</span>
-            <h2>Airlock check</h2>
-            <p>Validation can mark the payload ready for a future candidate store. It cannot submit, promote, or authorize it.</p>
-          </div>
+          <div><span className={styles.kicker}>LOCAL VALIDATION</span><h2>Airlock check</h2><p>Validation can mark the payload ready for a future candidate store. It cannot submit, promote, or authorize it.</p></div>
           <div className={styles.validationActions}>
             <button className={styles.primaryButton} type="submit">Validate candidate</button>
             <button className={styles.disabledButton} type="button" disabled>Submit disabled · STORE_PENDING</button>
@@ -124,15 +105,8 @@ export default function ContributorIntakePage() {
       </form>
 
       <section className={styles.boardPreview}>
-        <div>
-          <span className={styles.kicker}>WRITE BOUNDARY</span>
-          <h2>Validation is real. Submission is not.</h2>
-          <p>`PUBLIC_CONTRIBUTOR_SCHEMA_01` adds schema and fail-closed validation only. Durable candidate storage remains reserved for `PUBLIC_CANDIDATE_STORE_01`.</p>
-        </div>
-        <div className={styles.boardState}>
-          <strong>CONTRIBUTION_CANDIDATE / STORE_PENDING</strong>
-          <span>No Notion, Drive, GitHub, D1, Canon, registry, or execution write path exists here.</span>
-        </div>
+        <div><span className={styles.kicker}>WRITE BOUNDARY</span><h2>Validation is real. Submission is not.</h2><p>`PUBLIC_CONTRIBUTOR_SCHEMA_01` adds schema and fail-closed validation only. Durable candidate storage remains reserved for `PUBLIC_CANDIDATE_STORE_01`.</p></div>
+        <div className={styles.boardState}><strong>CONTRIBUTION_CANDIDATE / STORE_PENDING</strong><span>No Notion, Drive, GitHub, D1, Canon, registry, or execution write path exists here.</span></div>
       </section>
     </main>
   );
