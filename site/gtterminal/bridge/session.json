@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "expires_at": "2026-08-25T03:00:00Z",
+  "expires_at": "2026-08-25T18:56:00Z",
   "scope": "gt-terminal",
-  "note": "Active operator session. The Neocities API key lives only in the repository Actions secret NEOCITIES_GTTERMINAL_API_KEY."
+  "note": "Bounded operator session for authoritative inventory extraction. The Neocities API key lives only in the repository Actions secret NEOCITIES_GTTERMINAL_API_KEY."
 }
