@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SPECTRE v7 // HYBRID KERNEL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
+
+        :root {
+            --bg: #000000;
+            --accent: #ff003c; /* Cyberpunk Red */
+            --accent-sec: #00f3ff; /* Cyan */
+            --panel: rgba(10, 10, 10, 0.85);
+            --border: rgba(255, 255, 255, 0.15);
+        }
+
+        body { margin: 0; overflow: hidden; background: var(--bg); color: #e0e0e0; font-family: 'JetBrains Mono', monospace; -webkit-tap-highlight-color: transparent; }
+        canvas { display: block; }
+
+        /* Custom UI Elements */
+        .glass { background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--border); }
+        
+        /* CRT Scanline Effect */
+        .crt-line::after {
+            content: " "; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%; pointer-events: none; z-index: 10;
+        }
+
+        input[type=range] { height: 4px; -webkit-appearance: none; background: #333; accent-color: var(--accent-sec); border-radius: 2px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--accent-sec); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--accent-sec); }
+
+        /* Animations */
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 5px var(--accent); } 50% { box-shadow: 0 0 20px var(--accent); } }
+        .animate-pulse-red { animation: pulse-red 2s infinite; }
+    </style>
+</head>
+<body class="crt-line">
+
+    <canvas id="mainCanvas"></canvas>
+
+    <!-- Hidden Video Element for Streaming -->
+    <video id="sourceVideo" playsinline webkit-playsinline loop style="display: none;"></video>
+
+    <!-- UI LAYER -->
+    <div class="fixed inset-0 pointer-events-none flex flex-col justify-between p-4 z-20">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-start">
+            <div class="glass p-3 rounded-br-2xl border-l-4 border-l-[#ff003c] pointer-events-auto">
+                <h1 class="text-xs font-bold tracking-[0.2em] text-white">SPECTRE_v7</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <div id="status-dot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                    <span id="status-text" class="text-[9px] text-gray-300 font-mono uppercase">STANDBY</span>
+                </div>
+            </div>
+
+            <!-- Rack -->
+            <div id="rack" class="hidden md:block w-72 glass p-4 pointer-events-auto space-y-4 max-h-[80vh] overflow-y-auto rounded-bl-2xl border-r-4 border-r-[#00f3ff]">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                    <span class="text-[10px] text-gray-400 uppercase tracking-widest">Neural Rack</span>
+                    <button id="resetParams" class="text-[8px] text-[#00f3ff] hover:underline">RESET</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ACTIVATION OVERLAY (Crucial for Mobile Audio) -->
+        <div id="activation-overlay" class="hidden absolute inset-0 bg-black/80 flex items-center justify-center pointer-events-auto backdrop-blur-sm z-50">
+            <button id="activateBtn" class="group relative px-8 py-4 bg-transparent overflow-hidden rounded-none border border-[#ff003c]">
+                <div class="absolute inset-0 w-0 bg-[#ff003c] transition-all duration-[250ms] ease-out group-hover:w-full opacity-20"></div>
+                <span class="relative text-sm font-bold tracking-[0.3em] text-[#ff003c] group-hover:text-white">ACTIVATE NEURAL LINK</span>
+            </button>
+        </div>
+
+        <!-- Transport Control -->
+        <div class="flex justify-center mb-6">
+            <div class="glass p-4 rounded-full pointer-events-auto flex items-center gap-6 shadow-[0_0_30px_rgba(0,0,0,0.6)]">
+                <!-- Play/Pause -->
+                <button id="playBtn" class="text-white hover:text-[#00f3ff] transition-colors">
+                    <svg id="icon-play" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="icon-pause" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+
+                <div class="w-[1px] h-6 bg-gray-700"></div>
+
+                <!-- Load Button -->
+                <button onclick="document.getElementById('fileIn').click()" class="flex flex-col items-start group">
+                    <span class="text-[8px] text-gray-500 group-hover:text-[#ff003c] uppercase transition-colors font-bold">Input</span>
+                    <span class="text-xs font-bold text-white group-hover:text-[#ff003c] tracking-wide transition-colors">SELECT MEDIA</span>
+                </button>
+
+                <div class="w-[1px] h-6 bg-gray-700"></div>
+
+                <!-- Info -->
+                <div class="flex flex-col w-32">
+                    <span id="track-name" class="text-[9px] text-gray-400 truncate font-bold">NO SIGNAL</span>
+                    <span id="time-display" class="text-[9px] text-[#00f3ff] font-mono">--:-- / --:--</span>
+                </div>
+
+                <input type="file" id="fileIn" class="hidden" accept="audio/*,video/*">
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Rack Toggle -->
+    <button id="toggleRack" class="fixed top-20 right-4 z-40 glass p-3 md:hidden pointer-events-auto text-[#00f3ff] rounded-lg">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+    </button>
+
+<script>
+/**
+ * SPECTRE v7: HYBRID STREAMING ARCHITECTURE
+ * Fixes: Memory crashes on large files, iOS audio locking, Video rendering
+ */
+
+const CONSTANTS = { FFT_SIZE: 1024, SMOOTHING: 0.85 };
+
+// --- AUDIO/VIDEO KERNEL ---
+class HybridKernel {
+    constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = CONSTANTS.FFT_SIZE;
+        this.analyser.smoothingTimeConstant = CONSTANTS.SMOOTHING;
+        
+        this.videoEl = document.getElementById('sourceVideo');
+        this.sourceNode = null;
+        this.isInitialized = false;
+        
+        this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        this.prevData = new Uint8Array(this.analyser.frequencyBinCount);
+        this.fluxAvg = 0;
+    }
+
+    // Step 1: User selects file
+    loadFile(file) {
+        const url = URL.createObjectURL(file);
+        this.videoEl.src = url;
+        this.videoEl.load();
+        
+        ui.setTrack(file.name);
+        ui.setStatus('READY TO ENGAGE', '#ff003c');
+        
+        // Show activation button (Required for iOS)
+        document.getElementById('activation-overlay').classList.remove('hidden');
+    }
+
+    // Step 2: User explicitly taps "Activate"
+    async engage() {
+        if (this.ctx.state === 'suspended') await this.ctx.resume();
+        
+        if (!this.isInitialized) {
+            // Create source only once to avoid graph errors
+            this.sourceNode = this.ctx.createMediaElementSource(this.videoEl);
+            this.sourceNode.connect(this.analyser);
+            this.analyser.connect(this.ctx.destination);
+            this.isInitialized = true;
+        }
+
+        try {
+            await this.videoEl.play();
+            ui.setStatus('NEURAL LINK ACTIVE', '#00f3ff');
+            ui.updatePlayBtn(true);
+            document.getElementById('activation-overlay').classList.add('hidden');
+            document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-[#00f3ff] shadow-[0_0_10px_#00f3ff]';
+        } catch (err) {
+            console.error(err);
+            ui.setStatus('AUTOPLAY BLOCKED - RETRY', '#ff003c');
+        }
+    }
+
+    toggle() {
+        if (this.videoEl.paused) {
+            this.videoEl.play();
+            ui.updatePlayBtn(true);
+            ui.setStatus('RESUMED', '#00f3ff');
+        } else {
+            this.videoEl.pause();
+            ui.updatePlayBtn(false);
+            ui.setStatus('PAUSED', '#fbbf24');
+        }
+    }
+
+    getAnalysis() {
+        this.analyser.getByteFrequencyData(this.dataArray);
+        
+        const range = (min, max) => {
+            const nyquist = this.ctx.sampleRate / 2;
+            const start = Math.floor((min / nyquist) * this.dataArray.length);
+            const end = Math.floor((max / nyquist) * this.dataArray.length);
+            let sum = 0, count = 0;
+            for(let i=start; i<=end; i++) { sum += this.dataArray[i]; count++; }
+            return count > 0 ? (sum/count)/255 : 0;
+        };
+
+        // Transient Detection (Flux)
+        let flux = 0;
+        for(let i=0; i<this.dataArray.length; i++) {
+            let diff = this.dataArray[i] - this.prevData[i];
+            if(diff > 0) flux += diff;
+        }
+        flux /= (this.dataArray.length * 255);
+        this.fluxAvg = (this.fluxAvg * 0.9) + (flux * 0.1);
+        const isTransient = flux > (this.fluxAvg * 1.5) && flux > 0.05;
+        this.prevData.set(this.dataArray);
+
+        return {
+            bass: range(20, 150),
+            mid: range(150, 2000),
+            treble: range(2000, 12000),
+            isTransient,
+            video: this.videoEl // Pass video element to visualizer
+        };
+    }
+}
+
+// --- VISUAL STACK ---
+const Plugins = [
+    {
+        name: 'Video Feed',
+        config: { opacity: 0.4, saturation: 1.0 },
+        controls: [
+            {id: 'opacity', label: 'Video Mix', min: 0, max: 1, step: 0.1},
+            {id: 'saturation', label: 'Color Sat', min: 0, max: 2, step: 0.1}
+        ],
+        draw: (ctx, w, h, data, config) => {
+            if (data.video && data.video.readyState >= 2) {
+                ctx.save();
+                ctx.globalAlpha = config.opacity;
+                if(config.saturation !== 1) ctx.filter = `saturate(${config.saturation * 100}%)`;
+                
+                // Draw video to fit canvas (cover)
+                const vw = data.video.videoWidth, vh = data.video.videoHeight;
+                const ratio = Math.max(w/vw, h/vh);
+                const dw = vw * ratio, dh = vh * ratio;
+                const dx = (w - dw) / 2, dy = (h - dh) / 2;
+                
+                ctx.drawImage(data.video, dx, dy, dw, dh);
+                ctx.restore();
+            }
+        }
+    },
+    {
+        name: 'Data Decay',
+        config: { decay: 0.15 },
+        controls: [{id: 'decay', label: 'Trail Length', min: 0.05, max: 0.8, step: 0.01}],
+        draw: (ctx, w, h, data, config) => {
+            ctx.fillStyle = `rgba(5, 5, 8, ${config.decay})`;
+            ctx.fillRect(0, 0, w, h);
+        }
+    },
+    {
+        name: 'Thomas Attractor',
+        config: { scale: 35, speed: 1.5, chaos: 0.20 },
+        state: { points: [], init: false },
+        controls: [
+            {id: 'scale', label: 'Geo Scale', min: 10, max: 80, step: 1},
+            {id: 'chaos', label: 'Chaos Factor', min: 0.1, max: 0.3, step: 0.001}
+        ],
+        draw: (ctx, w, h, data, config) => {
+            const p = Plugins[2];
+            if (!p.state.init) {
+                for(let i=0; i<800; i++) p.state.points.push({
+                    x: Math.random()*2-1, y: Math.random()*2-1, z: Math.random()*2-1,
+                    hue: Math.random()*60 + 160 // Cyan/Blue range
+                });
+                p.state.init = true;
+            }
+
+            const dt = 0.01 * config.speed * (1 + data.bass);
+            const cx = w/2, cy = h/2;
+
+            p.state.points.forEach(pt => {
+                const b = config.chaos;
+                const dx = -b * pt.x + Math.sin(pt.y);
+                const dy = -b * pt.y + Math.sin(pt.z);
+                const dz = -b * pt.z + Math.sin(pt.x);
+                pt.x += dx * dt; pt.y += dy * dt; pt.z += dz * dt;
+
+                const scale = config.scale * (1 + data.bass * 0.6);
+                const sx = cx + pt.x * scale;
+                const sy = cy + pt.y * scale;
+
+                const alpha = 0.5 + data.treble;
+                // Mix Red (Accent) with Cyan based on intensity
+                const hue = pt.hue + (data.bass * 40); 
+                
+                ctx.fillStyle = `hsla(${hue}, 100%, 50%, ${alpha})`;
+                ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI*2); ctx.fill();
+            });
+        }
+    },
+    {
+        name: 'Glitch Interface',
+        config: { intensity: 0.5 },
+        controls: [{id: 'intensity', label: 'Glitch FX', min: 0, max: 1, step: 0.1}],
+        draw: (ctx, w, h, data, config) => {
+            if (!data.isTransient || Math.random() > config.intensity) return;
+            
+            // RGB Shift
+            const shift = (Math.random() - 0.5) * 20;
+            try {
+                // Copy Red Channel
+                const sliceH = Math.random() * h * 0.2;
+                const y = Math.random() * h;
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+                ctx.fillStyle = 'rgba(255, 0, 60, 0.5)';
+                ctx.fillRect(0, y, w, sliceH); // Flash
+                ctx.restore();
+                
+                // Displacement
+                ctx.drawImage(ctx.canvas, 0, y, w, sliceH, shift, y, w, sliceH);
+            } catch(e) {}
+        }
+    }
+];
+
+// --- MAIN LOOP ---
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+const kernel = new HybridKernel();
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function loop() {
+    requestAnimationFrame(loop);
+    const data = kernel.getAnalysis();
+    
+    // Pass video time to UI
+    if (data.video && !data.video.paused) {
+        const t = data.video.currentTime;
+        const d = data.video.duration || 0;
+        const fmt = val => Math.floor(val/60) + ':' + Math.floor(val%60).toString().padStart(2,'0');
+        document.getElementById('time-display').innerText = `${fmt(t)} / ${fmt(d)}`;
+    }
+
+    Plugins.forEach(p => {
+        ctx.save();
+        p.draw(ctx, canvas.width, canvas.height, data, p.config);
+        ctx.restore();
+    });
+}
+loop();
+
+// --- UI WIRING ---
+const ui = {
+    setStatus: (msg, col) => {
+        const el = document.getElementById('status-text');
+        el.innerText = msg;
+        if(col) el.style.color = col;
+    },
+    setTrack: (name) => document.getElementById('track-name').innerText = name.substring(0, 20),
+    updatePlayBtn: (playing) => {
+        document.getElementById('icon-play').classList.toggle('hidden', playing);
+        document.getElementById('icon-pause').classList.toggle('hidden', !playing);
+    }
+};
+
+const rack = document.getElementById('rack');
+Plugins.forEach(p => {
+    if(!p.controls) return;
+    const group = document.createElement('div');
+    group.className = 'mb-4 border-b border-gray-800 pb-2';
+    group.innerHTML = `<div class="text-[10px] text-[#00f3ff] font-bold mb-2 uppercase tracking-wider">${p.name}</div>`;
+    
+    p.controls.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'mb-3';
+        row.innerHTML = `
+            <div class="flex justify-between text-[9px] text-gray-400 mb-1">
+                <span>${c.label}</span>
+                <span id="val-${c.id}" class="text-white font-mono">${p.config[c.id]}</span>
+            </div>
+            <input type="range" class="w-full" min="${c.min}" max="${c.max}" step="${c.step}" value="${p.config[c.id]}">
+        `;
+        row.querySelector('input').addEventListener('input', (e) => {
+            p.config[c.id] = parseFloat(e.target.value);
+            document.getElementById(`val-${c.id}`).innerText = e.target.value;
+        });
+        group.appendChild(row);
+    });
+    rack.appendChild(group);
+});
+
+// Interactions
+document.getElementById('fileIn').addEventListener('change', (e) => {
+    if(e.target.files[0]) kernel.loadFile(e.target.files[0]);
+});
+document.getElementById('activateBtn').addEventListener('click', () => kernel.engage());
+document.getElementById('playBtn').addEventListener('click', () => kernel.toggle());
+document.getElementById('toggleRack').addEventListener('click', () => document.getElementById('rack').classList.toggle('hidden'));
+
+</script>
+</body>
+</html>
+

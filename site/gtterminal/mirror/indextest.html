@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>gtterminal :: signal node</title>
+  <meta name="description" content="gtterminal: a glitch-lit terminal hub for audio-reactive experiments, research logs, and broadcast artifacts." />
+
+  <style>
+    :root{
+      --bg:#06090c;
+      --panel:#0b1318;
+      --line:rgba(130, 255, 230, .18);
+      --text:#d7fff3;
+      --muted:rgba(215,255,243,.72);
+      --cyan:#62ffe0;
+      --amber:#ffd37a;
+      --red:#ff4d6d;
+      --shadow: rgba(0,0,0,.6);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:var(--mono);
+      color:var(--text);
+      background: radial-gradient(1200px 700px at 50% 30%, #0a1c20 0%, var(--bg) 55%, #040506 100%);
+      overflow-x:hidden;
+    }
+
+    /* keep status line clean */
+    #statusText{
+      display:inline-block;
+      max-width:62vw;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* CRT overlay: scanlines + vignette */
+    .crt::before{
+      content:"";
+      position:fixed; inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(to bottom,
+          rgba(255,255,255,.05),
+          rgba(255,255,255,0) 2px,
+          rgba(0,0,0,.12) 4px),
+        radial-gradient(900px 600px at 50% 30%, rgba(98,255,224,.08), rgba(0,0,0,.55) 70%);
+      background-size: 100% 6px, 100% 100%;
+      mix-blend-mode: overlay;
+      opacity:.75;
+    }
+
+    /* noise */
+    .crt::after{
+      content:"";
+      position:fixed; inset:-30%;
+      pointer-events:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+      opacity:.06;
+      animation: noiseShift 6s steps(6) infinite;
+    }
+    @keyframes noiseShift{
+      0%{transform:translate3d(-2%, -3%, 0)}
+      20%{transform:translate3d(3%, 1%, 0)}
+      40%{transform:translate3d(-1%, 4%, 0)}
+      60%{transform:translate3d(2%, -1%, 0)}
+      80%{transform:translate3d(-3%, 2%, 0)}
+      100%{transform:translate3d(0%, 0%, 0)}
+    }
+
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:28px 16px 56px;
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      background:rgba(8,14,18,.72);
+      border-radius:12px;
+      box-shadow:0 20px 60px var(--shadow);
+    }
+
+    .status{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      user-select:none;
+    }
+
+    .dot{
+      width:10px; height:10px;
+      border-radius:99px;
+      background: radial-gradient(circle at 30% 30%, #c8fff2, var(--cyan));
+      box-shadow: 0 0 18px rgba(98,255,224,.35);
+      animation: pulse 2.6s ease-in-out infinite;
+    }
+    @keyframes pulse{
+      0%,100%{transform:scale(.92); opacity:.9}
+      50%{transform:scale(1.06); opacity:1}
+    }
+
+    .right{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      font-size:12px;
+      color:var(--muted);
+      user-select:none;
+      white-space:nowrap;
+    }
+
+    .chip{
+      border:1px solid var(--line);
+      background:rgba(10,22,26,.6);
+      padding:6px 10px;
+      border-radius:999px;
+    }
+
+    .hero{
+      margin-top:18px;
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+    }
+
+    @media (max-width: 860px){
+      .hero{grid-template-columns:1fr}
+    }
+
+    .panel{
+      border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(10,22,26,.72), rgba(6,10,12,.72));
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 20px 60px var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
+
+    .panel::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: linear-gradient(90deg, rgba(98,255,224,.07), rgba(255,255,255,0), rgba(255,77,109,.05));
+      opacity:.35;
+      pointer-events:none;
+    }
+
+    .title{
+      margin:0 0 8px 0;
+      font-size:26px;
+      letter-spacing:.02em;
+      position:relative;
+      display:inline-block;
+      line-height:1.15;
+    }
+
+    /* glitch title */
+    .glitch{
+      position:relative;
+      text-shadow: 0 0 18px rgba(98,255,224,.18);
+    }
+    .glitch::before,
+    .glitch::after{
+      content: attr(data-text);
+      position:absolute;
+      left:0; top:0;
+      width:100%;
+      overflow:hidden;
+      clip-path: inset(0 0 0 0);
+      opacity:.75;
+      pointer-events:none;
+    }
+    .glitch::before{
+      transform: translate(1px, 0);
+      color: rgba(98,255,224,.9);
+      mix-blend-mode: screen;
+      animation: glitchA 3.4s infinite;
+    }
+    .glitch::after{
+      transform: translate(-1px, 0);
+      color: rgba(255,77,109,.85);
+      mix-blend-mode: screen;
+      animation: glitchB 2.9s infinite;
+    }
+
+    @keyframes glitchA{
+      0%, 100%{clip-path: inset(0 0 0 0)}
+      14%{clip-path: inset(12% 0 72% 0)}
+      18%{clip-path: inset(55% 0 30% 0)}
+      24%{clip-path: inset(8% 0 78% 0)}
+      58%{clip-path: inset(40% 0 45% 0)}
+      62%{clip-path: inset(0 0 0 0)}
+    }
+    @keyframes glitchB{
+      0%, 100%{clip-path: inset(0 0 0 0)}
+      10%{clip-path: inset(68% 0 10% 0)}
+      16%{clip-path: inset(20% 0 65% 0)}
+      30%{clip-path: inset(5% 0 80% 0)}
+      52%{clip-path: inset(45% 0 35% 0)}
+      56%{clip-path: inset(0 0 0 0)}
+    }
+
+    .subtitle{
+      margin:0 0 14px 0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+    }
+
+    .boot{
+      border:1px dashed rgba(98,255,224,.25);
+      background:rgba(6,10,12,.55);
+      border-radius:12px;
+      padding:12px;
+      font-size:12px;
+      line-height:1.55;
+      color:rgba(215,255,243,.82);
+      min-height:132px;
+      white-space:pre-wrap;
+    }
+
+    /* Terminal updates (changelog feed) */
+    .term-sep{
+      height:1px;
+      background: linear-gradient(90deg, transparent, rgba(98,255,224,.22), transparent);
+      margin:10px 0;
+      border:0;
+    }
+    .term-line{
+      font-family:var(--mono);
+      font-size:12px;
+      line-height:1.55;
+      color:rgba(215,255,243,.9);
+      white-space:pre-wrap;
+    }
+    .term-line.dim{color:rgba(215,255,243,.62)}
+    .term-line.good{color:rgba(98,255,224,.95)}
+    .term-line.warn{color:rgba(255,211,122,.95)}
+    .term-line.bad{color:rgba(255,77,109,.95)}
+    .term-line a{
+      color:rgba(98,255,224,.95);
+      text-decoration:none;
+      border-bottom:1px dotted rgba(98,255,224,.35);
+    }
+    .term-line a:hover{border-bottom-color:rgba(98,255,224,.65)}
+
+    .menu{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:10px;
+    }
+
+    @media (max-width: 520px){
+      .menu{grid-template-columns:1fr}
+    }
+
+    .link{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(8,14,18,.6);
+      text-decoration:none;
+      color:var(--text);
+      position:relative;
+      overflow:hidden;
+    }
+
+    .link:hover{
+      border-color: rgba(98,255,224,.45);
+      box-shadow: 0 0 0 1px rgba(98,255,224,.15), 0 18px 50px rgba(0,0,0,.55);
+      transform: translateY(-1px);
+      transition: .18s ease;
+    }
+
+    .k{
+      font-size:11px;
+      color: rgba(255,211,122,.9);
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .l-title{
+      font-size:14px;
+      letter-spacing:.02em;
+    }
+
+    .l-desc{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+
+    .aside h2{
+      margin:0 0 10px;
+      font-size:13px;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+      color: rgba(255,211,122,.92);
+    }
+
+    .list{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+
+    .tag{
+      font-size:12px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(130,255,230,.18);
+      background:rgba(8,14,18,.6);
+      color: rgba(215,255,243,.84);
+    }
+
+    .hr{
+      height:1px;
+      background: linear-gradient(90deg, transparent, rgba(98,255,224,.22), transparent);
+      margin:14px 0;
+      border:0;
+    }
+
+    footer{
+      margin-top:14px;
+      color:rgba(215,255,243,.6);
+      font-size:12px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .tiny{
+      color:rgba(215,255,243,.55);
+    }
+
+    .btnrow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      font-size:12px;
+      text-decoration:none;
+      color:rgba(215,255,243,.82);
+      border:1px solid rgba(130,255,230,.18);
+      background:rgba(8,14,18,.5);
+      padding:8px 10px;
+      border-radius:12px;
+    }
+    .btn:hover{border-color:rgba(98,255,224,.45)}
+
+    /* reduced motion */
+    @media (prefers-reduced-motion: reduce){
+      .crt::after, .dot, .glitch::before, .glitch::after{animation:none}
+      .link:hover{transform:none}
+    }
+  </style>
+</head>
+
+<body class="crt">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="statusText">gtterminal online</span>
+      </div>
+      <div class="right">
+        <span class="chip" id="clock">00:00:00</span>
+        <span class="chip">CTRL+K: keys 1–6</span>
+      </div>
+    </div>
+
+    <section class="hero">
+      <div class="panel">
+        <h1 class="title glitch" data-text="GTTERMINAL">GTTERMINAL</h1>
+        <p class="subtitle">
+          A home screen for audio-reactive experiments, glitch aesthetics, and research logs.
+          Select a channel. Touch nothing you aren’t willing to debug.
+        </p>
+
+        <div class="boot" id="boot" aria-label="Boot log"></div>
+
+        <!-- NEW: terminal window update feed -->
+        <div class="boot" id="terminalUpdates" aria-label="Latest updates" style="margin-top:12px; min-height:auto;">
+          <div class="term-line dim">updates: waiting for changelog feed…</div>
+        </div>
+
+        <div class="menu" aria-label="Channels">
+          <a class="link" href="broadcasts.html" data-key="1">
+            <div class="k">[1] Broadcasts</div>
+            <div class="l-title">Releases, videos, finished artifacts</div>
+            <div class="l-desc">The public signal. The parts that escaped the lab.</div>
+          </a>
+
+          <a class="link" href="research.html" data-key="2">
+            <div class="k">[2] Research</div>
+            <div class="l-title">Suno Prompt Lab notes, meta-tag experiments</div>
+            <div class="l-desc">Process, findings, failures, and the occasional victory lap.</div>
+          </a>
+
+          <a class="link" href="systems.html" data-key="3">
+            <div class="k">[3] Systems</div>
+            <div class="l-title">WebGL visualizers, glitch engine tools</div>
+            <div class="l-desc">Interactive modules. Use at your own frame rate.</div>
+          </a>
+
+          <a class="link" href="studio.html" data-key="4">
+            <div class="k">[4] Studio</div>
+            <div class="l-title">Ne0 Hack lore, logs, and build philosophy</div>
+            <div class="l-desc">Not a bio. A dossier with better lighting.</div>
+          </a>
+
+          <a class="link" href="archives.html" data-key="5">
+            <div class="k">[5] Archives</div>
+            <div class="l-title">Scraps, prototypes, broken beauties</div>
+            <div class="l-desc">Where “it didn’t work” becomes “it taught me something.”</div>
+          </a>
+
+          <a class="link" href="contact.html" data-key="6">
+            <div class="k">[6] Contact</div>
+            <div class="l-title">Links, handles, collab routes</div>
+            <div class="l-desc">If you’re here to build, you’re welcome.</div>
+          </a>
+        </div>
+
+        <hr class="hr" />
+
+        <footer>
+          <div class="tiny">Tip: press keys 1–6 to jump. Press “/” to focus search later.</div>
+          <div class="btnrow">
+            <a class="btn" href="now.html">Now</a>
+            <a class="btn" href="changelog.html">Changelog</a>
+            <a class="btn" href="credits.html">Credits</a>
+          </div>
+        </footer>
+      </div>
+
+      <aside class="panel aside" aria-label="Interests and modules">
+        <h2>Detected Interests</h2>
+        <div class="list">
+          <span class="tag">audio-reactive visuals</span>
+          <span class="tag">glitch taxonomy</span>
+          <span class="tag">Suno prompt labs</span>
+          <span class="tag">meta-tag architecture</span>
+          <span class="tag">WebGL2</span>
+          <span class="tag">DSP experiments</span>
+          <span class="tag">semantic exploits</span>
+          <span class="tag">satirical media</span>
+          <span class="tag">tool-building</span>
+        </div>
+
+        <hr class="hr" />
+
+        <h2>Active Modules</h2>
+        <div class="list">
+          <span class="tag">Spectra-Core</span>
+          <span class="tag">Glitch Engine</span>
+          <span class="tag">Prompt Lab Vault</span>
+          <span class="tag">Daily Derail Node</span>
+        </div>
+
+        <hr class="hr" />
+
+        <h2>Quick Note</h2>
+        <p class="subtitle" style="margin:0;">
+          This site is a living system. Pages will evolve, tools will ship, and some links will temporarily point into the void.
+          That’s not broken. That’s iteration.
+        </p>
+      </aside>
+    </section>
+  </div>
+
+  <script>
+  // Live clock (local time)
+  const clockEl = document.getElementById("clock");
+  function tick(){
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,"0");
+    const mm = String(d.getMinutes()).padStart(2,"0");
+    const ss = String(d.getSeconds()).padStart(2,"0");
+    clockEl.textContent = `${hh}:${mm}:${ss}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // Boot log: typewriter lines
+  const bootEl = document.getElementById("boot");
+  const lines = [
+    "GTTERMINAL BIOS v0.9.7",
+    "boot: initializing display buffer...",
+    "boot: loading scanline shader... OK",
+    "boot: mounting /research ... PENDING",
+    "boot: mounting /systems  ... PENDING",
+    "boot: signal lock: ACQUIRED",
+    "boot: audio-reactive bus: ARMED",
+    "boot: glitch governor: ACTIVE (controlled failure mode)",
+    "",
+    "WELCOME // select a channel:",
+    "1 Broadcasts  | 2 Research  | 3 Systems",
+    "4 Studio      | 5 Archives  | 6 Contact"
+  ];
+
+  let iLine = 0;
+  let iChar = 0;
+  let current = "";
+
+  function typeNext(){
+    if(iLine >= lines.length) return;
+    const line = lines[iLine];
+    if(iChar < line.length){
+      current += line[iChar++];
+      bootEl.textContent = current + "▌";
+      requestAnimationFrame(typeNext);
+    }else{
+      current += "\n";
+      bootEl.textContent = current;
+      iLine++;
+      iChar = 0;
+      const pause = 120 + Math.random()*220;
+      setTimeout(typeNext, pause);
+    }
+  }
+  setTimeout(typeNext, 250);
+
+  // Keyboard shortcuts 1–6
+  document.addEventListener("keydown", (e) => {
+    const k = e.key;
+    if(!/^[1-6]$/.test(k)) return;
+    const link = document.querySelector(\`.link[data-key="\${k}"]\`);
+    if(link){
+      window.location.href = link.getAttribute("href");
+    }
+  });
+
+  // Changelog feed -> Top status bar (latest entry)
+  async function loadLatestChangelog(){
+    try{
+      const res = await fetch("changelog.html", { cache: "no-store" });
+      if(!res.ok) throw new Error("changelog fetch failed");
+      const html = await res.text();
+
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const first = doc.querySelector(".entry");
+      if(!first) return;
+
+      const dateText = first.querySelector(".date")?.textContent?.trim() || "";
+      const iso = first.querySelector(".iso")?.getAttribute("data-iso") || "";
+      const update = first.querySelector(".update")?.textContent?.trim() || "UPDATE";
+      const tags = Array.from(first.querySelectorAll(".tag"))
+        .slice(0, 3)
+        .map(t => t.textContent.trim())
+        .filter(Boolean);
+
+      const stamp = iso || dateText || "UNKNOWN-DATE";
+      const tagStr = tags.length ? \` :: \${tags.join(", ")}\` : "";
+
+      const statusEl = document.getElementById("statusText");
+      if(statusEl) statusEl.textContent = \`\${stamp} :: \${update}\${tagStr}\`;
+    } catch (e){
+      // quiet fail: leave default status text
+    }
+  }
+
+  // NEW: Changelog feed -> Terminal window (multiple entries)
+  async function loadTerminalUpdates(){
+    const out = document.getElementById("terminalUpdates");
+    if(!out) return;
+
+    const mk = (cls, text) => {
+      const div = document.createElement("div");
+      div.className = ("term-line " + (cls || "")).trim();
+      div.textContent = text;
+      return div;
+    };
+
+    try{
+      const res = await fetch("changelog.html", { cache: "no-store" });
+      if(!res.ok) throw new Error("changelog fetch failed");
+
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      const entries = Array.from(doc.querySelectorAll(".entry")).slice(0, 6); // show newest 6
+      out.innerHTML = "";
+
+      out.appendChild(mk("good", "gtterminal :: latest updates"));
+      const sep1 = document.createElement("hr");
+      sep1.className = "term-sep";
+      out.appendChild(sep1);
+
+      if(!entries.length){
+        out.appendChild(mk("dim", "updates: changelog feed empty (no .entry found)"));
+        return;
+      }
+
+      for(const e of entries){
+        const dateText = e.querySelector(".date")?.textContent?.trim() || "";
+        const iso = e.querySelector(".iso")?.getAttribute("data-iso") || "";
+        const update = e.querySelector(".update")?.textContent?.trim() || "UPDATE";
+        const tags = Array.from(e.querySelectorAll(".tag"))
+          .slice(0, 4)
+          .map(t => t.textContent.trim())
+          .filter(Boolean);
+
+        const stamp = iso || dateText || "UNKNOWN-DATE";
+        const tagStr = tags.length ? ` [${tags.join(", ")}]` : "";
+        out.appendChild(mk("", `${stamp} :: ${update}${tagStr}`));
+      }
+
+      const sep2 = document.createElement("hr");
+      sep2.className = "term-sep";
+      out.appendChild(sep2);
+
+      // clickable hint
+      const hint = document.createElement("div");
+      hint.className = "term-line dim";
+      hint.innerHTML = 'source: <a href="changelog.html">changelog.html</a>';
+      out.appendChild(hint);
+
+    } catch(err){
+      out.innerHTML = "";
+      out.appendChild(mk("bad", "updates: failed to load changelog feed"));
+      out.appendChild(mk("dim", "check: changelog.html path + .entry markup"));
+    }
+  }
+
+  // run once on load
+  loadLatestChangelog();
+  loadTerminalUpdates();
+</script>
+</body>
+</html>

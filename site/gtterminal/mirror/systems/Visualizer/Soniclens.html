@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SonicLens | Modular Ecosystem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ==========================================
+           📁 /src/css/styles.css
+           ========================================== */
+        body {
+            background-color: #050505;
+            overflow: hidden;
+            color: white;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0; padding: 0;
+        }
+
+        #canvas-container { position: absolute; inset: 0; z-index: 1; }
+        canvas { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 0.5s ease; }
+        #canvas-2d { opacity: 0; z-index: 1; }
+        #canvas-gl { opacity: 0; z-index: 2; }
+
+        .glass-panel {
+            background: rgba(15, 15, 20, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        /* Sliders */
+        input[type=range] { -webkit-appearance: none; background: transparent; height: 4px; border-radius: 2px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
+            background: #fff; margin-top: -4px; cursor: pointer;
+            box-shadow: 0 0 10px rgba(255,255,255,0.8); transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+        .btn-icon {
+            padding: 0.5rem; border-radius: 50%; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.05); color: white; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-icon:hover { background: rgba(255,255,255,0.15); }
+        .btn-icon:active { transform: scale(0.95); }
+
+        /* Settings Popover */
+        #settings-panel {
+            position: absolute; bottom: 80px; right: 0; width: 300px;
+            transform: translateY(20px); opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #settings-panel.active { transform: translateY(0); opacity: 1; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+    <!-- Render Targets -->
+    <div id="canvas-container">
+        <canvas id="canvas-2d"></canvas>
+        <canvas id="canvas-gl"></canvas>
+    </div>
+
+    <!-- Intro Screen -->
+    <div id="intro-overlay" class="absolute inset-0 bg-[#050505] z-50 flex flex-col items-center justify-center transition-opacity duration-700">
+        <h1 class="text-4xl font-light tracking-[0.3em] mb-8">SONIC<span class="font-bold">LENS</span></h1>
+        <label for="audio-upload-main" class="px-8 py-3 bg-white text-black rounded-full font-bold cursor-pointer hover:bg-gray-200 transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95">
+            LOAD AUDIO FILE
+        </label>
+        <input type="file" id="audio-upload-main" accept="audio/*" class="hidden">
+    </div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-[95%] max-w-4xl opacity-0 pointer-events-none transition-opacity duration-700">
+        
+        <!-- Auto-Generated Settings Panel -->
+        <div id="settings-panel" class="glass-panel rounded-2xl p-6 mb-4">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 border-b border-white/10 pb-2">Plugin Parameters</h3>
+            <div id="params-container" class="space-y-4">
+                <!-- Sliders injected here via UIManager -->
+            </div>
+        </div>
+
+        <!-- Main Dock -->
+        <div class="glass-panel rounded-full p-3 flex items-center justify-between gap-4">
+            <!-- Playback -->
+            <div class="flex items-center gap-3 w-1/3 pl-2">
+                <button id="btn-play" class="btn-icon w-10 h-10 flex-shrink-0">
+                    <svg id="icon-play" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="icon-pause" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <div class="flex flex-col overflow-hidden">
+                    <span id="track-name" class="text-sm font-medium truncate w-full">No Track Loaded</span>
+                </div>
+            </div>
+
+            <!-- Plugin Selector -->
+            <div class="flex items-center justify-center w-1/3 relative" id="plugin-dropdown-container">
+                <button id="dropdown-trigger" class="flex items-center justify-between w-full max-w-[220px] px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/20 shadow-lg">
+                    <span id="dropdown-label" class="truncate text-gray-200">Select Visualizer</span>
+                    <svg id="dropdown-icon" class="w-4 h-4 ml-2 opacity-70 flex-shrink-0 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <!-- Custom Dropdown Menu -->
+                <div id="dropdown-menu" class="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-full max-w-[220px] glass-panel border border-white/10 rounded-2xl overflow-hidden opacity-0 pointer-events-none transition-all duration-300 transform translate-y-4 origin-bottom shadow-2xl">
+                    <ul id="dropdown-list" class="flex flex-col py-1 m-0">
+                        <!-- Injected via JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Tools -->
+            <div class="flex items-center justify-end gap-3 w-1/3 pr-2">
+                <!-- Volume Slider -->
+                <div class="group relative flex items-center bg-white/5 border border-white/10 rounded-full px-3 py-1.5 transition-colors hover:bg-white/10 hidden md:flex">
+                    <svg class="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5 10v4a2 2 0 002 2h2l4 4V4L9 8H7a2 2 0 00-2 2z"></path></svg>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.8" class="w-16 opacity-70 hover:opacity-100 transition-opacity focus:outline-none">
+                </div>
+                
+                <button id="btn-settings" class="btn-icon w-10 h-10" title="Adjust Parameters">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+                <label for="audio-upload-dock" class="btn-icon w-10 h-10 cursor-pointer" title="Load New Track">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                </label>
+                <input type="file" id="audio-upload-dock" accept="audio/*" class="hidden">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 📁 /src/plugins/Registry.js
+        // ==========================================
+        const PluginRegistry = {};
+
+        // ==========================================
+        // 📁 /src/plugins/Bubbles.js
+        // Drops a WebGL Raymarcher into the ecosystem
+        // ==========================================
+        PluginRegistry.Bubbles = {
+            name: 'Molecular Glitch (SDF)',
+            type: 'webgl',
+            // Define adjustable parameters. The UI auto-builds sliders for these.
+            // In the shader, they automatically become uniforms (e.g., u_gloop).
+            params: {
+                gloop: { name: 'Surface Tension', type: 'range', min: 0.1, max: 1.5, step: 0.1, value: 0.6 },
+                dispersion: { name: 'RGB Glitch Amt', type: 'range', min: 0.0, max: 0.5, step: 0.01, value: 0.15 },
+                chaos: { name: 'Orbital Chaos', type: 'range', min: 0.0, max: 2.0, step: 0.1, value: 1.0 },
+                zoom: { name: 'Camera Distance', type: 'range', min: 2.0, max: 8.0, step: 0.1, value: 5.0 }
+            },
+            vertexShader: `
+                attribute vec2 position;
+                void main() { gl_Position = vec4(position, 0.0, 1.0); }
+            `,
+            fragmentShader: `
+                precision highp float;
+                // Standard Engine Uniforms
+                uniform vec2 u_resolution; uniform float u_time;
+                uniform float u_bass; uniform float u_mid; uniform float u_high;      
+                uniform float u_impulse; uniform float u_centroid; uniform float u_energy;   
+                
+                // Dynamically Injected Plugin Parameters
+                uniform float u_gloop;
+                uniform float u_dispersion;
+                uniform float u_chaos;
+                uniform float u_zoom;
+
+                #define MAX_STEPS 80
+                #define MAX_DIST 20.0
+                #define SURF_DIST 0.002
+                #define PI 3.14159265
+
+                mat2 rot(float a) { float s = sin(a), c = cos(a); return mat2(c, -s, s, c); }
+                float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+                float hash(vec3 p) { p = fract( p*0.3183099+.1 ); p *= 17.0; return fract( p.x*p.y*p.z*(p.x+p.y+p.z) ); }
+                float noise( in vec3 x ) { vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f); return mix(mix(mix( hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)),f.x), mix( hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)),f.x),f.y), mix(mix( hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)),f.x), mix( hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)),f.x),f.y),f.z); }
+                float sdOctahedron( vec3 p, float s ) { p = abs(p); return (p.x+p.y+p.z-s)*0.57735027; }
+
+                float GetDist(vec3 p) {
+                    // Squash and Stretch
+                    float squash = 1.0 + u_bass * 0.4;
+                    float stretch = 1.0 - u_bass * 0.2;
+                    p.y /= squash; p.xz /= stretch;
+                    
+                    if(u_impulse > 0.5) { float grid = 0.5; p = floor(p / grid) * grid; }
+
+                    float rotSpeed = u_time * 0.2 + (u_energy * 0.3 * u_chaos); 
+                    p.xz *= rot(rotSpeed); p.yz *= rot(u_time * 0.15);
+
+                    // Core Morphing
+                    vec3 q = p;
+                    q.x += sin(q.y * (3.0 + u_centroid * 5.0) + u_time * 2.0) * (0.1 + u_high * 0.2);
+                    float sphere = length(q) - (0.4 + u_energy * 0.4);
+                    float crystal = sdOctahedron(q, 0.5 + u_energy * 0.5);
+                    float core = mix(sphere, crystal, u_centroid * 1.5); 
+
+                    // Dynamic Bubbles
+                    float bubbles = 100.0;
+                    float orbitRadius = 1.2 + (u_energy * 1.5) + (u_impulse * 2.0);
+
+                    for(float i=0.0; i<12.0; i++) {
+                        float phi = acos( -1.0 + ( 2.0 * i ) / 12.0 ); float theta = sqrt( 12.0 * PI ) * phi;
+                        vec3 dir = vec3(cos(theta) * sin(phi), sin(theta) * sin(phi), cos(phi));
+                        dir.xz *= rot(u_time * (0.5 + i * 0.1) * u_chaos); dir.xy *= rot(u_time * (0.3 - i * 0.1) * u_chaos);
+
+                        float freqIndex = i / 11.0; 
+                        float react = (u_bass * (1.0 - smoothstep(0.0, 0.4, freqIndex))) + (u_mid * (1.0 - abs(freqIndex - 0.5)*2.0)) + (u_high * smoothstep(0.6, 1.0, freqIndex));
+                        vec3 pos = dir * (orbitRadius + react * 0.8);
+                        
+                        float dSphere = length(p - pos) - (0.3 + react * 0.4);
+                        
+                        // Use User Param for Surface Tension
+                        float blendFactor = clamp(u_gloop + (u_energy * 0.4) - (u_impulse * 0.5), 0.1, 1.5);
+                        bubbles = smin(bubbles, dSphere, blendFactor);
+                    }
+                    return smin(core, bubbles, 0.4);
+                }
+
+                vec3 GetNormal(vec3 p) { vec2 e = vec2(0.002, 0); return normalize(GetDist(p) - vec3(GetDist(p-e.xyy), GetDist(p-e.yxy), GetDist(p-e.yyx))); }
+                vec3 GetEnv(vec3 dir, float time, vec3 tone) { vec3 col = 0.5 + 0.5 * cos(dir.y * 3.0 + time + vec3(0,2,4)); col += pow(max(0.0, sin(dir.x * 20.0 + dir.y * 5.0)), 20.0) * tone * 2.0; col += pow(max(0.0, dot(dir, normalize(vec3(1, 4, -2)))), 8.0) * tone; return col; }
+                float GetAO(vec3 p, vec3 n) { float occ = 0.0; float sca = 1.0; for(int i=0; i<4; i++) { float h = 0.01 + 0.12 * float(i)/3.0; float d = GetDist(p + h*n); occ += (h-d)*sca; sca *= 0.95; } return clamp(1.0 - 2.5*occ, 0.0, 1.0); }
+
+                void main() {
+                    vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
+                    
+                    // Camera controlled by User Param 'u_zoom'
+                    vec3 ro = vec3(0, 0, -u_zoom + (u_bass * 1.0)); 
+                    ro.xy += vec2(hash(vec3(u_time,0,0))-0.5, hash(vec3(0,u_time,0))-0.5) * u_impulse * 0.15;
+                    
+                    vec3 rd = normalize(vec3(uv, 1.0));
+                    rd.xy *= 1.0 + dot(uv, uv) * (u_impulse * 0.2); rd = normalize(rd);
+
+                    float d = 0.0; vec3 p = ro; float totalDist = 0.0;
+                    for(int i = 0; i < MAX_STEPS; i++) {
+                        p = ro + rd * totalDist; d = GetDist(p); totalDist += d;
+                        if(d < SURF_DIST || totalDist > MAX_DIST) break;
+                    }
+
+                    vec3 baseColor = mix(mix(vec3(1.0, 0.1, 0.2), vec3(0.0, 1.0, 1.0), u_centroid), vec3(1.0), u_impulse);
+                    vec3 col = vec3(0.0);
+
+                    if(d < SURF_DIST) {
+                        vec3 n = GetNormal(p); vec3 ref = reflect(rd, n); 
+                        float fresnel = pow(1.0 + dot(rd, n), 3.0); float ao = GetAO(p, n);
+                        
+                        // Use User Param for Dispersion
+                        float disp = u_dispersion + u_impulse * 0.25; 
+                        
+                        vec3 dispersiveEnv = vec3(GetEnv(reflect(rd, n + vec3(disp, 0.0, 0.0)), u_time, vec3(1,0.3,0.3)).r, GetEnv(reflect(rd, n), u_time, vec3(0.3,1,0.3)).g, GetEnv(reflect(rd, n - vec3(disp, 0.0, 0.0)), u_time, vec3(0.3,0.3,1)).b) * (1.0 + u_high * 2.0);
+                        col = mix(baseColor * pow(max(0.0, dot(rd, -n)), 2.0) * (1.0 + u_energy * 3.0), dispersiveEnv, fresnel) * ao;
+                        col += pow(max(dot(ref, vec3(0,0,1)), 0.0), 30.0) * u_impulse * 5.0; 
+                    }
+
+                    col += (1.0 / (1.0 + totalDist*totalDist*0.1)) * baseColor * 0.05 * (1.0 + u_energy);
+                    col = pow(col, vec3(0.4545)) * smoothstep(1.6, 0.5, length(uv));
+                    float shift = u_impulse * 0.02; col.r += shift; col.b -= shift;
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `
+        };
+
+        // ==========================================
+        // 📁 /src/plugins/Classic.js
+        // A simple 2D Canvas plugin example showing dynamic parameters
+        // ==========================================
+        PluginRegistry.Classic = {
+            name: 'Classic Oscilloscope (2D)',
+            type: '2d',
+            params: {
+                lineWidth: { name: 'Line Thickness', type: 'range', min: 1, max: 10, step: 1, value: 3 },
+                trail: { name: 'Motion Trail', type: 'range', min: 0.0, max: 0.9, step: 0.05, value: 0.2 },
+                reactivity: { name: 'Amplitude', type: 'range', min: 0.5, max: 3.0, step: 0.1, value: 1.5 }
+            },
+            render: function(ctx, canvas, features, rawData) {
+                // Read from local params
+                const p = this.params;
+                
+                ctx.fillStyle = `rgba(5, 5, 5, ${1.0 - p.trail.value})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.lineWidth = p.lineWidth.value;
+                ctx.strokeStyle = `hsl(${features.centroid * 360}, 100%, 60%)`;
+                ctx.beginPath();
+
+                const sliceWidth = canvas.width / rawData.length;
+                let x = 0;
+
+                for(let i = 0; i < rawData.length; i++) {
+                    // map 0-255 to -1 to 1
+                    const v = (rawData[i] - 128) / 128.0; 
+                    const y = (canvas.height / 2) + (v * (canvas.height / 2) * p.reactivity.value);
+
+                    if(i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                    
+                    x += sliceWidth;
+                }
+                ctx.stroke();
+
+                if(features.impulse > 0.5) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${features.impulse * 0.3})`;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+        };
+
+==========================================
+        // 📁 /src/plugins/QuantumLattice.js (NEW PLUGIN)
+        // High-Speed Architectural Cyberspace
+        // ==========================================
+        PluginRegistry.QuantumLattice = {
+            name: 'Quantum Lattice (SDF)',
+            type: 'webgl',
+            params: {
+                flightSpeed: { name: 'Flight Speed', type: 'range', min: 0.1, max: 20.0, step: 0.5, value: 5.0 },
+                spacing: { name: 'Grid Density', type: 'range', min: 1.0, max: 8.0, step: 0.1, value: 3.0 },
+                warp: { name: 'Tunnel Warp', type: 'range', min: 0.0, max: 5.0, step: 0.1, value: 1.5 },
+                glowAmt: { name: 'Fog / Glow', type: 'range', min: 0.1, max: 2.0, step: 0.1, value: 0.8 }
+            },
+            vertexShader: `
+                attribute vec2 position;
+                void main() { gl_Position = vec4(position, 0.0, 1.0); }
+            `,
+            fragmentShader: `
+                precision highp float;
+                // Standard Audio Uniforms
+                uniform vec2 u_resolution; uniform float u_time;
+                uniform float u_bass; uniform float u_mid; uniform float u_high;      
+                uniform float u_impulse; uniform float u_centroid; uniform float u_energy;   
+                
+                // Plugin Specific Uniforms
+                uniform float u_flightSpeed;
+                uniform float u_spacing;
+                uniform float u_warp;
+                uniform float u_glowAmt;
+
+                #define MAX_STEPS 70
+                #define MAX_DIST 40.0
+                #define SURF_DIST 0.005
+
+                mat2 rot(float a) { float s=sin(a), c=cos(a); return mat2(c,-s,s,c); }
+                float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
+                float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+
+                // The infinite lattice geometry
+                float GetDist(vec3 p) {
+                    // Forward Flight Engine
+                    p.z -= u_time * u_flightSpeed + (u_energy * 15.0);
+                    
+                    // Tunnel Twist / Warp
+                    p.xy *= rot(p.z * u_warp * 0.01 + sin(u_time * 0.5) * 0.1);
+                    
+                    // Infinite repetition
+                    float s = u_spacing;
+                    vec3 id = floor(p/s);
+                    vec3 q = mod(p, s) - s*0.5;
+                    
+                    // Unique data per grid cell
+                    float h = hash(id);
+                    
+                    // Rotate nodes based on Mids
+                    q.xy *= rot(u_time * 2.0 * h + u_mid * 5.0);
+                    q.yz *= rot(u_time * 1.5 * fract(h*10.0));
+                    
+                    // Dimensions mapped to audio
+                    float thickness = 0.01 + (u_bass * 0.1);
+                    float nodeSize = 0.05 + (u_mid * 0.3 * fract(h*10.0));
+                    
+                    // Core Nodes (Spheres)
+                    float dNodes = length(q) - nodeSize;
+                    
+                    // Connecting Beams (Cylinders along axes)
+                    float dBeamX = length(q.yz) - thickness;
+                    float dBeamY = length(q.xz) - thickness;
+                    float dBeamZ = length(q.xy) - thickness;
+                    float dBeams = min(min(dBeamX, dBeamY), dBeamZ);
+                    
+                    // Smoothly fuse beams and nodes together
+                    float d = smin(dNodes, dBeams, 0.2);
+
+                    return d * 0.8; // Prevent ray step artifacts over endless repeating space
+                }
+
+                void main() {
+                    vec2 uv = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / u_resolution.y;
+                    
+                    // Camera Shake on transients
+                    vec2 shake = vec2(hash(vec3(u_time,1,1))-0.5, hash(vec3(2,u_time,2))-0.5);
+                    vec3 ro = vec3(0, 0, -3.0);
+                    ro.xy += shake * u_impulse * 0.4; 
+                    
+                    // Ray direction
+                    vec3 rd = normalize(vec3(uv, 1.0));
+                    
+                    // Glitch Lens Flare
+                    float lensFlare = u_impulse * 0.1;
+                    rd.xy *= 1.0 - length(uv) * lensFlare;
+                    rd = normalize(rd);
+                    
+                    float t = 0.0;
+                    vec3 p;
+                    float accumGlow = 0.0;
+                    
+                    // Raymarching Volumetric Loop
+                    for(int i=0; i<MAX_STEPS; i++) {
+                        p = ro + rd * t;
+                        float d = GetDist(p);
+                        
+                        // Accumulate emissive glow near surfaces. Driven by Highs.
+                        accumGlow += exp(-d * (10.0 - u_glowAmt * 5.0)) * (0.02 + u_high * 0.08);
+                        
+                        t += d; 
+                        if(d < SURF_DIST || t > MAX_DIST) break;
+                    }
+                    
+                    // Color Palettes
+                    vec3 colorMatrix = vec3(0.0, 1.0, 0.4); // Deep Green
+                    vec3 colorCyber = vec3(1.0, 0.0, 0.8);  // Magenta
+                    vec3 colorNeon = vec3(0.0, 0.8, 1.0);   // Cyan
+                    
+                    // Shift entire environment color based on spectral center
+                    vec3 baseCol = mix(colorMatrix, colorCyber, u_centroid * 1.5);
+                    baseCol = mix(baseCol, colorNeon, smoothstep(0.5, 1.0, u_centroid));
+                    
+                    // Flash pure white on heavy hits
+                    baseCol = mix(baseCol, vec3(1.0), u_impulse * 0.9);
+                    
+                    // Render Image
+                    vec3 col = baseCol * accumGlow;
+                    
+                    // Central 'Warp Core' Beam
+                    float beamDist = length(p.xy); 
+                    col += mix(vec3(0), baseCol, exp(-beamDist * 3.0)) * (u_bass * 0.5);
+                    
+                    // Depth Fog (Fades out endless grid)
+                    col = mix(col, vec3(0.0), 1.0 - exp(-0.015 * t * t));
+                    
+                    // Post Proc & Vignette
+                    col = pow(col, vec3(0.4545));
+                    col *= smoothstep(1.8, 0.2, length(uv));
+                    
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `
+        };
+
+        // 
+        // ==========================================
+        // 📁 /src/core/AudioEngine.js
+        // Standardized Feature Extraction
+        // ==========================================
+        const AudioEngine = (function() {
+            let ctx, analyser, source;
+            let dataArray, timeArray;
+            let history = []; 
+            const HISTORY_SIZE = 15;
+            
+            function init(audioElement) {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = ctx.createAnalyser();
+                analyser.fftSize = 2048; 
+                analyser.smoothingTimeConstant = 0.85;
+                source = ctx.createMediaElementSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(ctx.destination);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                timeArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+            
+            function getFeatures() {
+                if (!analyser) return { bass:0, mid:0, high:0, impulse:0, centroid:0, energy:0, rawData: [] };
+                
+                analyser.getByteFrequencyData(dataArray);
+                analyser.getByteTimeDomainData(timeArray); 
+                
+                let sum = 0;
+                for(let i=0; i<timeArray.length; i++) sum += Math.pow((timeArray[i] - 128) / 128, 2);
+                let energy = Math.sqrt(sum / timeArray.length);
+                
+                let bSum=0, mSum=0, hSum=0;
+                for(let i=1; i<8; i++) bSum += dataArray[i];
+                for(let i=8; i<100; i++) mSum += dataArray[i];
+                for(let i=100; i<500; i++) hSum += dataArray[i];
+                
+                let bass = (bSum / 7) / 255, mid = (mSum / 92) / 255, high = (hSum / 400) / 255;
+                
+                let num=0, den=0;
+                for(let i=0; i<512; i++) { num += i * dataArray[i]; den += dataArray[i]; }
+                let centroid = Math.min(den === 0 ? 0 : (num / den) / 256, 1.0);
+                
+                history.push(bass);
+                if(history.length > HISTORY_SIZE) history.shift();
+                let avgBass = history.reduce((a,b)=>a+b, 0) / history.length;
+                let impulse = (bass > avgBass * 1.15 && bass > 0.05) ? Math.min((bass - avgBass) * 4.0, 1.0) : 0;
+
+                return { bass, mid, high, impulse, centroid, energy, rawData: timeArray };
+            }
+            return { init, getFeatures, resume: () => { if(ctx) ctx.resume() } };
+        })();
+
+
+        // ==========================================
+        // 📁 /src/core/Renderer.js
+        // Handles routing parameters and drawing
+        // ==========================================
+        const Renderer = (function() {
+            const c2d = document.getElementById('canvas-2d'); const ctx2d = c2d.getContext('2d');
+            const cGl = document.getElementById('canvas-gl'); const gl = cGl.getContext('webgl');
+            
+            let currentPlugin = null;
+            let glProgram = null, glLocs = {};
+            let smoothedImpulse = 0;
+
+            function resize() {
+                c2d.width = cGl.width = window.innerWidth; c2d.height = cGl.height = window.innerHeight;
+                if(gl) gl.viewport(0, 0, cGl.width, cGl.height);
+            }
+            window.addEventListener('resize', resize); resize();
+
+            function loadPlugin(pluginKey) {
+                currentPlugin = PluginRegistry[pluginKey];
+                if(!currentPlugin) return;
+
+                if (currentPlugin.type === 'webgl' && gl) {
+                    cGl.style.opacity = 1; c2d.style.opacity = 0;
+                    initWebGL(currentPlugin);
+                } else {
+                    c2d.style.opacity = 1; cGl.style.opacity = 0;
+                }
+            }
+
+            function initWebGL(plugin) {
+                const compile = (type, src) => {
+                    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+                    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error("Shader Error:", gl.getShaderInfoLog(s));
+                    return s;
+                };
+                
+                glProgram = gl.createProgram();
+                gl.attachShader(glProgram, compile(gl.VERTEX_SHADER, plugin.vertexShader));
+                gl.attachShader(glProgram, compile(gl.FRAGMENT_SHADER, plugin.fragmentShader));
+                gl.linkProgram(glProgram); gl.useProgram(glProgram);
+
+                const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+                const pos = gl.getAttribLocation(glProgram, 'position');
+                gl.enableVertexAttribArray(pos); gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+
+                // Map standard uniforms
+                ['u_resolution','u_time','u_bass','u_mid','u_high','u_impulse','u_centroid','u_energy'].forEach(u => {
+                    glLocs[u] = gl.getUniformLocation(glProgram, u);
+                });
+                
+                // Map dynamic plugin parameters as uniforms
+                if(plugin.params) {
+                    Object.keys(plugin.params).forEach(k => {
+                        glLocs[`u_${k}`] = gl.getUniformLocation(glProgram, `u_${k}`);
+                    });
+                }
+            }
+
+            function render(time, features) {
+                if(!currentPlugin) return;
+                smoothedImpulse = features.impulse > smoothedImpulse ? features.impulse : smoothedImpulse * 0.95;
+
+                if (currentPlugin.type === 'webgl' && glProgram) {
+                    gl.uniform2f(glLocs.u_resolution, cGl.width, cGl.height);
+                    gl.uniform1f(glLocs.u_time, time * 0.001);
+                    gl.uniform1f(glLocs.u_bass, features.bass);
+                    gl.uniform1f(glLocs.u_mid, features.mid);
+                    gl.uniform1f(glLocs.u_high, features.high);
+                    gl.uniform1f(glLocs.u_impulse, smoothedImpulse);
+                    gl.uniform1f(glLocs.u_centroid, features.centroid);
+                    gl.uniform1f(glLocs.u_energy, features.energy);
+                    
+                    // Inject current param values
+                    if(currentPlugin.params) {
+                        Object.entries(currentPlugin.params).forEach(([key, config]) => {
+                            if(glLocs[`u_${key}`] !== null) {
+                                gl.uniform1f(glLocs[`u_${key}`], config.value);
+                            }
+                        });
+                    }
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                } else if (currentPlugin.type === '2d') {
+                    currentPlugin.render(ctx2d, c2d, features, features.rawData);
+                }
+            }
+            return { loadPlugin, render };
+        })();
+
+
+        // ==========================================
+        // 📁 /src/gui/UIManager.js
+        // Handles DOM, bindings, and dynamic settings
+        // ==========================================
+        const UIManager = (function() {
+            const elParams = document.getElementById('params-container');
+            const elSettingsPanel = document.getElementById('settings-panel');
+            const elDropdownTrigger = document.getElementById('dropdown-trigger');
+            const elDropdownMenu = document.getElementById('dropdown-menu');
+            const elDropdownList = document.getElementById('dropdown-list');
+            const elDropdownLabel = document.getElementById('dropdown-label');
+            const elDropdownIcon = document.getElementById('dropdown-icon');
+            let currentPluginKey = null;
+
+            function init() {
+                // Build Custom Dropdown Menu
+                Object.entries(PluginRegistry).forEach(([key, plugin]) => {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.className = 'w-full text-left px-5 py-2.5 text-sm hover:bg-white/10 transition-colors focus:outline-none text-gray-300 hover:text-white font-medium';
+                    btn.textContent = plugin.name;
+                    btn.addEventListener('click', () => {
+                        elDropdownLabel.textContent = plugin.name;
+                        loadPluginState(key);
+                        closeDropdown();
+                    });
+                    li.appendChild(btn);
+                    elDropdownList.appendChild(li);
+                });
+
+                // Dropdown Toggle Logic
+                elDropdownTrigger.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isOpen = !elDropdownMenu.classList.contains('opacity-0');
+                    isOpen ? closeDropdown() : openDropdown();
+                });
+
+                // Close dropdown when clicking outside
+                window.addEventListener('click', () => closeDropdown());
+
+                function openDropdown() {
+                    elDropdownMenu.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+                    elDropdownIcon.classList.add('rotate-180');
+                }
+
+                function closeDropdown() {
+                    elDropdownMenu.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+                    elDropdownIcon.classList.remove('rotate-180');
+                }
+                
+                // Toggle Settings Panel
+                document.getElementById('btn-settings').addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevents outside click from instantly closing it
+                    elSettingsPanel.classList.toggle('active');
+                });
+                
+                // Initial Load
+                const firstKey = Object.keys(PluginRegistry)[0];
+                elDropdownLabel.textContent = PluginRegistry[firstKey].name;
+                loadPluginState(firstKey);
+            }
+
+            function loadPluginState(key) {
+                currentPluginKey = key;
+                Renderer.loadPlugin(key);
+                buildSettingsMenu(PluginRegistry[key]);
+            }
+
+            function buildSettingsMenu(plugin) {
+                elParams.innerHTML = ''; // Clear old params
+                if(!plugin.params || Object.keys(plugin.params).length === 0) {
+                    elParams.innerHTML = '<p class="text-xs text-gray-500 italic">No adjustable parameters for this plugin.</p>';
+                    return;
+                }
+
+                // Generate UI Sliders dynamically based on plugin config
+                Object.entries(plugin.params).forEach(([paramKey, config]) => {
+                    const row = document.createElement('div');
+                    row.className = 'flex flex-col gap-1';
+                    
+                    const labelWrap = document.createElement('div');
+                    labelWrap.className = 'flex justify-between text-xs text-gray-300';
+                    const name = document.createElement('span'); name.textContent = config.name;
+                    const valDisplay = document.createElement('span'); valDisplay.textContent = config.value.toFixed(2);
+                    
+                    labelWrap.appendChild(name); labelWrap.appendChild(valDisplay);
+
+                    const slider = document.createElement('input');
+                    slider.type = 'range'; slider.min = config.min; slider.max = config.max;
+                    slider.step = config.step; slider.value = config.value;
+                    
+                    // Two-way binding
+                    slider.addEventListener('input', (e) => {
+                        const val = parseFloat(e.target.value);
+                        config.value = val; // Update underlying plugin state
+                        valDisplay.textContent = val.toFixed(2); // Update UI
+                    });
+
+                    row.appendChild(labelWrap);
+                    row.appendChild(slider);
+                    elParams.appendChild(row);
+                });
+            }
+
+            return { init };
+        })();
+
+
+        // ==========================================
+        // 📁 /src/App.js (Bootstrapper)
+        // ==========================================
+        const audio = new Audio();
+        audio.volume = 0.8; // Match initial slider value
+        let isInitialized = false;
+
+        // Init UI Framework
+        UIManager.init();
+
+        function handleAudioUpload(file) {
+            if(!file) return;
+            audio.src = URL.createObjectURL(file);
+            document.getElementById('track-name').textContent = file.name;
+            
+            if(!isInitialized) {
+                AudioEngine.init(audio);
+                isInitialized = true;
+                
+                // UI Transitions
+                document.getElementById('intro-overlay').style.opacity = 0;
+                setTimeout(() => { 
+                    document.getElementById('intro-overlay').style.display = 'none'; 
+                    document.getElementById('ui-layer').style.opacity = 1; 
+                    document.getElementById('ui-layer').style.pointerEvents = 'auto'; 
+                }, 700);
+                
+                requestAnimationFrame(loop);
+            }
+            audio.play();
+            updatePlayIcon();
+        }
+
+        function loop(time) {
+            requestAnimationFrame(loop);
+            Renderer.render(time, AudioEngine.getFeatures());
+        }
+
+        function updatePlayIcon() {
+            document.getElementById('icon-play').classList.toggle('hidden', !audio.paused);
+            document.getElementById('icon-pause').classList.toggle('hidden', audio.paused);
+        }
+
+        // DOM Wiring
+        document.getElementById('audio-upload-main').addEventListener('change', e => handleAudioUpload(e.target.files[0]));
+        document.getElementById('audio-upload-dock').addEventListener('change', e => handleAudioUpload(e.target.files[0]));
+        
+        // Volume Wiring
+        const volSlider = document.getElementById('volume-slider');
+        if(volSlider) volSlider.addEventListener('input', e => audio.volume = e.target.value);
+
+        document.getElementById('btn-play').addEventListener('click', () => {
+            AudioEngine.resume(); 
+            audio.paused ? audio.play() : audio.pause();
+            updatePlayIcon();
+        });
+
+        // Setup resume constraints for modern browsers
+        window.addEventListener('click', () => { if(isInitialized) AudioEngine.resume(); });
+
+    </script>
+</body>
+</html>
+
+
+

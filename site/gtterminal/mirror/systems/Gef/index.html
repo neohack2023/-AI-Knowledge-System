@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GEF Sandbox Compiler v2.3</title>
+<link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+<div id="ui-layer">
+  <h1>GEF Engine</h1>
+  <p class="subtitle">Bicameral Architectural Runtime</p>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-studio">Compiler</div>
+    <div class="tab" id="tab-autopilot">Foundry</div>
+    <div class="tab" id="tab-library">Library</div>
+  </div>
+
+  <div id="view-studio" class="view-section active">
+    <div class="flex-row">
+      <label for="media-upload" class="btn-small" style="display:flex;align-items:center;justify-content:center;">Load Track</label>
+      <input type="file" id="media-upload" accept="audio/*,video/mp4,video/webm" />
+      <button id="btn-mic" class="btn-small">Microphone</button>
+    </div>
+
+    <div id="playback-controls" style="display:none;margin-top:10px;">
+      <div class="flex-row" style="margin-bottom:5px;">
+        <button id="btn-play" class="btn-small">Play</button>
+        <button id="btn-pause" class="btn-small">Pause</button>
+        <button id="btn-stop" class="btn-small">Stop</button>
+      </div>
+      <div class="flex-row">
+        <button id="btn-record" class="btn-small" style="background:rgba(255,65,108,.2);border:1px solid #ff416c;">Record</button>
+        <button id="btn-snapshot" class="btn-small">Snapshot</button>
+      </div>
+    </div>
+
+    <div class="meters">
+      <div class="meter-row"><div class="meter-label">BASS</div><div class="meter-track"><div id="fill-bass" class="meter-fill"></div></div></div>
+      <div class="meter-row"><div class="meter-label">MID</div><div class="meter-track"><div id="fill-mid" class="meter-fill"></div></div></div>
+      <div class="meter-row"><div class="meter-label">TREB</div><div class="meter-track"><div id="fill-treble" class="meter-fill"></div></div></div>
+      <div class="meter-row"><div class="meter-label" style="color:#f7b733;">GLITCH</div><div class="meter-track"><div id="fill-glitch" class="meter-fill"></div></div></div>
+      <div class="meter-row"><div class="meter-label" style="color:#a855f7;">CENT</div><div class="meter-track"><div id="fill-centroid" class="meter-fill"></div></div></div>
+    </div>
+
+    <div class="slider-group"><div class="slider-header"><span>Time Speed</span><span id="val-speed" class="slider-val">1.0</span></div><input id="sl-speed" type="range" min="-2" max="5" step="0.1" value="1.0" /></div>
+    <div class="slider-group"><div class="slider-header"><span>Glitch Threshold</span><span id="val-glitch" class="slider-val">1.5</span></div><input id="sl-glitch" type="range" min="0.1" max="5" step="0.1" value="1.5" /></div>
+    <div class="slider-group"><div class="slider-header"><span>Audio Sense</span><span id="val-audio-sense" class="slider-val">1.0</span></div><input id="sl-audio-sense" type="range" min="0" max="3" step="0.05" value="1.0" /></div>
+
+    <div class="section-title">Main Engine Adapter Lanes</div>
+    <div class="theme-grid">
+      <label class="theme-label"><input class="format-radio" type="radio" name="format" value="wgsl" /> WGSL</label>
+      <label class="theme-label"><input class="format-radio" type="radio" name="format" value="glsl" /> GLSL</label>
+      <label class="theme-label"><input class="format-radio" type="radio" name="format" value="js" checked /> JS</label>
+      <label class="theme-label"><input class="format-radio" type="radio" name="format" value="python" /> Python</label>
+    </div>
+
+    <div class="sandbox-panel" id="sandbox-container">
+      <div class="sandbox-header">
+        <label style="font-size:.8rem;color:#f7b733;font-weight:800;display:flex;gap:8px;align-items:center;cursor:pointer;"><input id="sandbox-toggle" type="checkbox" style="accent-color:#f7b733;width:16px;height:16px;"> SANDBOX RUNTIME</label>
+        <button id="panic-btn" class="btn-small btn-panic" style="display:none;">PANIC</button>
+      </div>
+      <div class="tiny-note" style="margin-bottom:10px;">Safe preview lane for curated modules and future adapter work.</div>
+      <div class="flex-row" style="margin-bottom:8px;"><select id="sandbox-preview-mode" style="margin:0;"><option value="AUTO" selected>Preview Mode: Auto</option><option value="STACK">Preview Mode: Stack Only</option><option value="REPLACE">Preview Mode: Force Base Replace</option></select></div>
+      <div class="flex-row"><button id="promote-sandbox-btn" class="btn-small btn-good" style="display:none;">Commit to Main</button><button id="discard-sandbox-btn" class="btn-small" style="display:none;">Discard</button></div>
+      <div id="diagnostics-log" style="display:none;"><div class="diag-info">Sandbox initialized.</div></div>
+    </div>
+
+    <div class="section-title">Global Render Pipeline <span id="pipeline-summary" style="color:#6b7280;font-size:.62rem;">0 modules</span></div>
+    <div id="module-stack-container"><div style="color:#666;font-size:.72rem;text-align:center;padding:8px;">Pipeline empty.</div></div>
+
+    <div class="section-title">Mutation Forge</div>
+    <textarea id="director-prompt" placeholder="Describe the visual mutation or full base replacement..."></textarea>
+    <div class="flex-row"><select id="evo-stage" style="margin:0;"><option value="PRE_BASE">Pre-Base</option><option value="BASE" selected>Replace Base</option><option value="OVERLAY">Stack Overlay</option><option value="POST_FX">Post FX Pass</option><option value="FEEDBACK_PASS">Feedback Loop</option><option value="UI_OVERLAY">UI Overlay</option></select></div>
+    <div class="flex-row"><button id="evolve-btn" class="btn btn-ai" style="margin:0;">Evolve</button><button id="iterate-btn" class="btn btn-ai" style="margin:0;background:linear-gradient(135deg,#f7b733,#fc4a1a);color:#000;">Iterate</button></div>
+
+    <div id="feedback-section" style="display:none;margin-top:10px;padding:12px;background:rgba(0,0,0,.4);border-radius:10px;border:1px solid rgba(255,255,255,.05);">
+      <div class="section-title" style="margin-top:0;">Training Feedback</div>
+      <button id="btn-like" class="btn-small btn-good" style="width:100%;margin-bottom:8px;">Looks Good</button>
+      <div style="display:flex;flex-direction:column;gap:6px;"><input id="dislike-reason" type="text" placeholder="Why did it fail?" /><button id="btn-dislike" class="btn-small btn-panic" style="width:100%;">Reject & Log</button></div>
+    </div>
+
+    <div class="flex-row" style="margin-top:14px;"><button id="toggle-code-btn" class="btn-small" style="background:rgba(0,184,255,.18);color:#00b8ff;border:1px solid rgba(0,184,255,.4);">Open IDE</button><button id="hide-ui-btn" class="btn-small">Hide UI</button></div>
+    <div class="hint">Tap background to restore UI</div>
+  </div>
+
+  <div id="view-autopilot" class="view-section">
+    <div class="section-title" style="margin-top:0;">Visual Foundry</div>
+    <div class="tiny-note warn-note" style="margin-bottom:10px;">Safe mode queues design notes and curated previews.</div>
+    <div class="flex-row" style="margin-bottom:8px;"><button id="btn-auto-ideas" class="btn-small btn-magic" style="width:100%;">Auto-Generate Seed Ideas</button></div>
+    <textarea id="autopilot-seeds" placeholder="Enter your visual direction, theme, or overarching concept here..." style="min-height:120px;"></textarea>
+    <div class="flex-row" style="margin-top:8px;align-items:center;"><button id="btn-run-one" class="btn-small btn-good" style="color:#000;background:#00ff88;flex:1.5;">Run One</button><div style="display:flex;flex:3;gap:4px;align-items:center;"><input type="number" id="autopilot-batch-count" title="Batch Runs" value="5" min="2" max="100" style="width:50px;padding:6px;margin:0;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.48);color:#fff;font-size:.8rem;text-align:center;"><button id="btn-run-batch" class="btn-small btn-ai" style="flex:1;">Run Batch</button></div><button id="btn-stop-batch" class="btn-small btn-panic" style="flex:1;">Stop</button></div>
+    <div class="section-title" style="margin-top:16px;">Foundry Logs</div>
+    <div id="autopilot-log" style="max-height:280px;overflow:auto;background:rgba(0,0,0,.36);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:10px;"><div style="color:#666;font-size:.72rem;text-align:center;">No logs yet.</div></div>
+  </div>
+
+  <div id="view-library" class="view-section">
+    <div class="section-title" style="margin-top:0;">Save Architecture Preset</div>
+    <div class="flex-row"><input id="preset-name" type="text" placeholder="Name your pipeline..." style="margin:0;"><button id="save-btn" class="btn-small btn-good" style="color:#000;background:#00ff88;">Save Local</button></div>
+    <div class="section-title">Local Library</div>
+    <div id="local-list" style="max-height:240px;overflow:auto;margin-bottom:15px;"><div style="text-align:center;color:#666;font-size:.8rem;">No local saves yet.</div></div>
+    <div style="padding:10px;background:rgba(0,0,0,.4);border-radius:10px;border:1px solid rgba(255,255,255,.05);"><div class="section-title" style="margin-top:0;">ML Telemetry Dataset</div><div style="font-size:.7rem;color:#a0a0a0;margin-bottom:10px;display:flex;justify-content:space-between;"><span>Events Logged:</span><span id="dataset-count" style="color:#00b8ff;font-weight:800;">0</span></div><div class="flex-row"><button id="btn-import-lora" class="btn-small btn-good">Import (.jsonl)</button><button id="btn-export-lora" class="btn-small" style="background:rgba(0,184,255,.14);color:#00b8ff;border-color:rgba(0,184,255,.35);">Export (.jsonl)</button></div><input id="dataset-upload" type="file" accept=".jsonl" /><div class="tiny-note" style="margin-top:8px;">Feedback memory for future pattern bias.</div></div>
+  </div>
+</div>
+
+<div id="code-layer" class="hidden"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:15px;border-bottom:1px solid rgba(255,255,255,.1);"><h3 id="code-title" style="margin:0;color:#00b8ff;font-size:1rem;">Source Architecture</h3><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;"><select id="code-format" style="width:auto;margin:0;padding:5px 7px;"><option value="wgsl">WGSL</option><option value="glsl">GLSL</option><option value="js" selected>JS Canvas</option><option value="python">Python</option></select><button id="apply-code-btn" class="btn-small btn-ai">Preview to Sandbox</button><button id="apply-main-base-btn" class="btn-small btn-good">Refresh Main Base</button><button id="close-code-btn" class="btn-small">X</button></div></div><textarea id="code-viewer" spellcheck="false" placeholder="// Adapter preview notes..."></textarea></div>
+
+<div id="status-bar">Engines Waking Up...</div>
+<canvas id="gpu-canvas" style="display:none;"></canvas>
+<canvas id="glsl-canvas" style="display:none;"></canvas>
+<canvas id="main-canvas-2d"></canvas>
+<canvas id="sandbox-canvas"></canvas>
+<canvas id="feedback-buffer"></canvas>
+<canvas id="composite-canvas"></canvas>
+<audio id="media-player" crossorigin="anonymous" style="display:none;"></audio>
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>

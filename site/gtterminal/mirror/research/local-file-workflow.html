@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>gtterminal :: research :: local-file-workflow</title>
+  <meta name="description" content="Local split-file workflow: avoid CORS, avoid build tools, keep it Neocities-friendly." />
+
+  <style>
+    :root{
+      --bg:#06090c; --panel:#0b1318; --line:rgba(130, 255, 230, .18);
+      --text:#d7fff3; --muted:rgba(215,255,243,.72); --cyan:#62ffe0;
+      --amber:#ffd37a; --red:#ff4d6d; --shadow: rgba(0,0,0,.6);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:var(--mono);color:var(--text);
+      background: radial-gradient(1200px 700px at 50% 30%, #0a1c20 0%, var(--bg) 55%, #040506 100%);
+      overflow-x:hidden;
+    }
+    .crt::before{
+      content:"";position:fixed;inset:0;pointer-events:none;
+      background:
+        linear-gradient(to bottom, rgba(255,255,255,.05), rgba(255,255,255,0) 2px, rgba(0,0,0,.12) 4px),
+        radial-gradient(900px 600px at 50% 30%, rgba(98,255,224,.08), rgba(0,0,0,.55) 70%);
+      background-size:100% 6px, 100% 100%;mix-blend-mode:overlay;opacity:.75;
+    }
+    .crt::after{
+      content:"";position:fixed;inset:-30%;pointer-events:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+      opacity:.06;animation: noiseShift 6s steps(6) infinite;
+    }
+    @keyframes noiseShift{
+      0%{transform:translate3d(-2%, -3%, 0)} 20%{transform:translate3d(3%, 1%, 0)}
+      40%{transform:translate3d(-1%, 4%, 0)} 60%{transform:translate3d(2%, -1%, 0)}
+      80%{transform:translate3d(-3%, 2%, 0)} 100%{transform:translate3d(0%, 0%, 0)}
+    }
+
+    .wrap{max-width:980px;margin:0 auto;padding:28px 16px 56px;}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:10px 12px;border:1px solid var(--line);
+      background:rgba(8,14,18,.72);border-radius:12px;
+      box-shadow:0 20px 60px var(--shadow);
+    }
+    .status{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;user-select:none;}
+    .dot{width:10px;height:10px;border-radius:999px;background:radial-gradient(circle at 30% 30%, #c8fff2, var(--cyan));box-shadow:0 0 18px rgba(98,255,224,.35);animation:pulse 2.6s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{transform:scale(.92);opacity:.9}50%{transform:scale(1.06);opacity:1}}
+    .right{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);user-select:none;white-space:nowrap;}
+    .chip{border:1px solid var(--line);background:rgba(10,22,26,.6);padding:6px 10px;border-radius:999px;}
+    #statusText{display:inline-block;max-width:58vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+    .panel{
+      margin-top:16px;border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(10,22,26,.72), rgba(6,10,12,.72));
+      border-radius:16px;padding:16px;box-shadow:0 20px 60px var(--shadow);
+      position:relative;overflow:hidden;
+    }
+    .panel::before{
+      content:"";position:absolute;inset:0;
+      background: linear-gradient(90deg, rgba(98,255,224,.07), rgba(255,255,255,0), rgba(255,77,109,.05));
+      opacity:.35;pointer-events:none;
+    }
+
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+    h1{margin:0;font-size:18px;letter-spacing:.02em}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.55;max-width:78ch}
+
+    .nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .btn{
+      font-size:12px;text-decoration:none;color:rgba(215,255,243,.82);
+      border:1px solid rgba(130,255,230,.18);background:rgba(8,14,18,.5);
+      padding:8px 10px;border-radius:12px;
+    }
+    .btn:hover{border-color:rgba(98,255,224,.45)}
+
+    .hr{height:1px;background:linear-gradient(90deg, transparent, rgba(98,255,224,.22), transparent);margin:14px 0;border:0;}
+
+    .content{position:relative}
+    .content h2{margin:18px 0 8px;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,211,122,.92)}
+    .content p,.content li{color:rgba(215,255,243,.78);font-size:13px;line-height:1.65}
+    ul{margin:8px 0 0 18px;padding:0}
+
+    pre{
+      margin:10px 0 0;
+      border:1px dashed rgba(98,255,224,.25);
+      background:rgba(6,10,12,.55);
+      border-radius:12px;
+      padding:12px;
+      color:rgba(215,255,243,.88);
+      font-size:12px;
+      line-height:1.55;
+      overflow:auto;
+      white-space:pre;
+    }
+    code{color:rgba(255,211,122,.92)}
+  </style>
+</head>
+
+<body class="crt">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="statusText">research node active</span>
+      </div>
+      <div class="right">
+        <span class="chip" id="clock">00:00:00</span>
+        <span class="chip">ESC: back</span>
+      </div>
+    </div>
+
+    <main class="panel">
+      <div class="head">
+        <div>
+          <h1>Local Files, No CORS, No Build Tools (Neocities-Friendly)</h1>
+          <p class="sub">
+            Goal: split your app into files while keeping it runnable on local machine and uploadable to Neocities.
+            This is the “compile once, run anywhere” lane.
+          </p>
+        </div>
+
+        <nav class="nav">
+          <a class="btn" href="../research.html">Research</a>
+          <a class="btn" href="../index.html">Home</a>
+          <a class="btn" href="../systems.html">Systems</a>
+        </nav>
+      </div>
+
+      <hr class="hr" />
+
+      <div class="content">
+        <h2>The core rule</h2>
+        <p>
+          Browsers don’t execute JSX directly. If you split into <code>.jsx</code> and try to load it,
+          you’ll get failures that look like CORS or “file cannot be found”.
+          The fix: compile JSX to normal JS once.
+        </p>
+
+        <h2>Recommended folder layout</h2>
+        <pre>/app
+  index.html
+  /src
+    app.jsx
+    ui.jsx
+    engine.jsx
+  /dist
+    app.js
+    ui.js
+    engine.js</pre>
+
+        <h2>Workflow (simple)</h2>
+        <ul>
+          <li>Edit JSX in <code>/src</code></li>
+          <li>Compile to JS in <code>/dist</code></li>
+          <li>Load only <code>/dist/*.js</code> from your HTML</li>
+        </ul>
+
+        <h2>Index load pattern (safe)</h2>
+        <pre>&lt;!-- index.html --&gt;
+&lt;script src="dist/ui.js"&gt;&lt;/script&gt;
+&lt;script src="dist/engine.js"&gt;&lt;/script&gt;
+&lt;script src="dist/app.js"&gt;&lt;/script&gt;</pre>
+
+        <h2>If you still need a local server</h2>
+        <p>
+          Some APIs (fetching files, modules, audio) behave better over http than file://.
+          Use a tiny local server when needed:
+        </p>
+
+        <pre># Python (in your project folder)
+python -m http.server 8000
+
+# Then open:
+http://localhost:8000/</pre>
+
+        <h2>Neocities deploy</h2>
+        <ul>
+          <li>Upload the same folder structure.</li>
+          <li>Make sure links are relative (no absolute disk paths).</li>
+          <li>Test after upload because caching can hide changes.</li>
+        </ul>
+
+        <h2>Win condition</h2>
+        <p>
+          You can now build multi-file apps without bundlers, and they work both locally and on Neocities.
+          That’s “portable lab equipment”.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // clock
+    const clockEl = document.getElementById("clock");
+    function tick(){
+      const d = new Date();
+      clockEl.textContent =
+        String(d.getHours()).padStart(2,"0") + ":" +
+        String(d.getMinutes()).padStart(2,"0") + ":" +
+        String(d.getSeconds()).padStart(2,"0");
+    }
+    tick(); setInterval(tick, 1000);
+
+    // esc back
+    document.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") window.location.href = "../research.html";
+    });
+
+    // changelog status feed
+    async function loadLatestChangelog(){
+      try{
+        const res = await fetch("../changelog.html", { cache: "no-store" });
+        if(!res.ok) throw new Error("changelog fetch failed");
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const first = doc.querySelector(".entry");
+        if(!first) return;
+
+        const dateText = first.querySelector(".date")?.textContent?.trim() || "";
+        const iso = first.querySelector(".iso")?.getAttribute("data-iso") || "";
+        const update = first.querySelector(".update")?.textContent?.trim() || "UPDATE";
+        const tags = Array.from(first.querySelectorAll(".tag")).slice(0, 3).map(t => t.textContent.trim()).filter(Boolean);
+
+        const stamp = iso || dateText || "UNKNOWN-DATE";
+        const statusEl = document.getElementById("statusText");
+        if(statusEl) statusEl.textContent = `${stamp} :: ${update}${tags.length ? " :: " + tags.join(", ") : ""}`;
+      }catch(e){}
+    }
+    loadLatestChangelog();
+  </script>
+</body>
+</html>

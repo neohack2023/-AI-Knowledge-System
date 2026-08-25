@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>gtterminal :: systems</title>
+  <meta name="description" content="Systems: WebGL visualizers, glitch tools, and live modules." />
+
+  <style>
+    :root{
+      --bg:#06090c;
+      --panel:#0b1318;
+      --line:rgba(130, 255, 230, .18);
+      --text:#d7fff3;
+      --muted:rgba(215,255,243,.72);
+      --cyan:#62ffe0;
+      --amber:#ffd37a;
+      --red:#ff4d6d;
+      --shadow: rgba(0,0,0,.6);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:var(--mono);
+      color:var(--text);
+      background: radial-gradient(1200px 700px at 50% 30%, #0a1c20 0%, var(--bg) 55%, #040506 100%);
+      overflow-x:hidden;
+    }
+
+    /* CRT overlay */
+    .crt::before{
+      content:"";
+      position:fixed; inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(to bottom,
+          rgba(255,255,255,.05),
+          rgba(255,255,255,0) 2px,
+          rgba(0,0,0,.12) 4px),
+        radial-gradient(900px 600px at 50% 30%, rgba(98,255,224,.08), rgba(0,0,0,.55) 70%);
+      background-size: 100% 6px, 100% 100%;
+      mix-blend-mode: overlay;
+      opacity:.75;
+    }
+    .crt::after{
+      content:"";
+      position:fixed; inset:-30%;
+      pointer-events:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+      opacity:.06;
+      animation: noiseShift 6s steps(6) infinite;
+    }
+    @keyframes noiseShift{
+      0%{transform:translate3d(-2%, -3%, 0)}
+      20%{transform:translate3d(3%, 1%, 0)}
+      40%{transform:translate3d(-1%, 4%, 0)}
+      60%{transform:translate3d(2%, -1%, 0)}
+      80%{transform:translate3d(-3%, 2%, 0)}
+      100%{transform:translate3d(0%, 0%, 0)}
+    }
+
+    .wrap{max-width:1100px;margin:0 auto;padding:28px 16px 56px;}
+
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:10px 12px;border:1px solid var(--line);
+      background:rgba(8,14,18,.72);border-radius:12px;
+      box-shadow:0 20px 60px var(--shadow);
+    }
+    .status{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;user-select:none;}
+    .dot{width:10px;height:10px;border-radius:999px;background:radial-gradient(circle at 30% 30%, #c8fff2, var(--cyan));box-shadow:0 0 18px rgba(98,255,224,.35);animation:pulse 2.6s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{transform:scale(.92);opacity:.9}50%{transform:scale(1.06);opacity:1}}
+    .right{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);user-select:none;white-space:nowrap;}
+    .chip{border:1px solid var(--line);background:rgba(10,22,26,.6);padding:6px 10px;border-radius:999px;}
+
+    /* keep status line clean */
+    #statusText{display:inline-block;max-width:62vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+    .panel{
+      margin-top:16px;
+      border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(10,22,26,.72), rgba(6,10,12,.72));
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 20px 60px var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
+    .panel::before{
+      content:"";position:absolute;inset:0;
+      background: linear-gradient(90deg, rgba(98,255,224,.07), rgba(255,255,255,0), rgba(255,77,109,.05));
+      opacity:.35;pointer-events:none;
+    }
+
+    .head{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    }
+    .title{margin:0;font-size:22px;letter-spacing:.02em;line-height:1.15;}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.5;max-width:70ch;}
+
+    .nav{
+      display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+    }
+    .btn{
+      font-size:12px;text-decoration:none;color:rgba(215,255,243,.82);
+      border:1px solid rgba(130,255,230,.18);background:rgba(8,14,18,.5);
+      padding:8px 10px;border-radius:12px;
+    }
+    .btn:hover{border-color:rgba(98,255,224,.45)}
+
+    .grid{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap:10px;
+    }
+    @media (max-width: 860px){ .grid{grid-template-columns:1fr} }
+
+    .card{
+      border:1px solid rgba(130,255,230,.18);
+      background:rgba(8,14,18,.6);
+      border-radius:14px;
+      padding:12px;
+      position:relative;
+      overflow:hidden;
+    }
+    .card:hover{
+      border-color: rgba(98,255,224,.45);
+      box-shadow: 0 0 0 1px rgba(98,255,224,.15), 0 18px 50px rgba(0,0,0,.55);
+      transform: translateY(-1px);
+      transition: .18s ease;
+    }
+
+    .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+    .pill{
+      font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+      padding:6px 9px;border-radius:999px;
+      border:1px solid rgba(130,255,230,.18);
+      background:rgba(10,22,26,.55);
+      color:rgba(215,255,243,.78);
+    }
+    .pill.live{border-color:rgba(98,255,224,.45);color:rgba(98,255,224,.95)}
+    .pill.wip{border-color:rgba(255,211,122,.45);color:rgba(255,211,122,.95)}
+    .pill.locked{border-color:rgba(255,77,109,.38);color:rgba(255,77,109,.9)}
+
+    .c-title{margin:0 0 6px 0;font-size:14px;letter-spacing:.02em;}
+    .c-desc{margin:0;color:var(--muted);font-size:12px;line-height:1.45;}
+    .c-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+    .link{
+      font-size:12px;text-decoration:none;color:rgba(215,255,243,.82);
+      border:1px solid rgba(130,255,230,.18);background:rgba(8,14,18,.35);
+      padding:8px 10px;border-radius:12px;
+    }
+    .link:hover{border-color:rgba(98,255,224,.45)}
+
+    .hr{height:1px;background:linear-gradient(90deg, transparent, rgba(98,255,224,.22), transparent);margin:14px 0;border:0;}
+
+    .hint{margin:0;color:rgba(215,255,243,.6);font-size:12px;line-height:1.5;}
+
+    /* reduced motion */
+    @media (prefers-reduced-motion: reduce){
+      .crt::after, .dot{animation:none}
+      .card:hover{transform:none}
+    }
+  </style>
+</head>
+
+<body class="crt">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="statusText">systems online</span>
+      </div>
+      <div class="right">
+        <span class="chip" id="clock">00:00:00</span>
+        <span class="chip">CTRL+K: jump</span>
+      </div>
+    </div>
+
+    <main class="panel">
+      <div class="head">
+        <div>
+          <h1 class="title">SYSTEMS</h1>
+          <p class="sub">
+            Interactive modules, visualizers, tools, and prototypes.
+            Each card is a door. Some doors open into useful software.
+            Some open into beautiful problems.
+          </p>
+
+
+        </div>
+
+        <nav class="nav" aria-label="Navigation">
+          <a class="btn" href="index.html">Home</a>
+          <a class="btn" href="research.html">Research</a>
+          <a class="btn" href="broadcasts.html">Broadcasts</a>
+          <a class="btn" href="changelog.html">Changelog</a>
+        </nav>
+      </div>
+
+      <hr class="hr" />
+
+      <section class="grid" aria-label="System modules">
+
+        <!-- CARD 1 -->
+        <article class="card">
+          <div class="meta">
+            <span class="pill live">LIVE</span>
+            <span class="pill">webgl2</span>
+            <span class="pill">audio-reactive</span>
+          </div>
+          <h2 class="c-title">Spectra-Core Visualizer Hub</h2>
+          <p class="c-desc">
+            Launcher page for your visualizer plugins. Stable baseline + room for controlled fracture.
+          </p>
+          <div class="c-actions">
+            <a class="link" href="systems/spectra-core/index.html">Launch</a>
+            <a class="link" href="systems/spectra-core/about.html">About</a>
+          </div>
+        </article>
+
+        <!-- CARD 1.5 (NEW) -->
+        <article class="card">
+          <div class="meta">
+            <span class="pill live">LIVE</span>
+            <span class="pill">react</span>
+            <span class="pill">video</span>
+            <span class="pill">audio-reactive</span>
+          </div>
+          <h2 class="c-title">Audio-Reactive Video Glitcher</h2>
+          <p class="c-desc">
+            Event-driven glitch engine: flux spikes, dropouts, bitcrush bursts, and recording export.
+          </p>
+          <div class="c-actions">
+            <a class="link" href="systems/glitch-synth/index.html">Launch</a>
+            <a class="link" href="systems/glitch-synth-v1/about.html">About</a>
+          </div>
+        </article>
+        <!-- CARD 1.6 -->
+        <article class="card">
+          <div class="meta">
+            <span class="pill live">LIVE</span>
+            <span class="pill">image</span>
+            <span class="pill">pixel-sorting</span>
+            <span class="pill">canvas</span>
+          </div>
+          <h2 class="c-title">LumaSort Studio</h2>
+          <p class="c-desc">
+            Advanced pixel sorting lab: luminance spans, channel sorting, thresholds, mask debug, export-safe output.
+          </p>
+          <div class="c-actions">
+            <a class="link" href="systems/lumasort/index.html">Launch</a>
+            <a class="link" href="systems/lumasort/about.html">About</a>
+          </div>
+        </article>
+        
+        <!-- CARD 2 -->
+        <article class="card">
+          <div class="meta">
+            <span class="pill wip">WIP</span>
+            <span class="pill">glitch</span>
+            <span class="pill">image</span>
+          </div>
+          <h2 class="c-title">Glyph Erosion Lab</h2>
+          <p class="c-desc">
+            Databending by typography logic. Binary becomes “text”, text becomes texture.
+          </p>
+          <div class="c-actions">
+            <a class="link" href="systems/glyph-erosion/index.html">Open Lab</a>
+            <a class="link" href="systems/glyph-erosion/notes.html">Notes</a>
+          </div>
+        </article>
+
+        <!-- CARD 3 -->
+        <article class="card">
+          <div class="meta">
+            <span class="pill wip">WIP</span>
+            <span class="pill">dsp</span>
+            <span class="pill">taxonomy</span>
+          </div>
+          <h2 class="c-title">Glitch Detection Engine</h2>
+          <p class="c-desc">
+            Burst / dropout / stutter detection. Built for visuals that react to failure modes, not just volume.
+          </p>
+          <div class="c-actions">
+            <a class="link" href="systems/glitch-engine/index.html">Prototype</a>
+            <a class="link" href="systems/glitch-engine/spec.html">Spec</a>
+          </div>
+        </article>
+
+        <!-- CARD 4 -->
+        <article class="card">
+          <div class="meta">
+            <span class="pill locked">LOCKED</span>
+            <span class="pill">experimental</span>
+            <span class="pill">unsafe</span>
+          </div>
+          <h2 class="c-title">Lorentz Field Distortion</h2>
+          <p class="c-desc">
+            Visual field warping based on vector dynamics. Gorgeous when it behaves. Educational when it doesn’t.
+          </p>
+          <div class="c-actions">
+            <a class="link" href="systems/lorentz/index.html">Preview</a>
+            <a class="link" href="systems/lorentz/math.html">Math</a>
+          </div>
+        </article>
+
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Live clock (local time)
+    const clockEl = document.getElementById("clock");
+    function tick(){
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mm = String(d.getMinutes()).padStart(2,"0");
+      const ss = String(d.getSeconds()).padStart(2,"0");
+      clockEl.textContent = `${hh}:${mm}:${ss}`;
+    }
+    tick(); setInterval(tick, 1000);
+
+    // Changelog feed -> Top status bar (latest entry)
+    async function loadLatestChangelog(){
+      try{
+        const res = await fetch("changelog.html", { cache: "no-store" });
+        if(!res.ok) throw new Error("changelog fetch failed");
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const first = doc.querySelector(".entry");
+        if(!first) return;
+
+        const dateText = first.querySelector(".date")?.textContent?.trim() || "";
+        const iso = first.querySelector(".iso")?.getAttribute("data-iso") || "";
+        const update = first.querySelector(".update")?.textContent?.trim() || "UPDATE";
+        const tags = Array.from(first.querySelectorAll(".tag"))
+          .slice(0, 3)
+          .map(t => t.textContent.trim())
+          .filter(Boolean);
+
+        const stamp = iso || dateText || "UNKNOWN-DATE";
+        const statusEl = document.getElementById("statusText");
+        if(statusEl) statusEl.textContent = `${stamp} :: ${update}${tags.length ? " :: " + tags.join(", ") : ""}`;
+      } catch(e){
+        // leave default
+      }
+    }
+    loadLatestChangelog();
+
+    // Optional: CTRL+K quick jump menu (simple)
+    document.addEventListener("keydown", (e) => {
+      if(!(e.ctrlKey && (e.key === "k" || e.key === "K"))) return;
+      e.preventDefault();
+      // quick jump: keep it minimal for now
+      window.location.href = "index.html";
+    });
+  </script>
+</body>
+</html>

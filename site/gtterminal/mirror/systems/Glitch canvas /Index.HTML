@@ -1,0 +1,878 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GLITCH.ENG | Signal Distortion</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                        sans: ['"Inter"', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: { 850: '#151f32', 950: '#020617' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Base & Scrollbar */
+        body { background-color: #020617; color: #e2e8f0; font-family: 'Inter', sans-serif; overflow: hidden; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        /* Utility */
+        .glass-panel { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border-right: 1px solid rgba(51, 65, 85, 0.5); }
+        .cyber-button { position: relative; overflow: hidden; transition: all 0.2s; }
+        .cyber-button::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); transition: 0.5s; }
+        .cyber-button:hover::after { left: 100%; }
+        
+        /* Loader */
+        #loader { position: fixed; inset: 0; background: #020617; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.5s; }
+        .glitch-text { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 2rem; color: #fff; position: relative; letter-spacing: 0.2em; }
+        .glitch-text::before, .glitch-text::after { content: 'GLITCH.ENG'; position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.8; }
+        .glitch-text::before { color: #f0f; clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%); transform: translate(-2px, -2px); animation: twitch 2s infinite linear alternate-reverse; }
+        .glitch-text::after { color: #0ff; clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%); transform: translate(2px, 2px); animation: twitch 2.5s infinite linear alternate-reverse; }
+        @keyframes twitch { 0% { transform: translate(0); } 10% { transform: translate(-2px, -2px); } 20% { transform: translate(2px, 2px); } 30% { transform: translate(-2px, 2px); } 40% { transform: translate(2px, -2px); } 100% { transform: translate(0); } }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="glitch-text">GLITCH.ENG</div>
+        <div class="mt-4 text-slate-500 font-mono text-xs">INITIALIZING...</div>
+    </div>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- SAFE INITIALIZATION ---
+        try {
+            const { useState, useRef, useEffect, useCallback } = React;
+            
+            /**
+             * ALGORITHMS (Preserved Logic)
+             * ------------------------------------------------------------------
+             */
+            const clamp01 = (v) => Math.max(0, Math.min(1, v));
+            const clamp255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
+            const getLuma01 = (r, g, b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+            const getLuma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+            const getEffectBounds = (w, h, bounds) => {
+                if (!bounds) return { x: 0, y: 0, w: w, h: h, x2: w, y2: h };
+                const bx = Math.floor(bounds.x * w);
+                const by = Math.floor(bounds.y * h);
+                const bw = Math.floor(bounds.w * w);
+                const bh = Math.floor(bounds.h * h);
+                const x = Math.max(0, bx);
+                const y = Math.max(0, by);
+                const wSafe = Math.min(w - x, bw);
+                const hSafe = Math.min(h - y, bh);
+                return { x, y, w: wSafe, h: hSafe, x2: x + wSafe, y2: y + hSafe };
+            };
+
+            const makeRng = (seed) => (n = 0) => {
+                let t = (seed + n) + 0x6D2B79F5;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+
+            const lumaDiff01 = (data, idxA, idxB) => {
+                const a = getLuma01(data[idxA], data[idxA + 1], data[idxA + 2]);
+                const b = getLuma01(data[idxB], data[idxB + 1], data[idxB + 2]);
+                return Math.abs(a - b);
+            };
+
+            const sortSegmentByIndices = (data, indices, comparator) => {
+                const n = indices.length;
+                if (n < 2) return;
+                const pixels = new Array(n);
+                for (let i = 0; i < n; i++) {
+                    const idx = indices[i];
+                    const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+                    const val = comparator === 'luma' ? (0.2126 * r + 0.7152 * g + 0.0722 * b) : (r + g + b);
+                    pixels[i] = { r, g, b, a, val };
+                }
+                pixels.sort((p, q) => p.val - q.val);
+                for (let i = 0; i < n; i++) {
+                    const idx = indices[i];
+                    const p = pixels[i];
+                    data[idx] = p.r; data[idx + 1] = p.g; data[idx + 2] = p.b; data[idx + 3] = p.a;
+                }
+            };
+
+            const scanAndSortHorizontal = (data, width, height, params) => {
+                const { threshold, comparator = 'luma', segmentMode = 'runs', windowSize = 96, edgeGate = 0, maxRun = 512, bounds = null } = params;
+                const b = getEffectBounds(width, height, bounds);
+                const gate = threshold * 255;
+                const edgeGate01 = clamp01(edgeGate);
+
+                for (let y = b.y; y < b.y2; y++) {
+                    const rowBase = y * width * 4;
+                    if (segmentMode === 'windowed') {
+                        for (let x0 = b.x; x0 < b.x2; x0 += windowSize) {
+                            const x1 = Math.min(b.x2, x0 + windowSize);
+                            const seg = [];
+                            for (let x = x0; x < x1; x++) {
+                                const idx = rowBase + x * 4;
+                                const l = (0.2126 * data[idx] + 0.7152 * data[idx + 1] + 0.0722 * data[idx + 2]);
+                                if (l > gate) seg.push(idx);
+                            }
+                            if (seg.length > 1) sortSegmentByIndices(data, seg, comparator);
+                        }
+                        continue;
+                    }
+                    let seg = [];
+                    for (let x = b.x; x < b.x2; x++) {
+                        const idx = rowBase + x * 4;
+                        const l = (0.2126 * data[idx] + 0.7152 * data[idx + 1] + 0.0722 * data[idx + 2]);
+                        const isActive = l > gate;
+                        const hasEdgeWall = edgeGate01 > 0 && x > b.x && lumaDiff01(data, idx, idx - 4) > edgeGate01;
+                        const shouldBreak = (!isActive) || hasEdgeWall || (seg.length >= maxRun);
+                        if (shouldBreak) {
+                            if (seg.length > 1) sortSegmentByIndices(data, seg, comparator);
+                            seg = [];
+                        } else { seg.push(idx); }
+                    }
+                    if (seg.length > 1) sortSegmentByIndices(data, seg, comparator);
+                }
+            };
+
+            const scanAndSortVertical = (data, width, height, params) => {
+                const { threshold, comparator = 'luma', segmentMode = 'runs', windowSize = 96, edgeGate = 0, maxRun = 512, bounds = null } = params;
+                const b = getEffectBounds(width, height, bounds);
+                const gate = threshold * 255;
+                const edgeGate01 = clamp01(edgeGate);
+
+                for (let x = b.x; x < b.x2; x++) {
+                    if (segmentMode === 'windowed') {
+                        for (let y0 = b.y; y0 < b.y2; y0 += windowSize) {
+                            const y1 = Math.min(b.y2, y0 + windowSize);
+                            const seg = [];
+                            for (let y = y0; y < y1; y++) {
+                                const idx = (y * width + x) * 4;
+                                const l = (0.2126 * data[idx] + 0.7152 * data[idx + 1] + 0.0722 * data[idx + 2]);
+                                if (l > gate) seg.push(idx);
+                            }
+                            if (seg.length > 1) sortSegmentByIndices(data, seg, comparator);
+                        }
+                        continue;
+                    }
+                    let seg = [];
+                    for (let y = b.y; y < b.y2; y++) {
+                        const idx = (y * width + x) * 4;
+                        const l = (0.2126 * data[idx] + 0.7152 * data[idx + 1] + 0.0722 * data[idx + 2]);
+                        const isActive = l > gate;
+                        const hasEdgeWall = edgeGate01 > 0 && y > b.y && lumaDiff01(data, idx, idx - width * 4) > edgeGate01;
+                        const shouldBreak = (!isActive) || hasEdgeWall || (seg.length >= maxRun);
+                        if (shouldBreak) {
+                            if (seg.length > 1) sortSegmentByIndices(data, seg, comparator);
+                            seg = [];
+                        } else { seg.push(idx); }
+                    }
+                    if (seg.length > 1) sortSegmentByIndices(data, seg, comparator);
+                }
+            };
+
+            const applyStructuralSort = (data, w, h, p) => {
+                const dir = p.sortDirection || 'horizontal';
+                if (dir === 'horizontal') scanAndSortHorizontal(data, w, h, p);
+                else if (dir === 'vertical') scanAndSortVertical(data, w, h, p);
+                else if (dir === 'both') { scanAndSortHorizontal(data, w, h, p); scanAndSortVertical(data, w, h, p); }
+            };
+
+            const quantize8bitToN = (v, bits) => {
+                if (bits >= 8) return v;
+                if (bits <= 0) return 0;
+                const levels = (1 << bits) - 1;
+                const q = Math.round((v / 255) * levels);
+                return Math.round((q / levels) * 255);
+            };
+
+            const applyChannelQuantization = (data, width, height, opts) => {
+                const { rBits = 8, gBits = 8, bBits = 8, dither = 0, seed = 0, ditherMode = 'luma', bounds = null } = opts;
+                const b = getEffectBounds(width, height, bounds);
+                const rng = makeRng(seed);
+                for (let y = b.y; y < b.y2; y++) {
+                    for (let x = b.x; x < b.x2; x++) {
+                        const i = (y * width + x) * 4;
+                        let r = data[i], g = data[i+1], bVal = data[i+2];
+                        if (dither > 0) {
+                            const n = (rng(i) - 0.5) * 2;
+                            const amp = Math.floor(dither * 12);
+                            if (ditherMode === 'luma') { r = clamp255(r + n * amp); g = clamp255(g + n * amp); bVal = clamp255(bVal + n * amp); }
+                            else if (ditherMode === 'rgb') { r = clamp255(r + (rng(i+1) - 0.5) * 2 * amp); g = clamp255(g + (rng(i+2) - 0.5) * 2 * amp); bVal = clamp255(bVal + (rng(i+3) - 0.5) * 2 * amp); }
+                        }
+                        data[i] = quantize8bitToN(r, rBits); data[i+1] = quantize8bitToN(g, gBits); data[i+2] = quantize8bitToN(bVal, bBits);
+                    }
+                }
+            };
+
+            const applyChannelRebinding = (data, width, height, opts) => {
+                const { mode = 'luma_swap', lumaSwapThreshold = 0.65, darkCollapseThreshold = 0.18, seed = 0, chunkHeight = 24, chunkStrength = 1.0, bounds = null } = opts;
+                const b = getEffectBounds(width, height, bounds);
+                const rng = makeRng(seed);
+                if (mode === 'chunk_map') {
+                    const maps = [(r,g,b)=>[r,g,b], (r,g,b)=>[b,g,r], (r,g,b)=>[g,r,b], (r,g,b)=>[r,b,g], (r,g,b)=>[b,r,g], (r,g,b)=>[g,b,r]];
+                    for (let y = b.y; y < b.y2; y++) {
+                        const chunkId = Math.floor(y / chunkHeight);
+                        const pick = Math.floor(rng(chunkId) * maps.length);
+                        const mapFn = maps[pick];
+                        for (let x = b.x; x < b.x2; x++) {
+                            const idx = (y * width + x) * 4;
+                            const r0 = data[idx], g0 = data[idx+1], b0 = data[idx+2];
+                            const [rm, gm, bm] = mapFn(r0,g0,b0);
+                            data[idx] = clamp255(r0 + (rm - r0) * chunkStrength);
+                            data[idx+1] = clamp255(g0 + (gm - g0) * chunkStrength);
+                            data[idx+2] = clamp255(b0 + (bm - b0) * chunkStrength);
+                        }
+                    }
+                    return;
+                }
+                for (let y = b.y; y < b.y2; y++) {
+                    for (let x = b.x; x < b.x2; x++) {
+                        const i = (y * width + x) * 4;
+                        const r = data[i], g = data[i+1], bVal = data[i+2];
+                        const l = getLuma01(r,g,bVal);
+                        if (mode === 'luma_swap' && l >= lumaSwapThreshold) { data[i] = bVal; data[i+2] = r; }
+                        if (mode === 'dark_collapse' && l <= darkCollapseThreshold) {
+                            const mono = Math.round(0.15*r + 0.75*g + 0.10*bVal);
+                            data[i] = Math.round(mono * 0.5); data[i+1] = mono; data[i+2] = Math.round(mono * 0.35);
+                        }
+                    }
+                }
+            };
+
+            const colorKey = (r,g,b, q=16) => {
+                const rb = (r * q / 256) | 0; const gb = (g * q / 256) | 0; const bb = (b * q / 256) | 0;
+                return (rb << 16) | (gb << 8) | bb;
+            };
+
+            const applyPaletteCollapse = (data, width, height, opts) => {
+                const { colors = 8, seed = 0, chunkHeight = 32, sampleCount = 800, preQuant = 16, mix = 1.0, bounds = null } = opts;
+                const b = getEffectBounds(width, height, bounds);
+                const rng = makeRng(seed);
+                const nearest = (r,g,b, pal) => {
+                    let best = 0, bestD = Infinity;
+                    for (let i = 0; i < pal.length; i++) {
+                        const p = pal[i];
+                        const d = (r-p[0])**2 + (g-p[1])**2 + (b-p[2])**2;
+                        if (d < bestD) { bestD = d; best = i; }
+                    }
+                    return pal[best];
+                };
+                for (let y0 = b.y; y0 < b.y2; y0 += chunkHeight) {
+                    const y1 = Math.min(b.y2, y0 + chunkHeight);
+                    const freq = new Map();
+                    const chunkId = (y0 / chunkHeight) | 0;
+                    for (let s = 0; s < sampleCount; s++) {
+                        const rx = b.x + Math.floor(rng(chunkId * 100000 + s) * (b.w));
+                        const ry = y0 + Math.floor(rng(chunkId * 200000 + s) * (y1 - y0));
+                        const idx = (ry * width + rx) * 4;
+                        const k = colorKey(data[idx], data[idx+1], data[idx+2], preQuant);
+                        const entry = freq.get(k);
+                        if (entry) entry.count++; else freq.set(k, { r: data[idx], g: data[idx+1], b: data[idx+2], count: 1 });
+                    }
+                    const candidates = Array.from(freq.values()).sort((a,b) => b.count - a.count).slice(0, Math.max(colors * 3, colors));
+                    if (candidates.length === 0) continue;
+                    const palette = [];
+                    palette.push([candidates[0].r, candidates[0].g, candidates[0].b]);
+                    while (palette.length < colors && palette.length < candidates.length) {
+                        let bestIdx = -1, bestScore = -1;
+                        for (let i = 0; i < candidates.length; i++) {
+                            const c = candidates[i];
+                            let minD = Infinity;
+                            for (let p of palette) minD = Math.min(minD, (c.r-p[0])**2 + (c.g-p[1])**2 + (c.b-p[2])**2);
+                            const score = minD * (1 + c.count * 0.1);
+                            if (score > bestScore) { bestScore = score; bestIdx = i; }
+                        }
+                        if (bestIdx === -1) break;
+                        const pick = candidates[bestIdx];
+                        palette.push([pick.r, pick.g, pick.b]);
+                        candidates.splice(bestIdx, 1);
+                    }
+                    for (let y = y0; y < y1; y++) {
+                        for (let x = b.x; x < b.x2; x++) {
+                            const idx = (y * width + x) * 4;
+                            const [rp, gp, bp] = nearest(data[idx], data[idx+1], data[idx+2], palette);
+                            data[idx] = clamp255(data[idx] + (rp - data[idx]) * mix);
+                            data[idx+1] = clamp255(data[idx+1] + (gp - data[idx+1]) * mix);
+                            data[idx+2] = clamp255(data[idx+2] + (bp - data[idx+2]) * mix);
+                        }
+                    }
+                }
+            };
+
+            const applyScanlineLogic = (data, width, height, opts) => {
+                const { mode = 'repeat', freq = 4, strength = 0.5, seed = 0, bounds = null } = opts;
+                const b = getEffectBounds(width, height, bounds);
+                const rng = makeRng(seed);
+                const copyRow = (srcY, destY) => {
+                    if (srcY < 0 || srcY >= height || destY < 0 || destY >= height) return;
+                    const srcOff = (srcY * width + b.x) * 4;
+                    const destOff = (destY * width + b.x) * 4;
+                    data.copyWithin(destOff, srcOff, srcOff + b.w * 4);
+                };
+                if (mode === 'repeat') {
+                    const n = Math.max(2, Math.floor(freq));
+                    for (let y = b.y; y < b.y2; y++) if (y % n === 0 && y > b.y) copyRow(y - 1, y);
+                } else if (mode === 'bands') {
+                    let inBand = false, bandRemaining = 0, holdRow = 0;
+                    const bandChance = 0.005 + (freq * 0.005);
+                    const maxLen = Math.floor(height * (0.02 + strength * 0.15));
+                    for (let y = b.y; y < b.y2; y++) {
+                        if (inBand) { copyRow(holdRow, y); bandRemaining--; if (bandRemaining <= 0) inBand = false; }
+                        else if (rng(y) < bandChance) { inBand = true; bandRemaining = Math.floor(rng(y + 999) * maxLen); holdRow = Math.max(b.y, y - 1); }
+                    }
+                } else if (mode === 'decay') {
+                    for (let y = b.y + 1; y < b.y2; y++) {
+                        const prob = ((y - b.y) / b.h) * strength * 0.8;
+                        if (rng(y * 13) < prob) copyRow(y - 1, y);
+                    }
+                }
+            };
+
+            const applyDesyncEcho = (data, width, height, opts) => {
+                const { intensity = 0.5, seed = 12345, maxShiftPx = 12, mode = 'add', echoAlpha = 0.35, lumaMask = 0.0, invertMask = false, perBand = false, bandHeight = 24, bounds = null } = opts || {};
+                if (intensity <= 0 || echoAlpha <= 0) return;
+                const b = getEffectBounds(width, height, bounds);
+                const src = new Uint8ClampedArray(data);
+                const rng = makeRng(seed);
+                const baseX = Math.round((rng(1) - 0.5) * 2 * maxShiftPx * intensity);
+                const baseY = Math.round((rng(2) - 0.5) * 2 * (maxShiftPx * 0.4) * intensity);
+                const blendChannel = (val, bVal, alpha, mode) => {
+                    if (mode === 'add') return clamp255(val + bVal * alpha);
+                    if (mode === 'sub') return clamp255(val - bVal * alpha);
+                    return clamp255(val + (bVal - 128) * alpha);
+                };
+                const getMask = (r, g, bVal) => {
+                    if (lumaMask <= 0) return 1.0;
+                    const l = (0.2126 * r + 0.7152 * g + 0.0722 * bVal) / 255;
+                    let m = invertMask ? 1 - l : l;
+                    return (1 - lumaMask) + (lumaMask * m);
+                };
+                for (let y = b.y; y < b.y2; y++) {
+                    let dx = baseX, dy = baseY;
+                    if (perBand) {
+                        const band = Math.floor(y / Math.max(1, bandHeight));
+                        dx = Math.round((rng(1000 + band) - 0.5) * 2 * maxShiftPx * intensity);
+                        dy = Math.round((rng(2000 + band) - 0.5) * 2 * (maxShiftPx * 0.25) * intensity);
+                    }
+                    const srcY = Math.max(0, Math.min(height - 1, y + dy));
+                    for (let x = b.x; x < b.x2; x++) {
+                        const srcX = Math.max(0, Math.min(width - 1, x + dx));
+                        const idx = (y * width + x) * 4;
+                        const sIdx = (srcY * width + srcX) * 4;
+                        const mask = getMask(data[idx], data[idx+1], data[idx+2]);
+                        const a = echoAlpha * intensity * mask;
+                        data[idx] = blendChannel(data[idx], src[sIdx], a, mode);
+                        data[idx+1] = blendChannel(data[idx+1], src[sIdx+1], a, mode);
+                        data[idx+2] = blendChannel(data[idx+2], src[sIdx+2], a, mode);
+                    }
+                }
+            };
+
+            const applyRGBDrift = (data, width, height, amount, bounds = null) => {
+                const offset = Math.floor(amount * width * 0.1);
+                if (offset === 0) return;
+                const b = getEffectBounds(width, height, bounds);
+                const tempData = new Uint8ClampedArray(data);
+                for (let y = b.y; y < b.y2; y++) {
+                    for (let x = b.x; x < b.x2; x++) {
+                        const idx = (y * width + x) * 4;
+                        const xR = Math.min(width - 1, Math.max(0, x - offset));
+                        const idxR = (y * width + xR) * 4;
+                        const xB = Math.min(width - 1, Math.max(0, x + offset));
+                        const idxB = (y * width + xB) * 4;
+                        data[idx] = tempData[idxR];
+                        data[idx + 2] = tempData[idxB + 2];
+                    }
+                }
+            };
+
+            const applyTearing = (data, width, height, intensity, seed, bounds = null) => {
+                if (intensity <= 0) return;
+                const b = getEffectBounds(width, height, bounds);
+                const tempData = new Uint8ClampedArray(data);
+                const rng = makeRng(seed);
+                const chunks = 20 + Math.floor(intensity * 50);
+                const maxShift = Math.floor(width * intensity * 0.5);
+                for (let i = 0; i < chunks; i++) {
+                    const r1 = rng(i), r2 = rng(i+1000), r3 = rng(i+2000);
+                    const rowStart = b.y + Math.floor(r1 * b.h);
+                    const rowHeight = Math.floor(r2 * (b.h / 10));
+                    const shift = Math.floor((r3 - 0.5) * 2 * maxShift);
+                    for (let y = rowStart; y < Math.min(b.y2, rowStart + rowHeight); y++) {
+                        for (let x = b.x; x < b.x2; x++) {
+                            const targetIdx = (y * width + x) * 4;
+                            let srcX = (x - shift) % width;
+                            if (srcX < 0) srcX += width;
+                            const srcIdx = (y * width + srcX) * 4;
+                            data[targetIdx] = tempData[srcIdx];
+                            data[targetIdx+1] = tempData[srcIdx+1];
+                            data[targetIdx+2] = tempData[srcIdx+2];
+                            data[targetIdx+3] = tempData[srcIdx+3];
+                        }
+                    }
+                }
+            };
+
+            const generateHistogram = (data) => {
+                const bins = new Array(64).fill(0);
+                for (let i = 0; i < data.length; i += 16) { 
+                    const luma = getLuma(data[i], data[i+1], data[i+2]);
+                    const binIdx = Math.floor((luma / 255) * 63);
+                    bins[binIdx]++;
+                }
+                const max = Math.max(...bins);
+                return bins.map(v => v / max);
+            };
+
+            /**
+             * MAIN COMPONENT
+             */
+            const GlitchEngine = () => {
+                const [sourceImage, setSourceImage] = useState(null);
+                const [sourceUrl, setSourceUrl] = useState(null);
+                const [processedUrl, setProcessedUrl] = useState(null);
+                const [isProcessing, setIsProcessing] = useState(false);
+                const [errorMsg, setErrorMsg] = useState(null);
+                const [dimensions, setDimensions] = useState({ w: 0, h: 0 });
+                const [histogram, setHistogram] = useState([]);
+                
+                const [viewMode, setViewMode] = useState('split'); 
+                const [sliderPos, setSliderPos] = useState(50);
+                const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+                const [showAdvanced, setShowAdvanced] = useState(false);
+                
+                const [interactionMode, setInteractionMode] = useState('preview'); 
+                const [selection, setSelection] = useState(null); 
+                const [isSelecting, setIsSelecting] = useState(false);
+                const selectionStart = useRef({ x: 0, y: 0 });
+                
+                const sliderRef = useRef(null);
+                const isDragging = useRef(false);
+                const canvasRef = useRef(null);
+                const fileInputRef = useRef(null);
+
+                const [params, setParams] = useState({
+                    algorithm: 'data_mosher',
+                    intensity: 0.5,
+                    threshold: 0.4,
+                    drift: 0.2,
+                    seed: 12345,
+                    sortDirection: 'horizontal', 
+                    segmentMode: 'runs',
+                    windowSize: 96,
+                    edgeGate: 0.15,
+                    maxRun: 512,
+                    rBits: 4, gBits: 8, bBits: 3, dither: 0.2,
+                    rebindingMode: 'luma_swap', paletteColors: 10, paletteChunk: 32, paletteMix: 1.0,
+                    scanlineMode: 'bands', scanlineCount: 4, scanlineStrength: 0.5,
+                    echoMode: 'add', echoShift: 24, echoAlpha: 0.4, echoBands: true,
+                });
+
+                useEffect(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 1200; canvas.height = 800;
+                    const ctx = canvas.getContext('2d');
+                    const grad = ctx.createLinearGradient(0, 0, 1200, 800);
+                    grad.addColorStop(0, '#1a1a2e'); grad.addColorStop(0.5, '#16213e'); grad.addColorStop(1, '#0f3460');
+                    ctx.fillStyle = grad; ctx.fillRect(0, 0, 1200, 800);
+                    ctx.fillStyle = '#e94560'; ctx.beginPath(); ctx.arc(600, 400, 200, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 120px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText('GLITCH', 600, 430);
+                    
+                    const url = canvas.toDataURL();
+                    const img = new Image();
+                    img.onload = () => handleImageLoad(img, url);
+                    img.src = url;
+                    
+                    setTimeout(() => {
+                        const loader = document.getElementById('loader');
+                        if (loader) loader.style.opacity = '0';
+                        setTimeout(() => { if (loader) loader.style.display = 'none'; }, 500);
+                    }, 800);
+                }, []);
+
+                const handleImageLoad = (img, url) => {
+                    setErrorMsg(null);
+                    let w = img.width; let h = img.height;
+                    const maxDim = 1920; 
+                    if (w > maxDim || h > maxDim) {
+                        const ratio = Math.min(maxDim / w, maxDim / h);
+                        w = Math.floor(w * ratio); h = Math.floor(h * ratio);
+                    }
+                    setSourceImage(img); setSourceUrl(url); setDimensions({ w, h });
+                    // No direct call to processImage here anymore; the new useEffect will handle it automatically
+                };
+
+                const handleUpload = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    e.target.value = null;
+
+                    // Simple check to warn about HEIC
+                    if (file.name.toLowerCase().endsWith('.heic')) {
+                        setErrorMsg("HEIC format not supported in this version. Please use JPG or PNG.");
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => handleImageLoad(img, event.target.result);
+                        img.onerror = () => setErrorMsg("Failed to load image data.");
+                        img.src = event.target.result;
+                    };
+                    reader.onerror = () => setErrorMsg("Failed to read file.");
+                    reader.readAsDataURL(file);
+                };
+
+                const processImage = useCallback(async (img, w, h, currentParams, currentSelection) => {
+                    if (!img) return;
+                    setIsProcessing(true);
+                    setTimeout(() => {
+                        try {
+                            const canvas = canvasRef.current;
+                            if (!canvas) return;
+                            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                            canvas.width = w; canvas.height = h;
+                            ctx.drawImage(img, 0, 0, w, h);
+                            const imageData = ctx.getImageData(0, 0, w, h);
+                            const data = imageData.data;
+                            setHistogram(generateHistogram(data));
+                            
+                            const bounds = currentSelection || null;
+
+                            if (currentParams.algorithm === 'data_mosher') {
+                                applyStructuralSort(data, w, h, { ...currentParams, bounds });
+                                applyTearing(data, w, h, currentParams.intensity * 0.3, currentParams.seed, bounds);
+                            } 
+                            else if (currentParams.algorithm === 'spectral_drift') {
+                                applyRGBDrift(data, w, h, currentParams.drift * 0.5 + 0.05, bounds); 
+                                applyChannelQuantization(data, w, h, { ...currentParams, bounds });
+                                applyStructuralSort(data, w, h, { ...currentParams, threshold: 0.1 + (currentParams.threshold * 0.6), comparator: 'sum', bounds });
+                            }
+                            else if (currentParams.algorithm === 'void_rot') {
+                                applyScanlineLogic(data, w, h, { mode: 'decay', strength: 0.2 * currentParams.intensity, seed: currentParams.seed, bounds });
+                                applyTearing(data, w, h, currentParams.intensity * 0.8, currentParams.seed, bounds);
+                                applyRGBDrift(data, w, h, currentParams.drift * 0.2, bounds);
+                                applyStructuralSort(data, w, h, { ...currentParams, threshold: 0.8 - (currentParams.intensity * 0.4), comparator: 'luma', bounds });
+                            }
+                            else if (currentParams.algorithm === 'palette_collapse') {
+                                applyPaletteCollapse(data, w, h, { ...currentParams, colors: Math.max(2, Math.floor(currentParams.paletteColors)), chunkHeight: Math.max(4, Math.floor(currentParams.paletteChunk)), mix: currentParams.paletteMix, bounds });
+                                applyChannelRebinding(data, w, h, { ...currentParams, mode: 'chunk_map', chunkHeight: Math.max(8, Math.floor(currentParams.paletteChunk * 0.75)), chunkStrength: 0.75, bounds });
+                                applyRGBDrift(data, w, h, 0.06 + currentParams.drift * 0.12, bounds);
+                            }
+                            else if (currentParams.algorithm === 'scanline_failure') {
+                                applyScanlineLogic(data, w, h, { mode: currentParams.scanlineMode, freq: currentParams.scanlineCount, strength: currentParams.scanlineStrength, seed: currentParams.seed, bounds });
+                                if (currentParams.intensity > 0.5) applyStructuralSort(data, w, h, { threshold: 0.7, sortDirection: 'horizontal', segmentMode: 'runs', maxRun: 64, bounds });
+                            }
+                            else if (currentParams.algorithm === 'desync_echo') {
+                                applyRGBDrift(data, w, h, currentParams.drift * 0.3, bounds);
+                                applyDesyncEcho(data, w, h, { ...currentParams, maxShiftPx: currentParams.echoShift, lumaMask: currentParams.threshold, bandHeight: 32, bounds });
+                                if (currentParams.intensity > 0.6) applyTearing(data, w, h, currentParams.intensity * 0.2, currentParams.seed, bounds);
+                            }
+
+                            ctx.putImageData(imageData, 0, 0);
+                            setProcessedUrl(canvas.toDataURL('image/png'));
+                            setIsProcessing(false);
+                        } catch (err) {
+                            setErrorMsg("Error: " + err.message);
+                            setIsProcessing(false);
+                        }
+                    }, 10);
+                }, []);
+
+                // WATCHDOG EFFECT: Automatically triggers processing when params change
+                useEffect(() => {
+                    if (!sourceImage || !dimensions.w || !dimensions.h) return;
+
+                    const timer = setTimeout(() => {
+                        processImage(sourceImage, dimensions.w, dimensions.h, params, selection);
+                    }, 20); // 20ms debounce for "real-time" feel without freezing
+
+                    return () => clearTimeout(timer);
+                }, [params, selection, sourceImage, dimensions, processImage]);
+
+                const updateParam = (key, value) => { setParams(prev => ({ ...prev, [key]: value })); };
+                const handleDownload = () => {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return;
+                    const link = document.createElement('a');
+                    link.download = `glitch_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                };
+
+                const handleMouseDown = (e) => {
+                    if (interactionMode === 'mask') {
+                        e.preventDefault();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = (e.clientX - rect.left) / rect.width;
+                        const y = (e.clientY - rect.top) / rect.height;
+                        setIsSelecting(true);
+                        selectionStart.current = { x, y };
+                        setSelection({ x, y, w: 0, h: 0 });
+                    } else { isDragging.current = true; }
+                };
+
+                const handleMouseMove = useCallback((e) => {
+                    if (!sliderRef.current) return;
+                    const rect = sliderRef.current.getBoundingClientRect();
+                    const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                    const xRel = (clientX - rect.left) / rect.width;
+                    const yRel = (clientY - rect.top) / rect.height;
+
+                    if (isSelecting) {
+                        const start = selectionStart.current;
+                        const x = Math.min(start.x, xRel);
+                        const y = Math.min(start.y, yRel);
+                        const w = Math.abs(xRel - start.x);
+                        const h = Math.abs(yRel - start.y);
+                        setSelection({ x: Math.max(0, x), y: Math.max(0, y), w: Math.min(1 - x, w), h: Math.min(1 - y, h) });
+                    } else if (isDragging.current) {
+                        setSliderPos(Math.max(0, Math.min(100, xRel * 100)));
+                    }
+                }, [isSelecting]);
+
+                const handleMouseUp = useCallback(() => {
+                    if (isSelecting) {
+                        setIsSelecting(false);
+                        if (selection && (selection.w < 0.01 || selection.h < 0.01)) setSelection(null);
+                    }
+                    isDragging.current = false;
+                }, [selection, isSelecting]);
+
+                useEffect(() => {
+                    window.addEventListener('mouseup', handleMouseUp);
+                    window.addEventListener('mousemove', handleMouseMove);
+                    window.addEventListener('touchend', handleMouseUp);
+                    window.addEventListener('touchmove', handleMouseMove);
+                    return () => { 
+                        window.removeEventListener('mouseup', handleMouseUp); 
+                        window.removeEventListener('mousemove', handleMouseMove);
+                        window.removeEventListener('touchend', handleMouseUp);
+                        window.removeEventListener('touchmove', handleMouseMove);
+                    };
+                }, [handleMouseUp, handleMouseMove]);
+
+                return (
+                    <div className="flex h-screen bg-slate-950 text-slate-200 font-sans overflow-hidden selection:bg-pink-500 selection:text-white">
+                        <div className={`flex-shrink-0 glass-panel flex flex-col z-40 transition-all duration-300 relative overflow-hidden ${isSidebarOpen ? 'w-80' : 'w-0 border-none'}`}>
+                            <div className="w-80 h-full flex flex-col">
+                                <div className="p-6 border-b border-slate-700/50 flex justify-between items-start">
+                                    <div><div className="flex items-center gap-2 mb-1"><span className="text-pink-500 font-mono text-xl">⚡</span><h1 className="text-lg font-bold tracking-wider text-slate-100 font-mono">GLITCH.ENG</h1></div><p className="text-xs text-slate-500 font-mono tracking-wider">SIGNAL DISTORTION UNIT</p></div>
+                                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-white font-mono text-xs">[CLOSE]</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 uppercase tracking-widest">:: SIGNAL ANALYSIS</div>
+                                        <div className="h-16 bg-slate-900 border border-slate-700/50 rounded p-1 flex items-end gap-[1px]">
+                                            {histogram.length > 0 ? histogram.map((val, i) => (<div key={i} className="flex-1 bg-cyan-500/40" style={{ height: `${val * 100}%` }} />)) : <div className="w-full h-full flex items-center justify-center text-slate-700 text-xs font-mono">NO SIGNAL</div>}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-widest">:: ALGORITHM</label>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {[{ id: 'data_mosher', name: 'Data Mosher', desc: 'Luma-gated sorting' }, { id: 'spectral_drift', name: 'Spectral Drift', desc: 'RGB Channel offset' }, { id: 'palette_collapse', name: 'Palette Collapse', desc: 'Chunk posterization' }, { id: 'scanline_failure', name: 'Scanline Failure', desc: 'Buffer freeze' }, { id: 'desync_echo', name: 'Desync Echo', desc: 'Ghost trails' }, { id: 'void_rot', name: 'Void Rot', desc: 'Structural tearing' }].map(algo => (
+                                                <button key={algo.id} onClick={() => updateParam('algorithm', algo.id)} className={`cyber-button px-4 py-3 rounded text-left transition-all border ${params.algorithm === algo.id ? 'bg-slate-800 border-pink-500/50 text-white shadow-[0_0_15px_rgba(236,72,153,0.15)]' : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:border-slate-600'}`}>
+                                                    <div className="font-bold text-sm font-mono">{algo.name}</div><div className="text-[10px] opacity-60 font-mono">{algo.desc}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Structural Controls */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-widest">:: STRUCTURE</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[{ id: 'horizontal', label: 'HORZ' }, { id: 'vertical', label: 'VERT' }, { id: 'both', label: 'BOTH' }].map(dir => (
+                                                <button key={dir.id} onClick={() => updateParam('sortDirection', dir.id)} className={`flex flex-col items-center justify-center py-2 rounded border transition-all ${params.sortDirection === dir.id ? 'bg-slate-800 border-cyan-500/50 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.1)]' : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}><span className="text-[10px] mt-1 font-mono">{dir.label}</span></button>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button onClick={() => updateParam('segmentMode', 'runs')} className={`flex items-center justify-center gap-2 py-2 rounded border transition-all ${params.segmentMode === 'runs' ? 'bg-slate-800 border-purple-500/50 text-purple-400' : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}><span className="text-xs font-mono">RUNS</span></button>
+                                            <button onClick={() => updateParam('segmentMode', 'windowed')} className={`flex items-center justify-center gap-2 py-2 rounded border transition-all ${params.segmentMode === 'windowed' ? 'bg-slate-800 border-purple-500/50 text-purple-400' : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:text-slate-300'}`}><span className="text-xs font-mono">WINDOW</span></button>
+                                        </div>
+                                    </div>
+
+                                    {/* Conditional Controls */}
+                                    {params.algorithm === 'scanline_failure' && (
+                                    <div className="space-y-4 border border-green-900/30 bg-green-900/5 p-3 rounded-lg backdrop-blur-sm">
+                                        <div className="flex items-center gap-2 text-xs font-mono text-green-400 uppercase tracking-widest">:: BUFFER LOGIC</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['repeat', 'bands', 'decay'].map(m => (
+                                            <button key={m} onClick={() => updateParam('scanlineMode', m)} className={`py-1 rounded text-[10px] font-mono border ${params.scanlineMode === m ? 'bg-green-900/40 border-green-500 text-green-200' : 'bg-slate-900/50 border-slate-700 text-slate-500'}`}>{m.toUpperCase()}</button>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-2"><div className="flex justify-between text-[10px] font-mono text-slate-300"><span>{params.scanlineMode === 'repeat' ? 'SKIP FREQ' : 'DENSITY'}</span><span>{params.scanlineCount}</span></div><input type="range" min="2" max="50" step="1" value={params.scanlineCount} onChange={(e) => updateParam('scanlineCount', parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-green-500" /></div>
+                                        <div className="space-y-2"><div className="flex justify-between text-[10px] font-mono text-slate-300"><span>STRENGTH</span><span>{(params.scanlineStrength * 100).toFixed(0)}%</span></div><input type="range" min="0" max="1" step="0.01" value={params.scanlineStrength} onChange={(e) => updateParam('scanlineStrength', parseFloat(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-green-500" /></div>
+                                    </div>
+                                    )}
+
+                                    {params.algorithm === 'desync_echo' && (
+                                    <div className="space-y-4 border border-indigo-900/30 bg-indigo-900/5 p-3 rounded-lg backdrop-blur-sm">
+                                        <div className="flex items-center gap-2 text-xs font-mono text-indigo-400 uppercase tracking-widest">:: ECHO PARAMS</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['add', 'sub', 'mix'].map(m => (
+                                            <button key={m} onClick={() => updateParam('echoMode', m)} className={`py-1 rounded text-[10px] font-mono border ${params.echoMode === m ? 'bg-indigo-900/40 border-indigo-500 text-indigo-200' : 'bg-slate-900/50 border-slate-700 text-slate-500'}`}>{m.toUpperCase()}</button>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-2"><div className="flex justify-between text-[10px] font-mono text-slate-300"><span>SHIFT (PX)</span><span>{params.echoShift}</span></div><input type="range" min="1" max="100" step="1" value={params.echoShift} onChange={(e) => updateParam('echoShift', parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" /></div>
+                                        <div className="space-y-2"><div className="flex justify-between text-[10px] font-mono text-slate-300"><span>OPACITY</span><span>{(params.echoAlpha * 100).toFixed(0)}%</span></div><input type="range" min="0.05" max="1" step="0.05" value={params.echoAlpha} onChange={(e) => updateParam('echoAlpha', parseFloat(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" /></div>
+                                        <div className="flex items-center justify-between"><span className="text-[10px] font-mono text-slate-300">BANDED ECHO</span><button onClick={() => updateParam('echoBands', !params.echoBands)} className="text-indigo-400 font-mono text-xs">{params.echoBands ? '[ ON ]' : '[ OFF ]'}</button></div>
+                                    </div>
+                                    )}
+
+                                    {/* Sliders */}
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-widest">:: MODULATION</div>
+                                        <div className="space-y-2"><div className="flex justify-between text-xs font-mono"><span>INTENSITY</span><span className="text-pink-400">{(params.intensity * 100).toFixed(0)}%</span></div><input type="range" min="0" max="1" step="0.01" value={params.intensity} onChange={(e) => updateParam('intensity', parseFloat(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-pink-500" /></div>
+                                        <div className="space-y-2"><div className="flex justify-between text-xs font-mono"><span>LUMA GATE</span><span className="text-cyan-400">{(params.threshold * 100).toFixed(0)}%</span></div><input type="range" min="0" max="1" step="0.01" value={params.threshold} onChange={(e) => updateParam('threshold', parseFloat(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500" /></div>
+                                        <div className="space-y-2"><div className="flex justify-between text-xs font-mono"><span>CHROMA DRIFT</span><span className="text-purple-400">{(params.drift * 100).toFixed(0)}%</span></div><input type="range" min="0" max="1" step="0.01" value={params.drift} onChange={(e) => updateParam('drift', parseFloat(e.target.value))} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500" /></div>
+                                    </div>
+
+                                    {/* Advanced Toggle */}
+                                    <div className="border border-slate-800 rounded bg-slate-900/50 overflow-hidden">
+                                        <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-3 text-xs font-mono text-slate-400 uppercase tracking-widest hover:bg-slate-800 transition-colors">
+                                            <div className="flex items-center gap-2">:: COLOR DEPTH</div>
+                                            <div className="text-[10px]">{showAdvanced ? '[-]' : '[+]'}</div>
+                                        </button>
+                                        {showAdvanced && (
+                                            <div className="p-3 space-y-5 border-t border-slate-800 bg-black/20">
+                                                <div className="space-y-1"><div className="flex justify-between text-[10px] font-mono text-slate-300"><span>R-BIT</span><span>{params.rBits}</span></div><input type="range" min="1" max="8" value={params.rBits} onChange={(e)=>updateParam('rBits', parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded accent-red-500"/></div>
+                                                <div className="space-y-1"><div className="flex justify-between text-[10px] font-mono text-slate-300"><span>B-BIT</span><span>{params.bBits}</span></div><input type="range" min="1" max="8" value={params.bBits} onChange={(e)=>updateParam('bBits', parseInt(e.target.value))} className="w-full h-1 bg-slate-800 rounded accent-blue-500"/></div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-700/50">
+                                        <button onClick={() => updateParam('seed', Math.random() * 10000)} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-2 px-4 rounded text-xs font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-2">[ REROLL SEED ]</button>
+                                    </div>
+                                </div>
+                                <div className="p-6 border-t border-slate-700/50 bg-slate-900/50 backdrop-blur-md space-y-3">
+                                    <input type="file" ref={fileInputRef} onChange={handleUpload} accept="image/*" className="hidden" />
+                                    <button onClick={() => fileInputRef.current?.click()} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-md text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 font-mono border border-slate-700">[ UPLOAD SOURCE ]</button>
+                                    <button onClick={handleDownload} disabled={!sourceUrl || isProcessing} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-md text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(236,72,153,0.3)] disabled:opacity-50 disabled:shadow-none font-mono">{isProcessing ? 'PROCESSING...' : '[ EXPORT ARTIFACT ]'}</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* --- PREVIEW AREA --- */}
+                        <div className="flex-1 bg-slate-950 relative overflow-hidden flex flex-col min-w-0 h-full">
+                            <div className="h-14 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4 backdrop-blur z-20 flex-shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors font-mono text-xs">{isSidebarOpen ? '[CLOSE]' : '[MENU]'}</button>
+                                    <div className="text-xs font-mono text-slate-500 hidden sm:flex gap-4 border-l border-slate-800 pl-4">{sourceImage && <><span>INPUT: {dimensions.w}x{dimensions.h}</span><span>SEED: {params.seed.toFixed(0)}</span></>}</div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 shadow-sm">
+                                        <button onClick={() => setInteractionMode('preview')} title="Preview Mode" className={`p-2 rounded flex items-center gap-2 transition-all ${interactionMode === 'preview' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><span className="text-[10px] font-bold uppercase font-mono">PREVIEW</span></button>
+                                        <button onClick={() => setInteractionMode('mask')} title="Masking Mode" className={`p-2 rounded flex items-center gap-2 transition-all ${interactionMode === 'mask' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><span className="text-[10px] font-bold uppercase font-mono">MASK</span></button>
+                                    </div>
+                                    {interactionMode === 'preview' && (
+                                        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 shadow-sm">
+                                            <button onClick={() => setViewMode('source')} className={`p-2 rounded transition-all text-[10px] font-mono font-bold ${viewMode === 'source' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>SRC</button>
+                                            <button onClick={() => setViewMode('split')} className={`p-2 rounded transition-all text-[10px] font-mono font-bold ${viewMode === 'split' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>SPLIT</button>
+                                            <button onClick={() => setViewMode('result')} className={`p-2 rounded transition-all text-[10px] font-mono font-bold ${viewMode === 'result' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>RES</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex-1 relative flex items-center justify-center p-0 overflow-hidden select-none bg-slate-950">
+                                <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#475569 1px, transparent 1px), linear-gradient(90deg, #475569 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+                                {errorMsg && <div className="absolute top-10 left-1/2 -translate-x-1/2 z-50 bg-red-900/90 text-white px-6 py-3 rounded border border-red-500 shadow-2xl flex items-center gap-3 text-sm font-mono">ERROR: {errorMsg}</div>}
+                                
+                                {sourceUrl ? (
+                                    <div ref={sliderRef} className={`relative shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-black group flex items-center justify-center max-w-full max-h-full ${interactionMode === 'mask' ? 'cursor-crosshair' : 'cursor-ew-resize'}`} onMouseDown={handleMouseDown} onTouchStart={handleMouseDown} style={{ maxWidth: '100%', maxHeight: '100%' }}>
+                                        <div className="relative" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+                                            <img src={sourceUrl} className="block opacity-0 pointer-events-none" style={{ maxHeight: 'calc(100vh - 7rem)', maxWidth: '100%', objectFit: 'contain' }} alt="" />
+                                            <img src={sourceUrl} alt="Source" className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${viewMode === 'result' && interactionMode === 'preview' ? 'opacity-0' : 'opacity-100'}`} />
+                                            {processedUrl && (
+                                                <img src={processedUrl} alt="Processed" className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${viewMode === 'source' && interactionMode === 'preview' ? 'opacity-0' : 'opacity-100'}`}
+                                                    style={{ 
+                                                        imageRendering: 'pixelated', 
+                                                        clipPath: (viewMode === 'split' && interactionMode === 'preview') ? `inset(0 0 0 ${sliderPos}%)` : 'none', 
+                                                        opacity: (viewMode === 'source' && interactionMode === 'preview') 
+                                                            ? 0 
+                                                            : ((interactionMode === 'mask' && !selection) ? 0.7 : 1)
+                                                    }}
+                                                />
+                                            )}
+                                            {interactionMode === 'preview' && viewMode === 'split' && processedUrl && (
+                                                <div className="absolute top-0 bottom-0 w-0.5 bg-pink-500 z-10 cursor-ew-resize group-hover:shadow-[0_0_15px_rgba(236,72,153,0.8)] transition-all" style={{ left: `${sliderPos}%` }}>
+                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-pink-500 p-2 rounded-full shadow-lg border-2 border-slate-900 transition-transform hover:scale-110 font-mono text-[10px] text-white font-bold">&lt;&gt;</div>
+                                                </div>
+                                            )}
+                                            {interactionMode === 'mask' && (
+                                                <div className="absolute inset-0 pointer-events-none">
+                                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
+                                                    {selection && (
+                                                        <div className="absolute border-2 border-cyan-400 bg-cyan-400/5 shadow-[0_0_30px_rgba(34,211,238,0.2)]" style={{ left: `${selection.x * 100}%`, top: `${selection.y * 100}%`, width: `${selection.w * 100}%`, height: `${selection.h * 100}%` }}>
+                                                            <div className="absolute -top-3 -left-3 w-6 h-6 border-t-2 border-l-2 border-cyan-400"></div>
+                                                            <div className="absolute -top-3 -right-3 w-6 h-6 border-t-2 border-r-2 border-cyan-400"></div>
+                                                            <div className="absolute -bottom-3 -left-3 w-6 h-6 border-b-2 border-l-2 border-cyan-400"></div>
+                                                            <div className="absolute -bottom-3 -right-3 w-6 h-6 border-b-2 border-r-2 border-cyan-400"></div>
+                                                        </div>
+                                                    )}
+                                                    {isSelecting && !selection && <div className="absolute inset-0 flex items-center justify-center text-cyan-400/80 font-mono text-sm uppercase tracking-widest pointer-events-none animate-pulse">DRAG TO SELECT REGION</div>}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-30 backdrop-blur-[2px]"><div className="flex flex-col items-center gap-3"><div className="text-4xl animate-spin">⚡</div><div className="text-xs font-mono text-pink-500 uppercase tracking-widest animate-pulse">PROCESSING...</div></div></div>}
+                                        {selection && interactionMode === 'mask' && <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-30"><button onClick={() => setSelection(null)} className="bg-red-900/90 hover:bg-red-800 text-white px-6 py-3 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-xl border border-red-500/50 transition-all pointer-events-auto font-mono">[ CLEAR MASK ]</button><div className="bg-slate-900/90 text-cyan-400 px-6 py-3 rounded text-xs font-mono border border-cyan-500/30 shadow-xl flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>ACTIVE REGION</div></div>}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-slate-700 gap-4">
+                                        <div className="w-24 h-24 border-2 border-dashed border-slate-800 rounded-xl flex items-center justify-center text-4xl opacity-20 font-mono font-bold">+</div>
+                                        <p className="font-mono text-xs uppercase tracking-widest opacity-50">NO SIGNAL INPUT</p>
+                                    </div>
+                                )}
+                                <canvas ref={canvasRef} className="hidden" />
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<GlitchEngine />);
+        } catch (err) {
+            document.getElementById('loader').innerHTML = `<div style="color:#ef4444; padding:20px; font-family:monospace; text-align:center;">
+                <h1 style="font-size:24px; margin-bottom:10px;">SYSTEM CRITICAL ERROR</h1>
+                <p style="color:#94a3b8">${err.message}</p>
+            </div>`;
+            console.error(err);
+        }
+    </script>
+</body>
+</html>
+
+
+```

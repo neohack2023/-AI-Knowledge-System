@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Audio-Reactive Video Glitcher (Docked UI)</title>
+
+  <script defer src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
+  <script defer src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
+  <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script defer src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg: #050607;
+      --panel: #0d1014;
+      --line: rgba(255,255,255,0.08);
+      --text: #e7eaf0;
+      --muted: #96a0af;
+      --accent: #ef4444;
+      --danger: #ef4444;
+      --sidebar-w: 360px;
+      --sidebar-mini: 54px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(239,68,68,0.08), transparent 25%),
+        linear-gradient(180deg, #07090d 0%, #050607 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid var(--line);
+      box-shadow:
+        0 12px 30px rgba(0,0,0,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+      backdrop-filter: blur(12px);
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(16,20,28,0.95), rgba(11,14,19,0.96));
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+    }
+
+    .scanlines::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(255,255,255,0.02) 50%, rgba(0,0,0,0.12) 50%),
+        linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,255,0.015), rgba(0,0,255,0.03));
+      background-size: 100% 2px, 3px 100%;
+      z-index: 12;
+      mix-blend-mode: soft-light;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #222938, #343d51);
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      margin-top: -6px;
+      background: linear-gradient(180deg, #ff6b6b, #ef4444);
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 4px 12px rgba(239,68,68,0.45);
+      cursor: pointer;
+    }
+
+    input[type=range]::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #222938, #343d51);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #ff6b6b, #ef4444);
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 4px 12px rgba(239,68,68,0.45);
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+    }
+
+    .meter-bar {
+      position: relative;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #0b0f14;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .meter-bar > div {
+      height: 100%;
+      border-radius: 999px;
+      transition: width .08s linear;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      transition: .18s ease;
+    }
+
+    .chip:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.14);
+    }
+
+    .btn {
+      transition: .18s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #21c15d, #169c48);
+      color: #04120a;
+      font-weight: 700;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .btn-warn {
+      background: linear-gradient(180deg, #f8d24f, #e7b81c);
+      color: #1e1600;
+      font-weight: 700;
+    }
+
+    .btn-warn:hover:not(:disabled) {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    .btn-rec {
+      background: linear-gradient(180deg, #ff5e5e, #ef4444);
+      color: white;
+      font-weight: 700;
+    }
+
+    .btn-rec:hover:not(:disabled) {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      border-color: rgba(239,68,68,0.45);
+      color: #ff7d7d;
+      background: rgba(239,68,68,0.06);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: rgba(239,68,68,0.12);
+      transform: translateY(-1px);
+    }
+
+    .download-link {
+      text-decoration: none;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    .main-stage {
+      min-width: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      height: 100vh;
+      border-left: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(11,14,19,0.98), rgba(8,10,14,0.98));
+      transition: width .22s ease;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar.collapsed {
+      width: var(--sidebar-mini);
+    }
+
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar,
+    .main-scroll::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-thumb,
+    .main-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-track,
+    .main-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar-fade {
+      opacity: 1;
+      transform: translateX(0);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .sidebar.collapsed .sidebar-fade {
+      opacity: 0;
+      transform: translateX(8px);
+      pointer-events: none;
+    }
+
+    .sidebar-mini-stack {
+      display: none;
+    }
+
+    .sidebar.collapsed .sidebar-mini-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding-top: 10px;
+    }
+
+    .sidebar-icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: #c8ced9;
+      cursor: pointer;
+      transition: .16s ease;
+    }
+
+    .sidebar-icon-btn:hover {
+      background: rgba(255,255,255,0.08);
+      color: white;
+    }
+
+    .floating-open {
+      position: fixed;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 50;
+    }
+
+    #fatal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      overflow: auto;
+      padding: 18px;
+      background: rgba(0,0,0,.94);
+      border-top: 4px solid var(--danger);
+    }
+
+    #fatal pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #ffdfe0;
+      background: #140909;
+      border: 1px solid rgba(239,68,68,0.22);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    @media (max-width: 900px) {
+      :root {
+        --sidebar-w: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <div id="fatal">
+    <div class="max-w-4xl mx-auto">
+      <div class="text-xl font-bold text-red-400 mb-2 mono">GLITCH_SYNTH_V4: RUNTIME FAULT</div>
+      <div class="text-sm text-gray-300 mb-4">
+        Something snapped in the signal chain.
+      </div>
+      <pre id="fatalText"></pre>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const fatal = document.getElementById('fatal');
+      const fatalText = document.getElementById('fatalText');
+
+      function showFatal(msg) {
+        fatal.style.display = 'block';
+        fatalText.textContent = msg;
+      }
+
+      window.addEventListener('error', (e) => {
+        showFatal(
+          `[window.onerror]\n${e.message}\n\nFile: ${e.filename}\nLine: ${e.lineno}:${e.colno}\n\n` +
+          (e.error && e.error.stack ? e.error.stack : '')
+        );
+      });
+
+      window.addEventListener('unhandledrejection', (e) => {
+        const r = e.reason;
+        showFatal(
+          `[unhandledrejection]\n${r && r.message ? r.message : String(r)}\n\n` +
+          (r && r.stack ? r.stack : '')
+        );
+      });
+
+      window.addEventListener('DOMContentLoaded', () => {
+        const missing = [];
+        if (!window.React) missing.push('React');
+        if (!window.ReactDOM) missing.push('ReactDOM');
+        if (!window.Babel) missing.push('Babel');
+        if (missing.length) {
+          showFatal(`Missing required globals:\n- ${missing.join('\n- ')}`);
+        }
+      });
+    })();
+  </script>
+
+  <script type="text/babel">
+    const { useEffect, useMemo, useRef, useState } = React;
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const mapRange = (value, inMin, inMax, outMin, outMax) => {
+      if (inMax === inMin) return outMin;
+      return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+    };
+
+    const PRESETS = {
+      subtle: {
+        threshold: 195,
+        intensity: 32,
+        mix: 52,
+        eventSens: 0.92,
+        cooldownMs: 240,
+        burstMs: 95,
+        dropoutBoost: 0.8,
+        calmFloor: 0.01,
+        colorShift: true,
+        sliceGlitch: false,
+        invertFlash: false,
+        scanlineFlash: true
+      },
+      glitchHop: {
+        threshold: 180,
+        intensity: 58,
+        mix: 74,
+        eventSens: 1.15,
+        cooldownMs: 180,
+        burstMs: 125,
+        dropoutBoost: 1.0,
+        calmFloor: 0.015,
+        colorShift: true,
+        sliceGlitch: true,
+        invertFlash: true,
+        scanlineFlash: true
+      },
+      chaos: {
+        threshold: 120,
+        intensity: 88,
+        mix: 92,
+        eventSens: 1.48,
+        cooldownMs: 95,
+        burstMs: 180,
+        dropoutBoost: 1.45,
+        calmFloor: 0.03,
+        colorShift: true,
+        sliceGlitch: true,
+        invertFlash: true,
+        scanlineFlash: true
+      }
+    };
+
+    const EVENT_PRESETS = {
+      idle:     { hold: 0.0, tear: 0.0, crush: 0.0, rgb: 0.0, invert: 0.0 },
+      stutter:  { hold: 1.0, tear: 0.9, crush: 0.0, rgb: 0.5, invert: 0.0 },
+      slam:     { hold: 0.75, tear: 1.0, crush: 0.15, rgb: 0.75, invert: 0.05 },
+      dropout:  { hold: 1.0, tear: 0.75, crush: 0.0, rgb: 0.35, invert: 0.85 },
+      bitcrush: { hold: 0.25, tear: 0.35, crush: 1.0, rgb: 0.45, invert: 0.18 }
+    };
+
+    const defaultParams = PRESETS.glitchHop;
+
+    const Icons = {
+      Upload: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" x2="12" y1="3" y2="15"/>
+        </svg>
+      ),
+      Play: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+      ),
+      Pause: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect width="4" height="16" x="6" y="4"/>
+          <rect width="4" height="16" x="14" y="4"/>
+        </svg>
+      ),
+      Stop: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="6" y="6" width="12" height="12"/>
+        </svg>
+      ),
+      Trash: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+        </svg>
+      ),
+      Mic: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" x2="12" y1="19" y2="22"/>
+        </svg>
+      ),
+      Activity: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      ),
+      Knob: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="8"/>
+          <line x1="12" x2="12" y1="12" y2="7"/>
+        </svg>
+      ),
+      Zap: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      ),
+      Download: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" x2="12" y1="15" y2="3"/>
+        </svg>
+      ),
+      PanelOpen: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M15 3v18"/>
+          <path d="m10 8-4 4 4 4"/>
+        </svg>
+      ),
+      PanelClose: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M9 3v18"/>
+          <path d="m14 8 4 4-4 4"/>
+        </svg>
+      ),
+      Sliders: () => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" x2="4" y1="21" y2="14"/>
+          <line x1="4" x2="4" y1="10" y2="3"/>
+          <line x1="12" x2="12" y1="21" y2="12"/>
+          <line x1="12" x2="12" y1="8" y2="3"/>
+          <line x1="20" x2="20" y1="21" y2="16"/>
+          <line x1="20" x2="20" y1="12" y2="3"/>
+          <line x1="2" x2="6" y1="12" y2="12"/>
+          <line x1="10" x2="14" y1="10" y2="10"/>
+          <line x1="18" x2="22" y1="14" y2="14"/>
+        </svg>
+      )
+    };
+
+    function eventStyles(type) {
+      if (type === "dropout") return "border-red-500/30 text-red-300 bg-red-500/10";
+      if (type === "bitcrush") return "border-cyan-500/30 text-cyan-300 bg-cyan-500/10";
+      if (type === "slam") return "border-orange-500/30 text-orange-300 bg-orange-500/10";
+      if (type === "stutter") return "border-yellow-500/30 text-yellow-300 bg-yellow-500/10";
+      return "border-white/10 text-gray-400 bg-white/[0.03]";
+    }
+
+    function App() {
+      const [videoSrc, setVideoSrc] = useState(null);
+      const [videoName, setVideoName] = useState("");
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [isRecording, setIsRecording] = useState(false);
+      const [sidebarOpen, setSidebarOpen] = useState(true);
+
+      const [params, setParams] = useState(defaultParams);
+      const paramsRef = useRef(defaultParams);
+
+      const [audioMetrics, setAudioMetrics] = useState({
+        bass: 0, mid: 0, high: 0, rms: 0, flux: 0, event: "idle"
+      });
+
+      const [recordingInfo, setRecordingInfo] = useState({
+        elapsedMs: 0,
+        mimeType: "",
+        chunks: 0
+      });
+
+      const [exportInfo, setExportInfo] = useState({
+        url: "",
+        filename: "",
+        mimeType: "",
+        sizeBytes: 0
+      });
+
+      const [recorderCapability, setRecorderCapability] = useState({
+        preferred: "",
+        actual: "",
+        mode: "unknown"
+      });
+
+      const videoRef = useRef(null);
+      const canvasRef = useRef(null);
+      const bufferCanvasRef = useRef(null);
+      const pixelCanvasRef = useRef(null);
+      const animationRef = useRef(null);
+      const isLoopingRef = useRef(false);
+      const objectUrlRef = useRef(null);
+      const exportUrlRef = useRef(null);
+
+      const audioCtxRef = useRef(null);
+      const analyserRef = useRef(null);
+      const sourceNodeRef = useRef(null);
+      const streamDestRef = useRef(null);
+
+      const mediaRecorderRef = useRef(null);
+      const recordedChunksRef = useRef([]);
+      const recordingStartRef = useRef(0);
+      const previousLoopValueRef = useRef(true);
+
+      const prevSpecRef = useRef(null);
+      const envRef = useRef({ rms: 0, flux: 0 });
+      const burstRef = useRef({ level: 0, type: "idle", until: 0, cooldownUntil: 0 });
+      const uiUpdateRef = useRef(0);
+
+      useEffect(() => {
+        paramsRef.current = params;
+      }, [params]);
+
+      useEffect(() => {
+        bufferCanvasRef.current = document.createElement("canvas");
+        pixelCanvasRef.current = document.createElement("canvas");
+        setRecorderCapability(detectRecorderCapability());
+      }, []);
+
+      useEffect(() => {
+        return () => {
+          stopLoop();
+          cleanupMediaGraph();
+          closeAudioContext();
+          revokeObjectUrl();
+          revokeExportUrl();
+        };
+      }, []);
+
+      const currentPresetName = useMemo(() => {
+        const match = Object.entries(PRESETS).find(([_, preset]) =>
+          JSON.stringify(preset) === JSON.stringify(params)
+        );
+        return match ? match[0] : "custom";
+      }, [params]);
+
+      function detectRecorderCapability() {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) {
+          return { preferred: "", actual: "", mode: "unsupported" };
+        }
+
+        const preferredTypes = [
+          "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+          "video/mp4;codecs=avc1,mp4a.40.2",
+          "video/mp4",
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
+          "video/webm"
+        ];
+
+        for (const type of preferredTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            return {
+              preferred: type,
+              actual: type,
+              mode: type.includes("mp4") ? "mp4" : "webm"
+            };
+          }
+        }
+
+        return { preferred: "", actual: "", mode: "unsupported" };
+      }
+
+      const stopLoop = () => {
+        isLoopingRef.current = false;
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      };
+
+      const startLoop = () => {
+        if (isLoopingRef.current) return;
+        isLoopingRef.current = true;
+
+        const tick = () => {
+          if (!isLoopingRef.current) return;
+          renderFrame();
+          animationRef.current = requestAnimationFrame(tick);
+        };
+
+        animationRef.current = requestAnimationFrame(tick);
+      };
+
+      const resetBurstState = () => {
+        burstRef.current = { level: 0, type: "idle", until: 0, cooldownUntil: 0 };
+        prevSpecRef.current = null;
+        envRef.current = { rms: 0, flux: 0 };
+      };
+
+      const cleanupMediaGraph = () => {
+        try { sourceNodeRef.current?.disconnect(); } catch {}
+        try { analyserRef.current?.disconnect(); } catch {}
+        try { streamDestRef.current?.disconnect(); } catch {}
+        sourceNodeRef.current = null;
+        analyserRef.current = null;
+        streamDestRef.current = null;
+      };
+
+      const closeAudioContext = async () => {
+        if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+          try { await audioCtxRef.current.close(); } catch {}
+        }
+        audioCtxRef.current = null;
+      };
+
+      const revokeObjectUrl = () => {
+        if (objectUrlRef.current) {
+          try { URL.revokeObjectURL(objectUrlRef.current); } catch {}
+          objectUrlRef.current = null;
+        }
+      };
+
+      const revokeExportUrl = () => {
+        if (exportUrlRef.current) {
+          try { URL.revokeObjectURL(exportUrlRef.current); } catch {}
+          exportUrlRef.current = null;
+        }
+      };
+
+      const clearLoadedMedia = async () => {
+        stopLoop();
+
+        if (mediaRecorderRef.current && isRecording) {
+          try { mediaRecorderRef.current.stop(); } catch {}
+        }
+
+        if (videoRef.current) {
+          try {
+            videoRef.current.pause();
+            videoRef.current.removeAttribute("src");
+            videoRef.current.load();
+          } catch {}
+        }
+
+        cleanupMediaGraph();
+        await closeAudioContext();
+        revokeObjectUrl();
+        resetBurstState();
+
+        recordedChunksRef.current = [];
+        setRecordingInfo({ elapsedMs: 0, mimeType: "", chunks: 0 });
+        setAudioMetrics({ bass: 0, mid: 0, high: 0, rms: 0, flux: 0, event: "idle" });
+        setIsPlaying(false);
+        setIsRecording(false);
+        setVideoSrc(null);
+        setVideoName("");
+      };
+
+      const handleFileChange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        stopLoop();
+
+        if (mediaRecorderRef.current && isRecording) {
+          try { mediaRecorderRef.current.stop(); } catch {}
+        }
+
+        revokeObjectUrl();
+        cleanupMediaGraph();
+        await closeAudioContext();
+        resetBurstState();
+
+        recordedChunksRef.current = [];
+        setRecordingInfo({ elapsedMs: 0, mimeType: "", chunks: 0 });
+        setAudioMetrics({ bass: 0, mid: 0, high: 0, rms: 0, flux: 0, event: "idle" });
+        setIsPlaying(false);
+        setIsRecording(false);
+
+        const url = URL.createObjectURL(file);
+        objectUrlRef.current = url;
+
+        setVideoName(file.name || "video");
+        setVideoSrc(url);
+
+        e.target.value = "";
+      };
+
+      const initAudio = async () => {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass || !videoRef.current) return false;
+
+        if (!audioCtxRef.current) {
+          const ctx = new AudioContextClass();
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 1024;
+          analyser.smoothingTimeConstant = 0.2;
+
+          const source = ctx.createMediaElementSource(videoRef.current);
+          const streamDest = ctx.createMediaStreamDestination();
+
+          source.connect(analyser);
+          analyser.connect(ctx.destination);
+          source.connect(streamDest);
+
+          audioCtxRef.current = ctx;
+          analyserRef.current = analyser;
+          sourceNodeRef.current = source;
+          streamDestRef.current = streamDest;
+        }
+
+        if (audioCtxRef.current.state === "suspended") {
+          try { await audioCtxRef.current.resume(); } catch {}
+        }
+
+        return !!analyserRef.current;
+      };
+
+      const ensurePlayback = async () => {
+        if (!videoRef.current || !videoSrc) return false;
+
+        const ok = await initAudio();
+        if (!ok) return false;
+
+        if (videoRef.current.paused) {
+          try {
+            await videoRef.current.play();
+            setIsPlaying(true);
+          } catch (err) {
+            console.error("Video play failed:", err);
+            return false;
+          }
+        }
+
+        startLoop();
+        return true;
+      };
+
+      const forceDownload = async (blob, filename) => {
+        if (window.showSaveFilePicker) {
+          try {
+            const ext = `.${filename.split(".").pop()}`;
+            const handle = await window.showSaveFilePicker({
+              suggestedName: filename,
+              types: [{
+                description: "Video File",
+                accept: { [blob.type || "video/webm"]: [ext] }
+              }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return true;
+          } catch {}
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => {
+          try { URL.revokeObjectURL(url); } catch {}
+        }, 3000);
+
+        return false;
+      };
+
+      const getPreferredRecorderOptions = () => {
+        if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return null;
+
+        const preferredTypes = [
+          "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+          "video/mp4;codecs=avc1,mp4a.40.2",
+          "video/mp4",
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
+          "video/webm"
+        ];
+
+        for (const type of preferredTypes) {
+          if (MediaRecorder.isTypeSupported(type)) {
+            return { mimeType: type };
+          }
+        }
+        return null;
+      };
+
+      const finalizeRecording = async (recorder) => {
+        const mime = recorder?.mimeType || recordingInfo.mimeType || "video/webm";
+        const extension = mime.includes("mp4") ? "mp4" : "webm";
+
+        const safeBase = (videoName || "glitch_output")
+          .replace(/\.[^/.]+$/, "")
+          .replace(/[^\w\-]+/g, "_");
+
+        const filename = `${safeBase}_glitched_${Date.now()}.${extension}`;
+        const blob = new Blob(recordedChunksRef.current, { type: mime });
+
+        revokeExportUrl();
+        const objectUrl = URL.createObjectURL(blob);
+        exportUrlRef.current = objectUrl;
+
+        setExportInfo({
+          url: objectUrl,
+          filename,
+          mimeType: mime,
+          sizeBytes: blob.size
+        });
+
+        setRecorderCapability(prev => ({
+          ...prev,
+          actual: mime,
+          mode: mime.includes("mp4") ? "mp4" : "webm"
+        }));
+
+        await forceDownload(blob, filename);
+
+        setIsRecording(false);
+        recordedChunksRef.current = [];
+        setRecordingInfo(prev => ({ ...prev, chunks: 0 }));
+
+        if (videoRef.current) {
+          videoRef.current.loop = previousLoopValueRef.current;
+          videoRef.current.onended = null;
+        }
+
+        mediaRecorderRef.current = null;
+      };
+
+      const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+          try { mediaRecorderRef.current.stop(); } catch (err) {
+            console.error("Manual stop failed:", err);
+          }
+        }
+      };
+
+      const drawRgbSplit = (ctx, source, w, h, amount, hit, mix) => {
+        const shiftX = (Math.random() - 0.5) * amount * 1.15;
+        const shiftY = (Math.random() - 0.5) * amount * 0.75;
+        const oldComp = ctx.globalCompositeOperation;
+        const oldAlpha = ctx.globalAlpha;
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = (0.12 + 0.32 * hit) * mix;
+        ctx.drawImage(source, shiftX, shiftY, w, h);
+        ctx.globalCompositeOperation = oldComp;
+        ctx.globalAlpha = oldAlpha;
+      };
+
+      const drawTearSlices = (ctx, source, w, h, amount, hit, mix) => {
+        const num = 1 + Math.floor(4 * hit * mix);
+        for (let i = 0; i < num; i++) {
+          const sliceH = Math.max(2, (Math.random() * (h / 7)) * (0.25 + hit));
+          const y = Math.random() * Math.max(1, h - sliceH);
+          const off = (Math.random() - 0.5) * amount * 7;
+          ctx.drawImage(source, 0, y, w, sliceH, off, y, w, sliceH);
+        }
+      };
+
+      const drawFrameHold = (ctx, source, w, h, hit, mix) => {
+        if (Math.random() < (0.18 + 0.42 * hit) * mix) {
+          ctx.drawImage(source, 0, 0, w, h);
+        }
+      };
+
+      const drawBitcrush = (ctx, source, w, h, hit, mix) => {
+        const pixel = pixelCanvasRef.current;
+        if (!pixel) return;
+
+        const scale = 1 + Math.floor((3 + 6 * hit) * mix);
+        const w2 = Math.max(1, Math.floor(w / scale));
+        const h2 = Math.max(1, Math.floor(h / scale));
+
+        if (pixel.width !== w2 || pixel.height !== h2) {
+          pixel.width = w2;
+          pixel.height = h2;
+        }
+
+        const pctx = pixel.getContext("2d");
+        pctx.clearRect(0, 0, w2, h2);
+        pctx.imageSmoothingEnabled = false;
+        pctx.drawImage(source, 0, 0, w2, h2);
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(pixel, 0, 0, w2, h2, 0, 0, w, h);
+        ctx.imageSmoothingEnabled = true;
+      };
+
+      const drawInvertFlash = (ctx, source, w, h, hit, mix) => {
+        if (Math.random() < (0.15 + 0.3 * hit) * mix) {
+          const oldFilter = ctx.filter;
+          ctx.filter = "invert(1)";
+          ctx.drawImage(source, 0, 0, w, h);
+          ctx.filter = oldFilter;
+        }
+      };
+
+      const drawScanlineFlash = (ctx, w, h, hit, mix) => {
+        if (Math.random() < (0.08 + 0.1 * hit) * mix) {
+          const oldAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = 0.05 + 0.12 * hit * mix;
+          ctx.fillStyle = "#ffffff";
+          const y = Math.random() * h;
+          ctx.fillRect(0, y, w, 1 + Math.random() * 2);
+          ctx.globalAlpha = oldAlpha;
+        }
+      };
+
+      const classifyEvent = ({ isDropout, isTransient, isRough, bassAvg, highAvg }) => {
+        if (isDropout) return "dropout";
+        if (isTransient && bassAvg > 110) return "slam";
+        if (isRough && highAvg > 118) return "bitcrush";
+        if (isTransient) return "stutter";
+        return "idle";
+      };
+
+      const renderFrame = () => {
+        const canvas = canvasRef.current;
+        const video = videoRef.current;
+        const analyser = analyserRef.current;
+        const bufferCanvas = bufferCanvasRef.current;
+        const p = paramsRef.current;
+
+        if (!canvas || !video || !analyser || !bufferCanvas) return;
+
+        const ctx = canvas.getContext("2d", { willReadFrequently: false });
+        const w = canvas.width;
+        const h = canvas.height;
+
+        const bufferLength = analyser.frequencyBinCount;
+        const spec = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(spec);
+
+        const bassBins = Math.min(48, bufferLength);
+        const midStart = bassBins;
+        const midEnd = Math.min(midStart + 140, bufferLength);
+        const highStart = midEnd;
+
+        let bassTotal = 0, midTotal = 0, highTotal = 0;
+        for (let i = 0; i < bassBins; i++) bassTotal += spec[i] || 0;
+        for (let i = midStart; i < midEnd; i++) midTotal += spec[i] || 0;
+        for (let i = highStart; i < bufferLength; i++) highTotal += spec[i] || 0;
+
+        const bassAvg = bassTotal / Math.max(1, bassBins);
+        const midAvg = midTotal / Math.max(1, midEnd - midStart);
+        const highAvg = highTotal / Math.max(1, bufferLength - highStart);
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = (spec[i] || 0) / 255;
+          sum += v * v;
+        }
+        const rmsNow = Math.sqrt(sum / Math.max(1, bufferLength)) * 255;
+
+        let fluxNow = 0;
+        const prev = prevSpecRef.current;
+        if (prev) {
+          for (let i = 0; i < bufferLength; i++) {
+            const d = (spec[i] || 0) - (prev[i] || 0);
+            if (d > 0) fluxNow += d;
+          }
+          fluxNow /= Math.max(1, bufferLength);
+        }
+        prevSpecRef.current = spec;
+
+        const env = envRef.current;
+        env.rms = env.rms * 0.90 + rmsNow * 0.10;
+        env.flux = env.flux * 0.75 + fluxNow * 0.25;
+
+        if (video.readyState >= 2) {
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(video, 0, 0, w, h);
+        }
+
+        if (bufferCanvas.width !== w || bufferCanvas.height !== h) {
+          bufferCanvas.width = w;
+          bufferCanvas.height = h;
+        }
+
+        const bctx = bufferCanvas.getContext("2d");
+        bctx.clearRect(0, 0, w, h);
+        bctx.drawImage(canvas, 0, 0, w, h);
+
+        const now = performance.now();
+        const burst = burstRef.current;
+
+        const legacySens = mapRange(255 - p.threshold, 0, 255, 0.75, 1.35);
+        const sens = p.eventSens * legacySens;
+
+        const fluxThresh = (18 + env.rms * 0.06) / sens;
+        const dropoutThresh = (env.rms * 0.50) / sens;
+        const roughThresh = (92 + env.rms * 0.10) / sens;
+
+        const isTransient = env.flux > fluxThresh;
+        const isDropout = rmsNow < dropoutThresh && env.rms > 60;
+        const isRough = highAvg > roughThresh && env.flux > fluxThresh * 0.85;
+
+        const detected = classifyEvent({ isDropout, isTransient, isRough, bassAvg, highAvg });
+        const canTrigger = now > burst.cooldownUntil;
+
+        if (canTrigger && detected !== "idle") {
+          burst.type = detected;
+          burst.level = 1.0;
+          burst.until = now + (detected === "dropout" ? p.burstMs * 1.65 : detected === "slam" ? p.burstMs * 1.15 : p.burstMs);
+          burst.cooldownUntil = now + (
+            detected === "dropout" ? p.cooldownMs * 1.8 :
+            detected === "slam" ? p.cooldownMs * 1.15 :
+            p.cooldownMs
+          );
+        } else {
+          const decayFast = burst.type === "dropout" ? 0.89 : 0.91;
+          const decayTail = burst.type === "bitcrush" ? 0.95 : 0.94;
+          burst.level *= (now < burst.until) ? decayFast : decayTail;
+          if (burst.level < p.calmFloor) {
+            burst.level = 0;
+            burst.type = "idle";
+          }
+        }
+
+        const hit = clamp(burst.level, 0, 1);
+        const mix = clamp(p.mix / 100, 0, 1);
+        const baseAmount = mapRange(p.intensity, 0, 100, 3, 46);
+        let amount = baseAmount * hit * mix;
+
+        if (burst.type === "dropout") {
+          amount *= (1.25 + 0.65 * p.dropoutBoost);
+        }
+
+        const preset = EVENT_PRESETS[burst.type] || EVENT_PRESETS.idle;
+
+        if (hit > 0.02) {
+          if (preset.hold > 0.01) {
+            drawFrameHold(ctx, bufferCanvas, w, h, hit * preset.hold, mix);
+          }
+
+          if (p.sliceGlitch && preset.tear > 0.01) {
+            drawTearSlices(ctx, bufferCanvas, w, h, amount * preset.tear, hit, mix);
+          }
+
+          if (preset.crush > 0.01 && Math.random() < 0.45 + 0.3 * hit) {
+            drawBitcrush(ctx, bufferCanvas, w, h, hit * preset.crush, mix);
+          }
+
+          if (p.colorShift && preset.rgb > 0.01) {
+            drawRgbSplit(ctx, bufferCanvas, w, h, amount * preset.rgb, hit, mix);
+          }
+
+          if (p.invertFlash && preset.invert > 0.01) {
+            drawInvertFlash(ctx, bufferCanvas, w, h, hit * preset.invert, mix);
+          }
+
+          if (p.scanlineFlash) {
+            drawScanlineFlash(ctx, w, h, hit, mix);
+          }
+        }
+
+        if (now - uiUpdateRef.current > 80) {
+          uiUpdateRef.current = now;
+          setAudioMetrics({
+            bass: bassAvg,
+            mid: midAvg,
+            high: highAvg,
+            rms: env.rms,
+            flux: env.flux,
+            event: burst.type || "idle"
+          });
+
+          if (isRecording) {
+            setRecordingInfo(prev => ({
+              ...prev,
+              elapsedMs: performance.now() - recordingStartRef.current,
+              chunks: recordedChunksRef.current.length
+            }));
+          }
+        }
+      };
+
+      const togglePlay = async () => {
+        if (!videoRef.current || !videoSrc) return;
+
+        if (isPlaying) {
+          try { videoRef.current.pause(); } catch {}
+          stopLoop();
+          setIsPlaying(false);
+        } else {
+          const ok = await ensurePlayback();
+          if (ok) setIsPlaying(true);
+        }
+      };
+
+      const onVideoLoadedMetadata = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const w = videoRef.current.videoWidth || 1280;
+        const h = videoRef.current.videoHeight || 720;
+        canvasRef.current.width = w;
+        canvasRef.current.height = h;
+
+        if (bufferCanvasRef.current) {
+          bufferCanvasRef.current.width = w;
+          bufferCanvasRef.current.height = h;
+        }
+      };
+
+      const startRecording = async () => {
+        if (!videoSrc || !canvasRef.current || !videoRef.current) return;
+
+        const ok = await ensurePlayback();
+        if (!ok || !streamDestRef.current) return;
+
+        const options = getPreferredRecorderOptions();
+        if (!options) {
+          alert("This browser does not support a usable recording format.");
+          return;
+        }
+
+        revokeExportUrl();
+        setExportInfo({
+          url: "",
+          filename: "",
+          mimeType: "",
+          sizeBytes: 0
+        });
+
+        recordedChunksRef.current = [];
+        previousLoopValueRef.current = !!videoRef.current.loop;
+        videoRef.current.loop = false;
+
+        const canvasStream = canvasRef.current.captureStream(30);
+        const audioStream = streamDestRef.current.stream;
+        const combinedStream = new MediaStream([
+          ...canvasStream.getVideoTracks(),
+          ...audioStream.getAudioTracks()
+        ]);
+
+        let recorder;
+        try {
+          recorder = new MediaRecorder(combinedStream, options);
+        } catch (err) {
+          console.error("MediaRecorder init failed", err);
+          alert("Could not start recording in this browser.");
+          videoRef.current.loop = previousLoopValueRef.current;
+          return;
+        }
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            recordedChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onstop = async () => {
+          await finalizeRecording(recorder);
+        };
+
+        recorder.onerror = (err) => {
+          console.error("Recorder error:", err);
+          setIsRecording(false);
+          if (videoRef.current) {
+            videoRef.current.loop = previousLoopValueRef.current;
+            videoRef.current.onended = null;
+          }
+          mediaRecorderRef.current = null;
+        };
+
+        videoRef.current.onended = () => {
+          setIsPlaying(false);
+          stopLoop();
+
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            try { mediaRecorderRef.current.stop(); } catch (err) {
+              console.error("Failed stopping recorder on end:", err);
+            }
+          }
+        };
+
+        try {
+          videoRef.current.currentTime = 0;
+          await videoRef.current.play();
+          setIsPlaying(true);
+          startLoop();
+
+          recorder.start(250);
+          mediaRecorderRef.current = recorder;
+          recordingStartRef.current = performance.now();
+
+          setRecordingInfo({
+            elapsedMs: 0,
+            mimeType: recorder.mimeType || options.mimeType,
+            chunks: 0
+          });
+
+          setRecorderCapability(prev => ({
+            ...prev,
+            actual: recorder.mimeType || options.mimeType,
+            mode: (recorder.mimeType || options.mimeType).includes("mp4") ? "mp4" : "webm"
+          }));
+
+          setIsRecording(true);
+        } catch (err) {
+          console.error("Recorder start failed", err);
+          videoRef.current.loop = previousLoopValueRef.current;
+          videoRef.current.onended = null;
+        }
+      };
+
+      const applyPreset = (name) => {
+        if (!PRESETS[name]) return;
+        setParams({ ...PRESETS[name] });
+      };
+
+      const updateParam = (key, value) => {
+        setParams(prev => ({ ...prev, [key]: value }));
+      };
+
+      const eventLabel = audioMetrics.event || "idle";
+      const exportSizeText = exportInfo.sizeBytes
+        ? `${(exportInfo.sizeBytes / (1024 * 1024)).toFixed(2)} MB`
+        : "0.00 MB";
+
+      const mp4Preferred = recorderCapability.preferred.includes("mp4");
+      const actualIsMp4 = recorderCapability.actual.includes("mp4");
+
+      return (
+        <div className="app-shell">
+          <div className="main-stage">
+            <div className="main-scroll">
+              <div className="max-w-[1600px] mx-auto space-y-5">
+                <div className="glass rounded-2xl px-5 py-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-red-500/12 border border-red-500/20 flex items-center justify-center text-red-400">
+                          <Icons.Activity />
+                        </div>
+                        <div>
+                          <h1 className="text-2xl md:text-3xl font-black tracking-tight">GLITCH_SYNTH_V4</h1>
+                          <div className="text-sm text-gray-400 mono">docked sidebar controls • live tuning while previewing • mp4-first export</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className={`mono text-xs px-3 py-2 rounded-xl border ${eventStyles(eventLabel)}`}>
+                        EVENT: {eventLabel.toUpperCase()}
+                      </span>
+                      <span className="mono text-xs px-3 py-2 rounded-xl border border-white/10 bg-white/[0.03] text-gray-300">
+                        PRESET: {currentPresetName.toUpperCase()}
+                      </span>
+                      {videoName && (
+                        <span className="mono text-xs px-3 py-2 rounded-xl border border-white/10 bg-white/[0.03] text-gray-400 max-w-[280px] truncate">
+                          {videoName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass rounded-2xl p-4">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="btn chip rounded-xl px-4 py-3 inline-flex items-center gap-2 cursor-pointer text-sm font-semibold">
+                        <Icons.Upload />
+                        Load Video
+                        <input type="file" accept="video/*" onChange={handleFileChange} className="hidden" />
+                      </label>
+
+                      <button
+                        onClick={togglePlay}
+                        disabled={!videoSrc || isRecording}
+                        className={`btn rounded-xl px-4 py-3 inline-flex items-center gap-2 text-sm ${
+                          !videoSrc || isRecording ? 'chip text-gray-500' :
+                          isPlaying ? 'btn-warn' : 'btn-primary'
+                        }`}
+                      >
+                        {isPlaying ? <Icons.Pause /> : <Icons.Play />}
+                        {isPlaying ? 'Pause Output' : 'Play Output'}
+                      </button>
+
+                      {isRecording ? (
+                        <button
+                          onClick={stopRecording}
+                          className="btn btn-rec rounded-xl px-4 py-3 inline-flex items-center gap-2 text-sm animate-pulse"
+                        >
+                          <Icons.Stop />
+                          Stop Recording
+                        </button>
+                      ) : (
+                        <button
+                          onClick={startRecording}
+                          disabled={!videoSrc || recorderCapability.mode === "unsupported"}
+                          className={`btn rounded-xl px-4 py-3 inline-flex items-center gap-2 text-sm ${
+                            !videoSrc || recorderCapability.mode === "unsupported" ? 'chip text-gray-500' : 'btn-outline'
+                          }`}
+                        >
+                          <Icons.Mic />
+                          Record Output
+                        </button>
+                      )}
+
+                      <button
+                        onClick={clearLoadedMedia}
+                        disabled={!videoSrc}
+                        className={`btn rounded-xl px-4 py-3 inline-flex items-center gap-2 text-sm ${
+                          !videoSrc ? 'chip text-gray-500' : 'chip text-red-300'
+                        }`}
+                      >
+                        <Icons.Trash />
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys(PRESETS).map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => applyPreset(name)}
+                          className={`mono rounded-xl px-3 py-2 text-xs border transition ${
+                            currentPresetName === name
+                              ? 'border-red-400/40 bg-red-500/12 text-red-300'
+                              : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {name.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel rounded-3xl overflow-hidden relative">
+                  <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold">Processed Output</div>
+                      <div className="text-xs text-gray-400 mono">watch live while adjusting sliders from the docked sidebar</div>
+                    </div>
+                    <div className="flex gap-2 items-center flex-wrap justify-end">
+                      <span className="mono text-[11px] px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-gray-300">
+                        mix {params.mix}%
+                      </span>
+                      <span className="mono text-[11px] px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-gray-300">
+                        intensity {params.intensity}%
+                      </span>
+                      <span className={`mono text-[11px] px-3 py-1.5 rounded-xl border ${
+                        recorderCapability.mode === "unsupported"
+                          ? "bg-red-500/10 border-red-500/20 text-red-300"
+                          : actualIsMp4
+                          ? "bg-green-500/10 border-green-500/20 text-green-300"
+                          : mp4Preferred
+                          ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-300"
+                          : "bg-cyan-500/10 border-cyan-500/20 text-cyan-300"
+                      }`}>
+                        {recorderCapability.mode === "unsupported"
+                          ? "recorder unsupported"
+                          : actualIsMp4
+                          ? "export codec: mp4"
+                          : mp4Preferred
+                          ? "mp4 preferred"
+                          : "fallback: webm"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative min-h-[420px] md:min-h-[720px] bg-black scanlines flex items-center justify-center">
+                    {!videoSrc && (
+                      <div className="text-center px-8">
+                        <div className="w-24 h-24 mx-auto rounded-3xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-gray-500 mb-5">
+                          <Icons.Zap />
+                        </div>
+                        <div className="text-xl font-semibold mb-2">No output signal</div>
+                        <div className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+                          Load a video source, tweak the sidebar live, then hide it when you want a clean stage view.
+                        </div>
+                      </div>
+                    )}
+
+                    <video
+                      ref={videoRef}
+                      src={videoSrc || undefined}
+                      onLoadedMetadata={onVideoLoadedMetadata}
+                      onEnded={() => {
+                        setIsPlaying(false);
+                        stopLoop();
+                        if (isRecording && mediaRecorderRef.current?.state === "recording") {
+                          try { mediaRecorderRef.current.stop(); } catch {}
+                        }
+                      }}
+                      loop
+                      muted={false}
+                      playsInline
+                      crossOrigin="anonymous"
+                      style={{ display: "none" }}
+                    />
+
+                    <canvas
+                      ref={canvasRef}
+                      className={`max-w-full max-h-[82vh] ${videoSrc ? 'block' : 'hidden'}`}
+                    />
+
+                    {videoSrc && (
+                      <div className="absolute left-4 right-4 bottom-4 z-20">
+                        <div className="glass rounded-2xl px-4 py-3 flex flex-wrap items-center gap-3 text-[11px] mono text-gray-300">
+                          <span>bass {Math.round(audioMetrics.bass)}</span>
+                          <span>mid {Math.round(audioMetrics.mid)}</span>
+                          <span>high {Math.round(audioMetrics.high)}</span>
+                          <span>rms {Math.round(audioMetrics.rms)}</span>
+                          <span>flux {Math.round(audioMetrics.flux)}</span>
+                          <span className="text-red-300">event {eventLabel}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {isRecording && (
+                      <div className="absolute top-4 right-4 z-30 glass rounded-full px-4 py-2 text-xs font-bold text-red-300 mono flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block animate-pulse"></span>
+                        REC {(recordingInfo.elapsedMs / 1000).toFixed(1)}s
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {exportInfo.url && (
+                  <div className="panel rounded-3xl p-5">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold">Latest Export Ready</div>
+                        <div className="text-xs text-gray-400 mono mt-1 break-all">
+                          {exportInfo.filename}
+                        </div>
+                        <div className="text-xs text-gray-500 mono mt-2">
+                          {exportInfo.mimeType} • {exportSizeText}
+                        </div>
+                      </div>
+
+                      <a
+                        href={exportInfo.url}
+                        download={exportInfo.filename}
+                        className="download-link btn btn-primary rounded-xl px-4 py-3 inline-flex items-center gap-2 text-sm justify-center"
+                      >
+                        <Icons.Download />
+                        Download Result
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <TelemetryCard label="Bass Band" value={audioMetrics.bass} color="from-red-500 to-pink-500" />
+                  <TelemetryCard label="Mid Band" value={audioMetrics.mid} color="from-blue-500 to-indigo-500" />
+                  <TelemetryCard label="High Band" value={audioMetrics.high} color="from-cyan-400 to-sky-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside className={`sidebar ${sidebarOpen ? "" : "collapsed"}`}>
+            <div className="p-3 border-b border-white/10 flex items-center justify-between min-h-[62px]">
+              <div className="sidebar-fade flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-red-300">
+                  <Icons.Sliders />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">Control Dock</div>
+                  <div className="text-[11px] text-gray-400 mono">live adjustment rail</div>
+                </div>
+              </div>
+
+              <button
+                className="sidebar-icon-btn"
+                onClick={() => setSidebarOpen(v => !v)}
+                title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+              >
+                {sidebarOpen ? <Icons.PanelClose /> : <Icons.PanelOpen />}
+              </button>
+            </div>
+
+            <div className="sidebar-mini-stack">
+              <button className="sidebar-icon-btn" onClick={() => setSidebarOpen(true)} title="Open controls">
+                <Icons.PanelOpen />
+              </button>
+              <button className="sidebar-icon-btn" onClick={() => applyPreset("glitchHop")} title="Glitch-Hop preset">
+                <Icons.Zap />
+              </button>
+              <button className="sidebar-icon-btn" onClick={() => setParams({ ...defaultParams })} title="Reset defaults">
+                <Icons.Knob />
+              </button>
+            </div>
+
+            <div className="sidebar-scroll">
+              <div className="sidebar-fade space-y-5">
+                <ControlSection title="Core Engine" icon={<Icons.Knob />}>
+                  <ControlSlider
+                    label="Trigger Threshold"
+                    valueLabel={`${255 - params.threshold} sens`}
+                    min={0}
+                    max={255}
+                    step={1}
+                    value={params.threshold}
+                    onChange={(v) => updateParam("threshold", v)}
+                    help="Lower values wake the detector. Higher values calm it down."
+                  />
+                  <ControlSlider
+                    label="Glitch Intensity"
+                    valueLabel={`${params.intensity}%`}
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={params.intensity}
+                    onChange={(v) => updateParam("intensity", v)}
+                    help="How violent each burst feels visually."
+                  />
+                  <ControlSlider
+                    label="Dry / Wet Mix"
+                    valueLabel={`${params.mix}%`}
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={params.mix}
+                    onChange={(v) => updateParam("mix", v)}
+                    help="Blend between clean image and corrupted output."
+                  />
+                  <ControlSlider
+                    label="Event Sensitivity"
+                    valueLabel={`${params.eventSens.toFixed(2)}x`}
+                    min={0.60}
+                    max={2.00}
+                    step={0.01}
+                    value={params.eventSens}
+                    onChange={(v) => updateParam("eventSens", v)}
+                    help="Higher catches more micro-attacks and transient chatter."
+                  />
+                </ControlSection>
+
+                <ControlSection title="Burst Timing" icon={<Icons.Activity />}>
+                  <ControlSlider
+                    label="Cooldown"
+                    valueLabel={`${params.cooldownMs}ms`}
+                    min={60}
+                    max={420}
+                    step={10}
+                    value={params.cooldownMs}
+                    onChange={(v) => updateParam("cooldownMs", v)}
+                    help="Spacing between bursts."
+                  />
+                  <ControlSlider
+                    label="Burst Length"
+                    valueLabel={`${params.burstMs}ms`}
+                    min={70}
+                    max={260}
+                    step={10}
+                    value={params.burstMs}
+                    onChange={(v) => updateParam("burstMs", v)}
+                    help="How long each burst holds before decaying."
+                  />
+                  <ControlSlider
+                    label="Dropout Boost"
+                    valueLabel={`${params.dropoutBoost.toFixed(2)}x`}
+                    min={0.5}
+                    max={2.0}
+                    step={0.05}
+                    value={params.dropoutBoost}
+                    onChange={(v) => updateParam("dropoutBoost", v)}
+                    help="Makes silence collapses nastier."
+                  />
+                  <ControlSlider
+                    label="Calm Floor"
+                    valueLabel={params.calmFloor.toFixed(3)}
+                    min={0.005}
+                    max={0.050}
+                    step={0.001}
+                    value={params.calmFloor}
+                    onChange={(v) => updateParam("calmFloor", v)}
+                    help="Tiny residual motion before a burst fully dies."
+                  />
+                </ControlSection>
+
+                <ControlSection title="Visual Modes" icon={<Icons.Zap />}>
+                  <Toggle checked={params.colorShift} onChange={(v) => updateParam("colorShift", v)} label="RGB Split" />
+                  <Toggle checked={params.sliceGlitch} onChange={(v) => updateParam("sliceGlitch", v)} label="Tear Slices" />
+                  <Toggle checked={params.invertFlash} onChange={(v) => updateParam("invertFlash", v)} label="Invert Flash" />
+                  <Toggle checked={params.scanlineFlash} onChange={(v) => updateParam("scanlineFlash", v)} label="Scanline Hitch" />
+
+                  <button
+                    onClick={() => setParams({ ...defaultParams })}
+                    className="w-full mt-2 chip rounded-xl px-4 py-3 text-sm font-semibold text-gray-200"
+                  >
+                    Reset Engine Defaults
+                  </button>
+                </ControlSection>
+
+                <div className="panel rounded-3xl p-5">
+                  <div className="text-sm font-semibold mb-2">Sidebar Notes</div>
+                  <div className="text-sm text-gray-400 leading-relaxed space-y-2">
+                    <div>This dock stays live while the output runs, so you can tune visually instead of guessing blind.</div>
+                    <div>Hide the dock when you want a clean stage view.</div>
+                    <div>Open it again whenever the chaos needs a screwdriver.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {!sidebarOpen && (
+            <div className="floating-open">
+              <button
+                className="sidebar-icon-btn"
+                onClick={() => setSidebarOpen(true)}
+                title="Open controls"
+              >
+                <Icons.PanelOpen />
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function TelemetryCard({ label, value, color }) {
+      return (
+        <div className="panel rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold">{label}</div>
+            <div className="mono text-xs text-gray-400">{Math.round(value)}</div>
+          </div>
+          <div className="meter-bar h-3">
+            <div className={`bg-gradient-to-r ${color}`} style={{ width: `${(value / 255) * 100}%` }} />
+          </div>
+        </div>
+      );
+    }
+
+    function ControlSection({ title, icon, children }) {
+      return (
+        <div className="panel rounded-3xl p-5 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-red-300">
+              {icon}
+            </div>
+            <div>
+              <div className="font-semibold">{title}</div>
+              <div className="text-xs text-gray-400 mono">live-tunable</div>
+            </div>
+          </div>
+          {children}
+        </div>
+      );
+    }
+
+    function ControlSlider({ label, valueLabel, min, max, step, value, onChange, help }) {
+      return (
+        <div className="space-y-2">
+          <div className="flex justify-between items-center gap-4">
+            <label className="text-sm font-medium text-gray-200">{label}</label>
+            <span className="mono text-xs text-red-300 whitespace-nowrap">{valueLabel}</span>
+          </div>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+          />
+          {help && <div className="text-xs text-gray-500 leading-relaxed">{help}</div>}
+        </div>
+      );
+    }
+
+    function Toggle({ checked, onChange, label }) {
+      return (
+        <label className="flex items-center justify-between gap-4 rounded-2xl px-4 py-3 bg-white/[0.03] border border-white/10 cursor-pointer">
+          <span className="text-sm text-gray-200">{label}</span>
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+        </label>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Waveform Sound Lab 2.0 (Hybrid Research Mode)</title>
+<style>
+  body{background:#07090c;color:#e8fff7;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;text-align:center;padding:18px}
+  canvas{border:1px solid rgba(98,255,224,.25);margin-top:10px;max-width:100%;height:auto;background:#0b1318}
+  button,input,select{font-family:inherit}
+  .panel{max-width:980px;margin:12px auto;border:1px solid rgba(98,255,224,.18);background:#0b1318;border-radius:12px;padding:12px;text-align:left}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:flex-start}
+  .row > *{margin:2px 0}
+  button{padding:10px 14px;background:#0f1c22;color:#d7fff3;border:1px solid rgba(98,255,224,.25);border-radius:10px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  input[type="range"]{width:220px}
+  .muted{color:rgba(215,255,243,.72)}
+  .tag{display:inline-block;padding:2px 8px;border:1px solid rgba(98,255,224,.25);border-radius:999px;margin-left:8px}
+  pre{white-space:pre-wrap;background:#081016;border:1px solid rgba(98,255,224,.15);padding:10px;border-radius:10px;max-height:220px;overflow:auto}
+  .good{color:#62ffe0}
+  .warn{color:#ffd37a}
+</style>
+</head>
+<body>
+
+<h2>Waveform Sound Lab 2.0 <span class="tag">Hybrid</span></h2>
+
+<div class="panel">
+  <div class="row">
+    <input type="file" id="imageUpload" accept="image/*" />
+    <button id="analyzeBtn" disabled>Analyze</button>
+    <button id="playBtn" disabled>Play</button>
+    <button id="stopBtn" disabled>Stop</button>
+    <button id="exportBtn" disabled>Export Session JSON</button>
+  </div>
+
+  <div class="row">
+    <label class="muted">Mode</label>
+    <select id="mode">
+      <option value="research">Research (deterministic)</option>
+      <option value="performance">Performance (stochastic)</option>
+      <option value="hybrid" selected>Hybrid (A/B toggle)</option>
+    </select>
+
+    <label class="muted">Seed</label>
+    <input id="seed" type="number" value="1337" style="width:110px" />
+
+    <label class="muted">BPM</label>
+    <input id="bpm" type="range" min="80" max="130" step="1" value="112" />
+    <span id="bpmVal">112</span>
+
+    <label class="muted">Swing</label>
+    <input id="swing" type="range" min="0" max="0.35" step="0.01" value="0.18" />
+    <span id="swingVal">0.18</span>
+  </div>
+
+  <div class="row">
+    <label class="muted">Pitch (Hz)</label>
+    <input id="pitch" type="range" min="40" max="900" step="1" value="110" />
+    <span id="pitchVal">110</span>
+
+    <label class="muted">Drive</label>
+    <input id="drive" type="range" min="0" max="1" step="0.01" value="0.35" />
+    <span id="driveVal">0.35</span>
+
+    <label class="muted">FM Aggro</label>
+    <input id="fm" type="range" min="0" max="1" step="0.01" value="0.45" />
+    <span id="fmVal">0.45</span>
+
+    <label class="muted">Gain</label>
+    <input id="gain" type="range" min="0" max="1" step="0.01" value="0.28" />
+    <span id="gainVal">0.28</span>
+  </div>
+
+  <div class="row">
+    <label class="muted">Steps</label>
+    <input id="steps" type="range" min="8" max="64" step="1" value="32" />
+    <span id="stepsVal">32</span>
+
+    <label class="muted">Stutter Prob</label>
+    <input id="stProb" type="range" min="0" max="1" step="0.01" value="0.18" />
+    <span id="stProbVal">0.18</span>
+
+    <label class="muted">Stutter Rate</label>
+    <select id="stRate">
+      <option value="2">1/2 beat</option>
+      <option value="4">1/4 beat</option>
+      <option value="8" selected>1/8 beat</option>
+      <option value="16">1/16 beat</option>
+    </select>
+  </div>
+
+  <div id="status" class="muted">Upload an image to begin.</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div class="panel">
+  <div class="row">
+    <div class="muted">Session Log</div>
+    <div id="health" class="tag">idle</div>
+  </div>
+  <pre id="log"></pre>
+</div>
+
+<script>
+/* ------------------------- UI helpers ------------------------- */
+const $ = (id)=>document.getElementById(id);
+const logEl = $("log"), statusEl = $("status"), healthEl = $("health");
+function log(msg){ logEl.textContent = (msg + "\n" + logEl.textContent).slice(0, 8000); }
+function setStatus(msg, cls="muted"){ statusEl.className = cls; statusEl.textContent = msg; }
+function tagHealth(t){ healthEl.textContent = t; }
+
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+const ui = {
+  mode:$("mode"), seed:$("seed"),
+  bpm:$("bpm"), bpmVal:$("bpmVal"),
+  swing:$("swing"), swingVal:$("swingVal"),
+  pitch:$("pitch"), pitchVal:$("pitchVal"),
+  drive:$("drive"), driveVal:$("driveVal"),
+  fm:$("fm"), fmVal:$("fmVal"),
+  gain:$("gain"), gainVal:$("gainVal"),
+  steps:$("steps"), stepsVal:$("stepsVal"),
+  stProb:$("stProb"), stProbVal:$("stProbVal"),
+  stRate:$("stRate"),
+  imageUpload:$("imageUpload"),
+  analyzeBtn:$("analyzeBtn"),
+  playBtn:$("playBtn"),
+  stopBtn:$("stopBtn"),
+  exportBtn:$("exportBtn"),
+};
+function bindRange(r, out){
+  const update = ()=> out.textContent = (+r.value).toFixed(r.step.includes(".")?2:0);
+  r.addEventListener("input", update); update();
+}
+bindRange(ui.bpm, ui.bpmVal);
+bindRange(ui.swing, ui.swingVal);
+bindRange(ui.pitch, ui.pitchVal);
+bindRange(ui.drive, ui.driveVal);
+bindRange(ui.fm, ui.fmVal);
+bindRange(ui.gain, ui.gainVal);
+bindRange(ui.steps, ui.stepsVal);
+bindRange(ui.stProb, ui.stProbVal);
+
+/* ------------------- Deterministic RNG (seed) ------------------- */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ------------------- Image feature extraction ------------------- */
+/* We compute per-step feature slices across X:
+   - entropy (Shannon) on luminance histogram
+   - edge energy (simple Sobel magnitude sum)
+   - waveform trace (orange line) -> wavetable
+*/
+function rgbToHsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  const d=max-min;
+  let h=0;
+  if(d!==0){
+    if(max===r) h=((g-b)/d)%6;
+    else if(max===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  const s = max===0 ? 0 : d/max;
+  const v = max;
+  return {h,s,v};
+}
+function shannonEntropy(hist, total){
+  let H = 0;
+  for (let i=0;i<hist.length;i++){
+    const c = hist[i];
+    if (!c) continue;
+    const p = c/total;
+    H -= p * Math.log2(p);
+  }
+  return H;
+}
+function sobelEnergy(gray, w, h, x0, x1){
+  // compute edge energy in region [x0,x1) over full height (cheap)
+  let sum = 0;
+  for (let y=1;y<h-1;y++){
+    for (let x=Math.max(1,x0); x<Math.min(w-1,x1); x++){
+      const i = y*w + x;
+      const gx =
+        -gray[i-w-1] + gray[i-w+1] +
+        -2*gray[i-1]   + 2*gray[i+1] +
+        -gray[i+w-1] + gray[i+w+1];
+      const gy =
+        -gray[i-w-1] -2*gray[i-w] -gray[i-w+1] +
+         gray[i+w-1] +2*gray[i+w] +gray[i+w+1];
+      sum += Math.sqrt(gx*gx + gy*gy);
+    }
+  }
+  return sum;
+}
+function normalize01(arr){
+  let min=Infinity, max=-Infinity;
+  for (const v of arr){ if (v<min) min=v; if (v>max) max=v; }
+  const out = arr.map(v => (max-min<1e-9) ? 0 : (v-min)/(max-min));
+  return out;
+}
+function smoothFloat32(arr, win=7){
+  const out = new Float32Array(arr.length);
+  const half = Math.floor(win/2);
+  for(let i=0;i<arr.length;i++){
+    let sum=0,cnt=0;
+    for(let k=-half;k<=half;k++){
+      const j=i+k;
+      if(j>=0 && j<arr.length){ sum+=arr[j]; cnt++; }
+    }
+    out[i]=sum/cnt;
+  }
+  return out;
+}
+function normalizeInPlace(arr){
+  let maxAbs=0;
+  for(let i=0;i<arr.length;i++) maxAbs=Math.max(maxAbs, Math.abs(arr[i]));
+  if(maxAbs < 1e-6) return 0;
+  for(let i=0;i<arr.length;i++) arr[i] /= maxAbs;
+  return maxAbs;
+}
+function extractOrangeWave(imgData, w, h){
+  const data = imgData.data;
+  const yTrace = new Array(w).fill(null);
+  const wave = new Float32Array(w);
+  let hits=0;
+
+  for(let x=0;x<w;x++){
+    let bestY=null, bestScore=-1;
+    for(let y=0;y<h;y++){
+      const idx=(y*w+x)*4;
+      const r=data[idx], g=data[idx+1], b=data[idx+2], a=data[idx+3];
+      if(a<10) continue;
+      const {h:hh,s,v} = rgbToHsv(r,g,b);
+      if(s < 0.18 || v < 0.25) continue;     // ignore near-white
+      if(hh < 5 || hh > 85) continue;        // orange-ish band
+      const score = s*0.8 + v*0.2;
+      if(score > bestScore){ bestScore=score; bestY=y; }
+    }
+    if(bestY!=null){
+      yTrace[x]=bestY; hits++;
+      wave[x] = 1 - (bestY/(h-1))*2;
+    } else wave[x]=0;
+  }
+  return {yTrace, wave, hits};
+}
+function drawTrace(yTrace){
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(98,255,224,.95)";
+  ctx.beginPath();
+  for(let x=0;x<yTrace.length;x++){
+    const y=yTrace[x];
+    if(y==null) continue;
+    if(x===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ------------------- Audio (Phase 1 main-thread) ------------------- */
+let audioCtx=null, masterGain=null;
+let voice=null; // {src, buf, stutterDelay, dryGain, wetGain, delay}
+
+async function ensureAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.25;
+    masterGain.connect(audioCtx.destination);
+  }
+  if(audioCtx.state !== "running") await audioCtx.resume();
+}
+
+function makeSoftClipCurve(k=10, n=2048){
+  const curve = new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1))*2 - 1;
+    curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+  }
+  return curve;
+}
+
+function stop(){
+  if(voice){
+    try{ voice.src.stop(); }catch(e){}
+    try{ voice.src.disconnect(); }catch(e){}
+    voice=null;
+  }
+  tagHealth("stopped");
+}
+
+function scheduleHybridLoop(session){
+  // Build one-cycle wavetable buffer
+  const N = session.wavetable.length;
+  const sr = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, N, sr);
+  buf.copyToChannel(session.wavetable, 0);
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+
+  // Pitch via playbackRate
+  src.playbackRate.value = (session.pitchHz * N) / sr;
+
+  // FX chain: FM-ish aggression via AM + waveshaper (Phase 1 placeholder)
+  // (true FM will move to AudioWorklet in Phase 2)
+  const shaper = audioCtx.createWaveShaper();
+  shaper.curve = makeSoftClipCurve(10 + session.drive*40);
+  shaper.oversample = "4x";
+
+  // Simple filter to keep it musical
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 600 + session.entropyMean*3200; // more entropy = more bite
+
+  // Stutter capture loop (simplified)
+  const dryGain = audioCtx.createGain();
+  const wetGain = audioCtx.createGain();
+  dryGain.gain.value = 1;
+  wetGain.gain.value = 0;
+
+  const delay = audioCtx.createDelay(2.0);
+  delay.delayTime.value = (60/session.bpm)/8; // default 1/8 beat
+  const fb = audioCtx.createGain();
+  fb.gain.value = 0.999; // almost infinite
+
+  // routing: src -> shaper -> lp -> split dry/wet
+  src.connect(shaper);
+  shaper.connect(lp);
+
+  lp.connect(dryGain);
+
+  // wet loop buffer always receiving audio
+  lp.connect(delay);
+  delay.connect(fb);
+  fb.connect(delay);
+  delay.connect(wetGain);
+
+  // sum
+  const pre = audioCtx.createGain();
+  dryGain.connect(pre);
+  wetGain.connect(pre);
+
+  // final gain
+  pre.connect(masterGain);
+  masterGain.gain.value = session.gain;
+
+  src.start();
+
+  voice = {src, buf, dryGain, wetGain, delay, fb, shaper, lp, pre};
+
+  // Step scheduler (visual-driven)
+  const steps = session.steps;
+  const stepDur = 60/session.bpm/4; // 16th note duration
+  const rng = mulberry32(session.seed);
+
+  const startT = audioCtx.currentTime + 0.05;
+
+  for(let s=0; s<steps; s++){
+    // swing on even 16ths (Dilla-ish)
+    const isEven16 = (s % 2) === 1;
+    const swingOffset = isEven16 ? session.swing * stepDur : 0;
+    const t = startT + s*stepDur + swingOffset;
+
+    const e = session.entropyTimeline[s] ?? session.entropyMean;
+    const edge = session.edgeTimeline[s] ?? session.edgeMean;
+
+    // map features to parameters
+    // entropy => more distortion + brighter filter
+    const k = 10 + (session.drive * 25) + (e * 35);
+    const cutoff = 500 + (e*4200);
+    // edge => stutter chance boost
+    const stChance = clamp01(session.stutterProb * (0.6 + edge*1.4));
+
+    // schedule updates
+    // (safe param automation)
+    voice.lp.frequency.setValueAtTime(cutoff, t);
+
+    // refresh shaper curve occasionally (cheap but ok for Phase 1)
+    // (Phase 2: do inside AudioWorklet)
+    setTimeout(()=> {
+      if(voice) voice.shaper.curve = makeSoftClipCurve(k);
+    }, Math.max(0, (t - audioCtx.currentTime)*1000 - 10));
+
+    // stutter trigger
+    const mode = session.mode;
+    const allowStutter =
+      mode === "performance" ? true :
+      mode === "research" ? (edge > 0.85) :
+      (edge > 0.92 || rng() < 0.04); // hybrid: mostly deterministic + a little spice
+
+    if(allowStutter && rng() < stChance){
+      // “freeze” stutter for a short moment
+      const stLen = stepDur * 2; // 2 steps
+      const base = (60/session.bpm) / session.stutterDiv;
+      voice.delay.delayTime.setValueAtTime(base, t);
+      voice.dryGain.gain.setValueAtTime(0, t);
+      voice.wetGain.gain.setValueAtTime(1, t);
+
+      // zipper down a bit for texture
+      voice.delay.delayTime.exponentialRampToValueAtTime(Math.max(0.002, base/4), t + stLen*0.6);
+      voice.delay.delayTime.setValueAtTime(base, t + stLen);
+
+      voice.wetGain.gain.setValueAtTime(0, t + stLen);
+      voice.dryGain.gain.setValueAtTime(1, t + stLen);
+    }
+  }
+
+  tagHealth("playing");
+}
+
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+/* ------------------- Session state ------------------- */
+let session = null;
+
+ui.imageUpload.addEventListener("change", e=>{
+  const file = e.target.files?.[0];
+  if(!file) return;
+
+  const img = new Image();
+  img.onload = ()=>{
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img, 0, 0);
+
+    ui.analyzeBtn.disabled = false;
+    setStatus("Image loaded. Click Analyze.", "muted");
+    log("Loaded image: " + file.name);
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+ui.analyzeBtn.addEventListener("click", ()=>{
+  const w=canvas.width, h=canvas.height;
+  const imgData = ctx.getImageData(0,0,w,h);
+
+  // grayscale buffer for Sobel
+  const gray = new Float32Array(w*h);
+  const d = imgData.data;
+  for(let i=0;i<w*h;i++){
+    const r=d[i*4], g=d[i*4+1], b=d[i*4+2];
+    gray[i] = 0.2126*r + 0.7152*g + 0.0722*b;
+  }
+
+  // waveform trace
+  const waveRes = extractOrangeWave(imgData, w, h);
+
+  if(waveRes.hits < w*0.1){
+    setStatus("Wave detection failed. Crop tighter around the orange line.", "warn");
+    log("Wave detection hits: " + waveRes.hits + "/" + w);
+    return;
+  }
+
+  // smooth + DC remove + normalize
+  let sm = smoothFloat32(waveRes.wave, 7);
+  let mean=0; for(let i=0;i<sm.length;i++) mean += sm[i];
+  mean/=sm.length; for(let i=0;i<sm.length;i++) sm[i]-=mean;
+  normalizeInPlace(sm);
+
+  // build single-cycle wavetable (2048)
+  const N = 2048;
+  const wavetable = new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const t=i/(N-1);
+    const x=t*(sm.length-1);
+    const x0=Math.floor(x), x1=Math.min(sm.length-1, x0+1);
+    const f=x-x0;
+    wavetable[i]=sm[x0]*(1-f)+sm[x1]*f;
+  }
+  normalizeInPlace(wavetable);
+
+  // per-step features
+  const steps = +ui.steps.value;
+  const entropy = [];
+  const edge = [];
+  for(let s=0;s<steps;s++){
+    const x0 = Math.floor((s/steps)*w);
+    const x1 = Math.floor(((s+1)/steps)*w);
+
+    // entropy on luminance histogram
+    const hist = new Uint32Array(64);
+    let total=0;
+    for(let y=0;y<h;y++){
+      for(let x=x0;x<x1;x++){
+        const gval = gray[y*w+x];
+        const bin = Math.max(0, Math.min(63, (gval/256*64)|0));
+        hist[bin]++; total++;
+      }
+    }
+    const H = shannonEntropy(hist, Math.max(1,total));
+    entropy.push(H);
+
+    // edge energy (Sobel)
+    const E = sobelEnergy(gray, w, h, x0, x1);
+    edge.push(E);
+  }
+
+  const entropyN = normalize01(entropy);
+  const edgeN = normalize01(edge);
+
+  const entropyMean = entropyN.reduce((a,b)=>a+b,0)/entropyN.length;
+  const edgeMean = edgeN.reduce((a,b)=>a+b,0)/edgeN.length;
+
+  // draw trace overlay for debug
+  drawTrace(waveRes.yTrace);
+
+  session = {
+    mode: ui.mode.value,
+    seed: Math.floor(+ui.seed.value || 1337),
+    bpm: +ui.bpm.value,
+    swing: +ui.swing.value,
+    pitchHz: +ui.pitch.value,
+    drive: +ui.drive.value,
+    fmAggro: +ui.fm.value, // Phase 2: real FM
+    gain: +ui.gain.value,
+    steps,
+    stutterProb: +ui.stProb.value,
+    stutterDiv: +ui.stRate.value,
+    wavetable,
+    entropyTimeline: entropyN,
+    edgeTimeline: edgeN,
+    entropyMean,
+    edgeMean,
+    createdAt: new Date().toISOString()
+  };
+
+  ui.playBtn.disabled = false;
+  ui.stopBtn.disabled = false;
+  ui.exportBtn.disabled = false;
+
+  setStatus(`Analyzed. Entropy mean ${entropyMean.toFixed(2)} | Edge mean ${edgeMean.toFixed(2)}. Ready.`, "good");
+  log(`Analyze: steps=${steps} entropyMean=${entropyMean.toFixed(3)} edgeMean=${edgeMean.toFixed(3)} hits=${waveRes.hits}/${w}`);
+});
+
+ui.playBtn.addEventListener("click", async ()=>{
+  if(!session){ setStatus("Analyze first.", "warn"); return; }
+  await ensureAudio();
+  stop();
+  scheduleHybridLoop(session);
+  log("Play: mode=" + session.mode + " bpm=" + session.bpm + " swing=" + session.swing.toFixed(2));
+});
+
+ui.stopBtn.addEventListener("click", ()=>{
+  stop();
+  log("Stop");
+});
+
+ui.exportBtn.addEventListener("click", ()=>{
+  if(!session) return;
+  // export without huge arrays? we keep short summaries + allow optional full export
+  const payload = {
+    ...session,
+    wavetable: Array.from(session.wavetable.slice(0, 64)), // preview only
+    entropyTimeline: session.entropyTimeline.map(x=>+x.toFixed(4)),
+    edgeTimeline: session.edgeTimeline.map(x=>+x.toFixed(4)),
+    note: "Export preview includes first 64 wavetable samples only (Phase 1)."
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "waveform-soundlab-session.json";
+  a.click();
+  log("Exported session JSON (preview).");
+});
+
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+</script>
+
+</body>
+</html>

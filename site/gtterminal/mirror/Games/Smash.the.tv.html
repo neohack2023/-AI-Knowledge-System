@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>NEON CARNAGE :: AAA WebGPU Arena</title>
+  <style>
+    :root{
+      --bg:#000;
+      --cyan:#62ffe0;
+      --mag:#ff3cff;
+      --amber:#ffd37a;
+      --red:#ff4d6d;
+      --text:#eafff9;
+      --muted:rgba(234,255,249,.68);
+      --panel:rgba(8,12,16,.78);
+      --line:rgba(98,255,224,.22);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    }
+    html,body{
+      margin:0; padding:0; width:100%; height:100%;
+      background:var(--bg); color:var(--text);
+      font-family:var(--mono);
+      overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none;
+    }
+    canvas{ display:block; width:100vw; height:100vh; image-rendering:pixelated; }
+
+    #crt{
+      position:fixed; inset:0; pointer-events:none; z-index:9;
+      background:
+        linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.26) 50%),
+        linear-gradient(90deg, rgba(255,0,0,0.06), rgba(0,255,0,0.02), rgba(0,0,255,0.06));
+      background-size:100% 4px, 6px 100%;
+      box-shadow: inset 0 0 160px rgba(0,0,0,.92);
+      mix-blend-mode:screen;
+      opacity:.82;
+    }
+
+    #hud{
+      position:fixed; left:0; top:0; width:100%;
+      padding:16px 18px; box-sizing:border-box;
+      display:none; z-index:20;
+      pointer-events:none;
+      text-shadow: 2px 2px rgba(0,0,0,.85);
+    }
+    #hudRow{ display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
+    .title{
+      font-weight:900; letter-spacing:.18em;
+      font-size:20px; color:var(--cyan);
+      filter: drop-shadow(0 0 14px rgba(98,255,224,.25));
+      opacity:.95;
+    }
+    .statBig{
+      font-weight:900; letter-spacing:.14em;
+      font-size:26px; color:var(--amber);
+      filter: drop-shadow(0 0 16px rgba(255,211,122,.25));
+      text-align:right;
+    }
+    .statSmall{
+      font-weight:800; letter-spacing:.06em;
+      font-size:14px; color:rgba(255,255,255,.86);
+      text-align:right;
+    }
+    .bars{ margin-top:10px; display:flex; gap:10px; align-items:center; }
+    .bar{
+      width:240px; height:14px; border:1px solid var(--line);
+      background: rgba(4,6,8,.55);
+      border-radius:999px; overflow:hidden;
+      box-shadow: 0 0 18px rgba(0,255,224,.08);
+    }
+    .fill{ height:100%; width:50%; background: linear-gradient(90deg, rgba(98,255,224,.95), rgba(255,60,255,.85)); }
+    .fillHP{ background: linear-gradient(90deg, rgba(0,255,140,.92), rgba(255,77,109,.88)); }
+    .pill{
+      padding:3px 10px; border:1px solid var(--line);
+      background: rgba(10,16,20,.55);
+      border-radius:999px; font-size:12px; font-weight:800; color:rgba(234,255,249,.9);
+    }
+
+    #announcer{
+      position:fixed; left:50%; top:32%;
+      transform:translate(-50%,-50%) scale(1);
+      font-size:42px; font-weight:900; letter-spacing:.06em;
+      color:#ffea00;
+      text-shadow: 0 0 26px rgba(255,0,68,.65), 4px 4px rgba(0,0,0,.9);
+      opacity:0; pointer-events:none; z-index:40;
+      transition: opacity .12s, transform .35s cubic-bezier(.175,.885,.32,1.275);
+      text-align:center; white-space:pre-line;
+    }
+
+    .centerBox{
+      position:fixed; left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      z-index:60; text-align:center;
+      width:min(92vw, 760px);
+    }
+    #menu{
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:18px;
+    }
+    .logo{
+      font-weight:1000; letter-spacing:.22em;
+      font-size: clamp(54px, 8vw, 96px);
+      background: linear-gradient(90deg, rgba(98,255,224,1), rgba(255,60,255,1));
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+      filter: drop-shadow(0 0 22px rgba(98,255,224,.22));
+      line-height:.9;
+    }
+    .tagline{
+      color:var(--amber); font-weight:900; letter-spacing:.22em;
+      font-size: clamp(14px, 2.3vw, 18px);
+      opacity:.92;
+    }
+    .panel{
+      background: var(--panel);
+      border: 1px solid rgba(98,255,224,.26);
+      box-shadow: 0 0 40px rgba(0,255,224,.08);
+      border-radius: 14px;
+      padding: 16px 18px;
+      text-align:left;
+    }
+    .panel h3{ margin:0 0 8px; font-size:14px; color:rgba(98,255,224,.92); letter-spacing:.12em; }
+    .panel ul{ margin:0; padding-left:18px; color:rgba(234,255,249,.78); font-size:13px; line-height:1.45; }
+    .panel li{ margin:4px 0; }
+    .btn{
+      pointer-events:auto;
+      font-weight:1000;
+      letter-spacing:.16em;
+      font-size:22px;
+      padding: 14px 24px;
+      border-radius: 14px;
+      border: 2px solid rgba(255,255,255,.9);
+      background: rgba(0,255,224,.34);
+      color: rgba(255,255,255,.96);
+      box-shadow: 0 0 44px rgba(0,255,224,.22);
+      cursor:pointer;
+      transition: transform .12s, background .12s, box-shadow .12s;
+    }
+    .btn:hover{ transform: translateY(-1px); background: rgba(0,255,224,.48); box-shadow: 0 0 62px rgba(0,255,224,.34); }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+
+    #gameover{ display:none; }
+    .deadTitle{
+      font-size:52px; font-weight:1000; letter-spacing:.18em;
+      color: var(--red);
+      text-shadow: 0 0 26px rgba(255,77,109,.5), 4px 4px rgba(0,0,0,.9);
+      margin:0 0 10px;
+    }
+    .deadSub{ color:rgba(234,255,249,.86); font-weight:900; letter-spacing:.08em; margin:0 0 14px; }
+    .stats{
+      margin: 12px auto 18px;
+      text-align:left;
+      max-width: 540px;
+      background: rgba(0,0,0,.72);
+      border: 1px solid rgba(255,77,109,.35);
+      box-shadow: 0 0 44px rgba(255,77,109,.12);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: rgba(234,255,249,.84);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .stats b{ color: var(--amber); }
+
+    #pause{
+      display:none;
+      position:fixed; left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      z-index:70; text-align:center;
+      padding: 20px 22px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.84);
+      border: 1px solid rgba(98,255,224,.35);
+      box-shadow: 0 0 46px rgba(0,255,224,.12);
+      pointer-events:none;
+    }
+    #pause .p1{ font-weight:1000; letter-spacing:.18em; font-size:42px; color: var(--cyan); }
+    #pause .p2{ margin-top:10px; color: rgba(234,255,249,.72); font-weight:900; letter-spacing:.08em; }
+
+    .joy-base{
+      position:fixed; width:120px; height:120px;
+      border-radius:50%;
+      border: 2px solid rgba(98,255,224,.30);
+      background: radial-gradient(circle, rgba(0,255,224,0.05) 0%, rgba(0,255,224,0.18) 100%);
+      box-shadow: 0 0 26px rgba(0,255,224,.08);
+      display:none; z-index:30; pointer-events:none;
+      transform: translate(-50%,-50%);
+    }
+    .joy-stick{
+      position:absolute; width:50px; height:50px;
+      border-radius:50%;
+      top:50%; left:50%;
+      margin-left:-25px; margin-top:-25px;
+      background: radial-gradient(circle, rgba(98,255,224,1) 0%, rgba(0,120,160,1) 100%);
+      border: 2px solid rgba(255,255,255,.92);
+      box-shadow: 0 0 18px rgba(0,255,224,.55);
+      transform: translate(0,0);
+    }
+
+    .hint{ font-size:12px; color: rgba(234,255,249,.62); letter-spacing:.06em; }
+
+    #nogpu{
+      display:none;
+      position:fixed; inset:0; z-index:100;
+      background:#000; color:#fff;
+      padding: 24px;
+      font-family: var(--mono);
+    }
+    #nogpu h2{ margin:0 0 10px; color: var(--red); letter-spacing:.12em; }
+    #nogpu p{ margin:6px 0; color: rgba(234,255,249,.78); }
+  </style>
+</head>
+<body>
+  <div id="crt"></div>
+
+  <div id="hud">
+    <div id="hudRow">
+      <div>
+        <div class="title">NEON CARNAGE</div>
+        <div class="bars">
+          <div class="pill" id="roundPill">ROUND 1</div>
+          <div class="bar" title="HP"><div class="fill fillHP" id="hpFill" style="width:100%"></div></div>
+          <div class="bar" title="HYPE"><div class="fill" id="hypeFill" style="width:0%"></div></div>
+        </div>
+        <div class="hint" id="hudHint">WASD / Left Stick = Move • Arrows / Right Stick = Fire • Space = Dash • P/Esc = Pause</div>
+      </div>
+      <div>
+        <div class="statBig" id="scoreTxt">0000000</div>
+        <div class="statSmall" id="metaTxt">HYPE x1.0 • SHD 0</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="announcer">WELCOME TO THE ARENA</div>
+
+  <div class="centerBox" id="menu">
+    <div class="logo">NEON<br/>CARNAGE</div>
+    <div class="tagline">AAA WEBGPU ARENA SHOWDOWN</div>
+
+    <div class="panel">
+      <h3>RULES OF THE SHOW</h3>
+      <ul>
+        <li><b>Survive rounds</b>. Pressure ramps fast. Don’t camp.</li>
+        <li><b>HYPE</b> multiplies score. Keep kills flowing. Taking damage nukes it.</li>
+        <li><b>DASH</b> grants brief i-frames. Timing beats bravery.</li>
+        <li><b>Pickups</b>: Med (green), Shield (cyan), Hype (magenta).</li>
+      </ul>
+    </div>
+
+    <button class="btn" id="startBtn">ENTER ARENA</button>
+    <div class="hint">Tip: On mobile, double-tap left side to dash.</div>
+  </div>
+
+  <div class="centerBox" id="gameover">
+    <h2 class="deadTitle">DEAD</h2>
+    <p class="deadSub">THE AUDIENCE IS DISAPPOINTED.</p>
+    <div class="stats" id="statsBox"></div>
+    <button class="btn" id="retryBtn">RETRY</button>
+  </div>
+
+  <div id="pause">
+    <div class="p1">PAUSED</div>
+    <div class="p2">Press P / ESC to resume</div>
+  </div>
+
+  <div id="nogpu">
+    <h2>WEBGPU REQUIRED</h2>
+    <p>This build uses WebGPU for the render graph and post stack.</p>
+    <p>Try a Chromium-based browser with WebGPU enabled.</p>
+  </div>
+
+  <div id="moveBase" class="joy-base"><div id="moveStick" class="joy-stick"></div></div>
+  <div id="fireBase" class="joy-base"><div id="fireStick" class="joy-stick"></div></div>
+
+  <canvas id="c"></canvas>
+
+  <script type="module">
+    // ---------- DOM ----------
+    const $ = (id) => document.getElementById(id);
+    const hud = $("hud");
+    const announcer = $("announcer");
+    const menu = $("menu");
+    const gameover = $("gameover");
+    const pauseBox = $("pause");
+    const nogpu = $("nogpu");
+    const startBtn = $("startBtn");
+    const retryBtn = $("retryBtn");
+    const scoreTxt = $("scoreTxt");
+    const metaTxt  = $("metaTxt");
+    const roundPill = $("roundPill");
+    const hpFill = $("hpFill");
+    const hypeFill = $("hypeFill");
+    const statsBox = $("statsBox");
+
+    // ---------- GAME CONSTANTS ----------
+    const ARENA_W = 3200;
+    const ARENA_H = 2200;
+
+    const PLAYER_R = 44;
+    const BULLET_R = 9;
+    const ENEMY_R  = 34;
+    const ORB_R    = 40;
+    const PICKUP_R = 26;
+
+    const MAX_ENEMIES = 1200;
+    const MAX_BULLETS = 900;
+    const MAX_PARTS   = 1600;
+
+    const MOVE_SPEED = 560;
+    const DASH_SPEED = 1350;
+    const DASH_TIME  = 0.14;
+    const DASH_CD    = 0.65;
+    const IFRAMES_HIT= 0.38;
+
+    const FIRE_CD_MS = 85;
+
+    const ROUND_BREAK = 2.0;
+    const ROUND_LEN   = 22.0;
+
+    const GATES = [
+      {x: 0, y: -ARENA_H/2 + 80},
+      {x: 0, y:  ARENA_H/2 - 80},
+      {x: -ARENA_W/2 + 80, y: 0},
+      {x:  ARENA_W/2 - 80, y: 0},
+    ];
+
+    // ---------- UTIL ----------
+    const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+    const len = (x,y)=>Math.sqrt(x*x+y*y);
+    const dist2=(ax,ay,bx,by)=>{const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy;}
+    const rand = (a,b)=>a+Math.random()*(b-a);
+    const irand=(a,b)=> (a + ((Math.random()*(b-a+1))|0));
+    const pad7 = (n)=>String(n|0).padStart(7,"0");
+
+    function snap8(vx,vy){
+      if (Math.abs(vx)<0.1 && Math.abs(vy)<0.1) return {x:0,y:0};
+      const a=Math.atan2(vy,vx);
+      const s=Math.round(a/(Math.PI/4))*(Math.PI/4);
+      return {x:Math.cos(s), y:Math.sin(s)};
+    }
+
+    // ---------- ANNOUNCER ----------
+    const QUOTES = [
+      "BIG MONEY!",
+      "TOTAL CARNAGE!",
+      "THE CROWD DEMANDS VIOLENCE!",
+      "BONUS DROP!",
+      "HYPE LEVELS: ILLEGAL!",
+      "DASH!",
+      "ROUND UP!"
+    ];
+    function shout(text){
+      announcer.textContent = text || QUOTES[(Math.random()*QUOTES.length)|0];
+      announcer.style.opacity = 1;
+      announcer.style.transform =
+        `translate(-50%,-50%) scale(${rand(1.45,1.75)}) rotate(${rand(-6,6)}deg)`;
+      setTimeout(()=>{
+        announcer.style.opacity = 0;
+        announcer.style.transform = "translate(-50%,-50%) scale(1)";
+      }, 1050);
+    }
+
+    // ---------- INPUT ----------
+    const keys = {};
+    window.addEventListener("keydown", (e)=>{
+      keys[e.code]=true;
+      if (e.code==="KeyP" || e.code==="Escape") togglePause();
+      if (e.code==="Space") tryDash();
+    });
+    window.addEventListener("keyup", (e)=> keys[e.code]=false);
+
+    let moveDir={x:0,y:0}, fireDir={x:0,y:0};
+
+    const activeTouches = {};
+    let moveTouch=null, fireTouch=null;
+    const JOY_MAX=60, JOY_DEAD=0.2;
+    let lastLeftTap=0;
+
+    function onTouchStart(e){
+      if (e.target.closest("button")) return;
+      e.preventDefault();
+      const half = innerWidth/2;
+
+      for (const t of e.changedTouches){
+        const isLeft = t.clientX < half;
+
+        if (isLeft){
+          const now=performance.now();
+          if (now-lastLeftTap<280) tryDash();
+          lastLeftTap=now;
+        }
+
+        if (isLeft && moveTouch===null){
+          moveTouch=t.identifier;
+          activeTouches[t.identifier]={sx:t.clientX, sy:t.clientY, type:"move"};
+          $("moveBase").style.display="block";
+          $("moveBase").style.left = t.clientX+"px";
+          $("moveBase").style.top  = t.clientY+"px";
+        } else if (!isLeft && fireTouch===null){
+          fireTouch=t.identifier;
+          activeTouches[t.identifier]={sx:t.clientX, sy:t.clientY, type:"fire"};
+          $("fireBase").style.display="block";
+          $("fireBase").style.left = t.clientX+"px";
+          $("fireBase").style.top  = t.clientY+"px";
+        }
+      }
+    }
+    function onTouchMove(e){
+      e.preventDefault();
+      for (const t of e.changedTouches){
+        const it=activeTouches[t.identifier];
+        if (!it) continue;
+        const dx=t.clientX-it.sx, dy=t.clientY-it.sy;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        const nd=Math.min(d/JOY_MAX,1);
+        const drawX=(d===0)?0:(dx/d)*nd*JOY_MAX;
+        const drawY=(d===0)?0:(dy/d)*nd*JOY_MAX;
+
+        let ox=0, oy=0;
+        if (nd>JOY_DEAD){ ox=dx/d; oy=dy/d; }
+
+        if (it.type==="move"){
+          $("moveStick").style.transform=`translate(${drawX}px,${drawY}px)`;
+          moveDir={x:ox,y:oy};
+        } else {
+          $("fireStick").style.transform=`translate(${drawX}px,${drawY}px)`;
+          fireDir={x:ox,y:oy};
+        }
+      }
+    }
+    function onTouchEnd(e){
+      for (const t of e.changedTouches){
+        const it=activeTouches[t.identifier];
+        if (!it) continue;
+        if (it.type==="move"){
+          moveTouch=null;
+          $("moveBase").style.display="none";
+          $("moveStick").style.transform="translate(0,0)";
+          moveDir={x:0,y:0};
+        } else {
+          fireTouch=null;
+          $("fireBase").style.display="none";
+          $("fireStick").style.transform="translate(0,0)";
+          fireDir={x:0,y:0};
+        }
+        delete activeTouches[t.identifier];
+      }
+    }
+    document.addEventListener("touchstart", onTouchStart, {passive:false});
+    document.addEventListener("touchmove",  onTouchMove,  {passive:false});
+    document.addEventListener("touchend",   onTouchEnd);
+    document.addEventListener("touchcancel",onTouchEnd);
+
+    // ---------- GAME STATE ----------
+    function freshState(){
+      return {
+        started:false, over:false, paused:false,
+        t:0,
+
+        camX:0, camY:0, camShake:0,
+
+        round:0, roundT:0, inter:true, interT:0,
+
+        player:{
+          x:0,y:0, rot:0,
+          hp:100, maxHp:100,
+          hype:1.0,
+          shield:0,
+          invuln:0,
+          dashT:0, dashCd:0,
+          dashVX:0, dashVY:0,
+        },
+
+        score:0, kills:0, shots:0, hits:0,
+
+        enemies:[],
+        bullets:[],
+        parts:[],
+        pickups:[],
+
+        lastFire:0,
+        lastSpawn:0,
+      };
+    }
+    let S = freshState();
+
+    function togglePause(){
+      if (!S.started || S.over) return;
+      S.paused = !S.paused;
+      pauseBox.style.display = S.paused ? "block" : "none";
+    }
+
+    function startGame(){
+      S = freshState();
+      S.started = true;
+      hud.style.display="block";
+      menu.style.display="none";
+      gameover.style.display="none";
+      pauseBox.style.display="none";
+      shout("WELCOME TO THE ARENA");
+      S.inter=true; S.interT=0;
+    }
+
+    function endGame(){
+      S.over=true;
+      hud.style.display="none";
+      pauseBox.style.display="none";
+      const alive = Math.max(0, Math.floor(S.t));
+      const acc = S.shots ? Math.floor((S.hits/S.shots)*100) : 0;
+      statsBox.innerHTML =
+        `<b>Score:</b> ${S.score|0}<br/>
+         <b>Time:</b> ${alive}s<br/>
+         <b>Rounds:</b> ${S.round}<br/>
+         <b>Kills:</b> ${S.kills}<br/>
+         <b>Accuracy-ish:</b> ${acc}%<br/>
+         <b>Note:</b> The crowd respects precision. Mostly.`;
+      gameover.style.display="block";
+      shout("ELIMINATED");
+    }
+
+    startBtn.addEventListener("click", startGame);
+    retryBtn.addEventListener("click", startGame);
+
+    function tryDash(){
+      if (!S.started || S.over || S.paused) return;
+      const p=S.player;
+      if (p.dashCd>0 || p.dashT>0) return;
+
+      let mx=moveDir.x, my=moveDir.y;
+      if (keys["KeyW"]) my=-1;
+      if (keys["KeyS"]) my= 1;
+      if (keys["KeyA"]) mx=-1;
+      if (keys["KeyD"]) mx= 1;
+
+      if (mx===0 && my===0) return;
+      const m=len(mx,my); mx/=m; my/=m;
+
+      p.dashT = DASH_TIME;
+      p.dashCd= DASH_CD;
+      p.invuln = Math.max(p.invuln, DASH_TIME*0.95);
+      p.dashVX = mx*DASH_SPEED;
+      p.dashVY = my*DASH_SPEED;
+
+      S.camShake = Math.min(1, S.camShake + 0.35);
+      shout("DASH!");
+    }
+
+    function hurtPlayer(amount){
+      const p=S.player;
+      if (p.invuln>0) return;
+
+      if (p.shield>0){
+        const s=Math.min(p.shield, amount);
+        p.shield -= s;
+        amount -= s;
+        burst(p.x,p.y, 10, [0.0,0.9,1.0]);
+      }
+      if (amount>0){
+        p.hp -= amount;
+        p.invuln = IFRAMES_HIT;
+        p.hype = 1.0;
+        burst(p.x,p.y, 14, [1.0,0.2,0.2]);
+        S.camShake = Math.min(1, S.camShake + 0.55);
+      }
+      if (p.hp<=0) endGame();
+    }
+
+    function spawnPickup(x,y,kind){
+      S.pickups.push({x,y,kind,life:12});
+    }
+
+    function applyPickup(kind){
+      const p=S.player;
+      if (kind===0){
+        p.hp = clamp(p.hp + 36, 0, p.maxHp);
+        burst(p.x,p.y, 12, [0.2,1.0,0.3]);
+        shout("MEDKIT!");
+      } else if (kind===1){
+        p.shield = clamp(p.shield + 44, 0, 90);
+        burst(p.x,p.y, 10, [0.0,0.9,1.0]);
+        shout("SHIELD UP!");
+      } else {
+        p.hype = clamp(p.hype + 1.0, 1.0, 5.0);
+        S.score += 1200 * p.hype;
+        burst(p.x,p.y, 12, [1.0,0.2,1.0]);
+        shout("HYPE BOOST!");
+      }
+    }
+
+    function burst(x,y,count,color){
+      for (let i=0;i<count;i++){
+        const a=Math.random()*Math.PI*2;
+        const v=rand(220,720);
+        S.parts.push({
+          x,y,
+          vx:Math.cos(a)*v,
+          vy:Math.sin(a)*v,
+          life:rand(0.25,0.85),
+          r:rand(6,16),
+          color
+        });
+      }
+    }
+
+    function beginRound(){
+      S.round++;
+      S.roundT=0;
+      S.inter=false;
+      shout(`ROUND ${S.round}`);
+    }
+    function beginIntermission(){
+      S.inter=true;
+      S.interT=0;
+      shout("CATCH YOUR BREATH");
+      const kind = Math.random()<0.34 ? 0 : Math.random()<0.65 ? 1 : 2;
+      spawnPickup(S.player.x+rand(-70,70), S.player.y+rand(-70,70), kind);
+    }
+
+    function spawnWave(now){
+      if (S.enemies.length >= MAX_ENEMIES) return;
+
+      const r=S.round;
+      const base=980;
+      const squeeze=clamp(120*(r-1), 0, 720);
+      const rate=Math.max(140, base - squeeze - S.score/95);
+      if (now - S.lastSpawn < rate) return;
+
+      const gate = GATES[(Math.random()*GATES.length)|0];
+      const cluster = 3 + irand(0, Math.min(10, 2+r));
+      const machineChance = clamp(0.12 + r*0.05, 0.15, 0.58);
+      const eliteChance   = clamp(-0.05 + r*0.03, 0.00, 0.22);
+
+      for (let i=0;i<cluster;i++){
+        const roll=Math.random();
+        const isElite = roll < eliteChance;
+        const isMachine = !isElite && roll < eliteChance + machineChance;
+
+        if (isElite){
+          S.enemies.push({
+            x: gate.x + rand(-140,140),
+            y: gate.y + rand(-140,140),
+            type: 3,
+            hp: 2,
+            speed: rand(360,520),
+            rot:0,
+            vx:0,vy:0,
+          });
+        } else if (isMachine){
+          S.enemies.push({
+            x: gate.x + rand(-140,140),
+            y: gate.y + rand(-140,140),
+            type: 2,
+            hp: 1,
+            speed: 0,
+            rot:0,
+            vx: rand(-360,360),
+            vy: rand(-360,360),
+          });
+        } else {
+          S.enemies.push({
+            x: gate.x + rand(-140,140),
+            y: gate.y + rand(-140,140),
+            type: 1,
+            hp: 1,
+            speed: rand(170,260) + r*4,
+            rot:0,
+            vx:0,vy:0
+          });
+        }
+      }
+
+      if (Math.random()<0.18){
+        S.pickups.push({
+          x: rand(-ARENA_W/2+120, ARENA_W/2-120),
+          y: rand(-ARENA_H/2+120, ARENA_H/2-120),
+          kind: 3, // prize
+          life: 12
+        });
+      }
+
+      S.lastSpawn = now;
+      S.camShake = Math.min(1, S.camShake + 0.05);
+    }
+
+    function update(dt){
+      if (!S.started || S.over || S.paused) return;
+      S.t += dt;
+
+      const p=S.player;
+      p.invuln = Math.max(0, p.invuln - dt);
+      p.dashCd = Math.max(0, p.dashCd - dt);
+      p.dashT  = Math.max(0, p.dashT  - dt);
+
+      if (S.inter){
+        S.interT += dt;
+        if (S.interT >= ROUND_BREAK) beginRound();
+      } else {
+        S.roundT += dt;
+        if (S.roundT >= ROUND_LEN) beginIntermission();
+      }
+
+      let mx=moveDir.x, my=moveDir.y;
+      if (keys["KeyW"]) my=-1;
+      if (keys["KeyS"]) my= 1;
+      if (keys["KeyA"]) mx=-1;
+      if (keys["KeyD"]) mx= 1;
+      if (mx!==0 || my!==0){ const m=len(mx,my); mx/=m; my/=m; }
+
+      let fx=fireDir.x, fy=fireDir.y;
+      if (keys["ArrowUp"]) fy=-1;
+      if (keys["ArrowDown"]) fy= 1;
+      if (keys["ArrowLeft"]) fx=-1;
+      if (keys["ArrowRight"]) fx= 1;
+
+      if (fx!==0 || fy!==0) p.rot = Math.atan2(fy,fx);
+      else if (mx!==0 || my!==0){
+        const target=Math.atan2(my,mx);
+        let diff=target-p.rot;
+        while(diff<-Math.PI) diff+=Math.PI*2;
+        while(diff> Math.PI) diff-=Math.PI*2;
+        p.rot += diff * 15.0 * dt;
+      }
+
+      let vx=mx*MOVE_SPEED, vy=my*MOVE_SPEED;
+      if (p.dashT>0){ vx=p.dashVX; vy=p.dashVY; }
+
+      p.x += vx*dt; p.y += vy*dt;
+      p.x = clamp(p.x, -ARENA_W/2+PLAYER_R, ARENA_W/2-PLAYER_R);
+      p.y = clamp(p.y, -ARENA_H/2+PLAYER_R, ARENA_H/2-PLAYER_R);
+
+      const now=performance.now();
+      if (!S.inter) spawnWave(now);
+
+      if ((fx!==0 || fy!==0) && (now - S.lastFire > FIRE_CD_MS) && S.bullets.length<MAX_BULLETS){
+        const s=snap8(fx,fy);
+        S.bullets.push({
+          x:p.x + s.x*(PLAYER_R+8),
+          y:p.y + s.y*(PLAYER_R+8),
+          vx:s.x*1550,
+          vy:s.y*1550,
+          life:1.15
+        });
+        S.lastFire=now;
+        S.shots++;
+        S.camShake = Math.min(1, S.camShake + 0.035);
+      }
+
+      for (let i=S.bullets.length-1;i>=0;i--){
+        const b=S.bullets[i];
+        b.x += b.vx*dt; b.y += b.vy*dt;
+        b.life -= dt;
+        if (b.life<=0 || b.x<-ARENA_W/2 || b.x>ARENA_W/2 || b.y<-ARENA_H/2 || b.y>ARENA_H/2){
+          S.bullets.splice(i,1);
+        }
+      }
+
+      for (let i=S.pickups.length-1;i>=0;i--){
+        const u=S.pickups[i];
+        u.life -= dt;
+
+        const rr = (u.kind===3) ? (PICKUP_R+10) : PICKUP_R;
+        if (dist2(p.x,p.y,u.x,u.y) < (PLAYER_R+rr)*(PLAYER_R+rr)){
+          if (u.kind===3){
+            S.score += 5200 * p.hype;
+            burst(u.x,u.y, 16, [1.0,0.85,0.0]);
+            shout("BONUS!");
+          } else {
+            applyPickup(u.kind);
+          }
+          S.pickups.splice(i,1);
+          continue;
+        }
+        if (u.life<=0) S.pickups.splice(i,1);
+      }
+
+      for (let i=S.enemies.length-1;i>=0;i--){
+        const e=S.enemies[i];
+
+        if (e.type===1){
+          const dx=p.x-e.x, dy=p.y-e.y;
+          const d=len(dx,dy)||1;
+          e.x += (dx/d)*e.speed*dt;
+          e.y += (dy/d)*e.speed*dt;
+          e.rot = Math.atan2(dy,dx);
+        } else if (e.type===2){
+          e.x += e.vx*dt; e.y += e.vy*dt;
+          const half = ORB_R;
+          if (e.x < -ARENA_W/2+half || e.x > ARENA_W/2-half) e.vx *= -1;
+          if (e.y < -ARENA_H/2+half || e.y > ARENA_H/2-half) e.vy *= -1;
+          e.rot += dt*4.2;
+        } else {
+          const dx=p.x-e.x, dy=p.y-e.y;
+          const d=len(dx,dy)||1;
+          e.x += (dx/d)*e.speed*dt;
+          e.y += (dy/d)*e.speed*dt;
+          e.rot = Math.atan2(dy,dx);
+          e.speed = clamp(e.speed + dt*6, 360, 560);
+        }
+
+        const er = (e.type===2) ? ORB_R : ENEMY_R;
+        if (dist2(p.x,p.y,e.x,e.y) < (PLAYER_R+er*0.8)*(PLAYER_R+er*0.8)){
+          hurtPlayer( (e.type===3 ? 30 : 18) * dt );
+        }
+
+        let gotHit=false;
+        const hitR = (e.type===2) ? ORB_R*0.85 : ENEMY_R*0.95;
+        for (let bi=S.bullets.length-1;bi>=0;bi--){
+          const b=S.bullets[bi];
+          if (dist2(b.x,b.y,e.x,e.y) < (hitR+BULLET_R)*(hitR+BULLET_R)){
+            S.bullets.splice(bi,1);
+            S.hits++;
+            e.hp--;
+            gotHit=true;
+            break;
+          }
+        }
+
+        if (gotHit && e.hp<=0){
+          const base = (e.type===1)? 120 : (e.type===2)? 420 : 900;
+          S.score += base * p.hype;
+          p.hype = Math.min(5.0, p.hype + (e.type===3 ? 0.12 : 0.03));
+          S.kills++;
+
+          if (e.type===1) burst(e.x,e.y, 14, [1.0,0.2,0.0]);
+          else if (e.type===2) burst(e.x,e.y, 14, [0.8,0.0,1.0]);
+          else burst(e.x,e.y, 18, [1.0,0.1,1.0]);
+
+          const d=Math.random();
+          if (d<0.05) spawnPickup(e.x,e.y,0);
+          else if (d<0.09) spawnPickup(e.x,e.y,1);
+          else if (d<0.11) spawnPickup(e.x,e.y,2);
+
+          S.enemies.splice(i,1);
+          S.camShake = Math.min(1, S.camShake + 0.18);
+        }
+      }
+
+      const decay = S.inter ? 0.36 : 0.22;
+      p.hype = Math.max(1.0, p.hype - decay*dt);
+
+      for (let i=S.parts.length-1;i>=0;i--){
+        const q=S.parts[i];
+        q.x += q.vx*dt; q.y += q.vy*dt;
+        q.vx *= 0.88; q.vy *= 0.88;
+        q.life -= dt;
+        if (q.life<=0) S.parts.splice(i,1);
+      }
+      if (S.parts.length>MAX_PARTS) S.parts.splice(0, S.parts.length-MAX_PARTS);
+
+      const follow = 10.5;
+      S.camX += (p.x - S.camX) * (1 - Math.exp(-follow*dt));
+      S.camY += (p.y - S.camY) * (1 - Math.exp(-follow*dt));
+      S.camShake = Math.max(0, S.camShake - dt*1.35);
+
+      scoreTxt.textContent = pad7(S.score);
+      metaTxt.textContent = `HYPE x${p.hype.toFixed(1)} • SHD ${Math.floor(p.shield)}`;
+      roundPill.textContent = S.inter ? `INTERMISSION` : `ROUND ${S.round}`;
+      hpFill.style.width = `${clamp((p.hp/p.maxHp)*100,0,100)}%`;
+      hypeFill.style.width = `${clamp(((p.hype-1)/4)*100,0,100)}%`;
+    }
+
+    // ---------- WEBGPU ----------
+    const canvas = $("c");
+
+    if (!navigator.gpu){
+      nogpu.style.display="block";
+    } else {
+      initWebGPU().catch(err=>{
+        console.error(err);
+        nogpu.style.display="block";
+        alert("WebGPU init failed: " + (err?.message || err));
+      });
+    }
+
+    async function initWebGPU(){
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) throw new Error("No WebGPU adapter");
+
+      // Optional: enable float16 filtering if available (we're using rgba8unorm now, but keep for future)
+      const requiredFeatures = [];
+      if (adapter.features && adapter.features.has("float16-filterable")) {
+        requiredFeatures.push("float16-filterable");
+      }
+
+      const device = await adapter.requestDevice({ requiredFeatures });
+
+      // 🔥 Make silent voids loud
+      device.onuncapturederror = (e) => {
+        console.error("WebGPU uncaptured error:", e.error);
+        alert("WebGPU error: " + e.error.message);
+      };
+
+      const ctx = canvas.getContext("webgpu");
+      const format = navigator.gpu.getPreferredCanvasFormat();
+
+      function resizeAndConfigure(){
+        const dpr = Math.max(1, Math.min(2.5, devicePixelRatio||1));
+        canvas.width = Math.max(1, Math.floor(innerWidth * dpr));
+        canvas.height= Math.max(1, Math.floor(innerHeight* dpr));
+        ctx.configure({ device, format, alphaMode:"premultiplied" });
+      }
+
+      resizeAndConfigure();
+      addEventListener("resize", () => {
+        resizeAndConfigure();
+        rebuildTargets();
+        postBG = makePostBG(); // IMPORTANT: post bind group must point at NEW texture views
+      });
+
+      // ✅ FIX: Use rgba8unorm for offscreen scene/bloom to avoid float filtering black-screen
+      const SCENE_FMT = "rgba8unorm";
+      const BLOOM_FMT = "rgba8unorm";
+
+      function makeTex(w,h,fmt,usage){
+        return device.createTexture({ size:{width:w,height:h}, format:fmt, usage });
+      }
+
+      let sceneTex, sceneView;
+      let bloomA, bloomAView, bloomB, bloomBView;
+
+      function rebuildTargets(){
+        const w=canvas.width, h=canvas.height;
+
+        sceneTex = makeTex(w,h,SCENE_FMT,
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING);
+        sceneView = sceneTex.createView();
+
+        const bw = Math.max(1, (w/2)|0);
+        const bh = Math.max(1, (h/2)|0);
+
+        bloomA = makeTex(bw,bh,BLOOM_FMT,
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING);
+        bloomB = makeTex(bw,bh,BLOOM_FMT,
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING);
+
+        bloomAView = bloomA.createView();
+        bloomBView = bloomB.createView();
+      }
+      rebuildTargets();
+
+      // instance buffer
+      const MAX_INST = 6500;
+      const instStrideFloats = 12;
+      const instData = new Float32Array(MAX_INST * instStrideFloats);
+
+      const instBuf = device.createBuffer({
+        size: instData.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+
+      // uniforms (96 bytes)
+      const uniBuf = device.createBuffer({
+        size: 96,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+
+      // ---------- WGSL ----------
+      const sceneWGSL = /* wgsl */`
+        struct Global {
+          viewProj : mat4x4f,
+          camPos   : vec2f,
+          time     : f32,
+          flash    : f32,
+          res      : vec2f,
+          pad      : vec2f,
+        };
+
+        struct Inst {
+          pos : vec2f,
+          size: vec2f,
+          color: vec3f,
+          type : f32,
+          rot  : f32,
+          _p0  : f32,
+          _p1  : f32,
+          _p2  : f32,
+        };
+
+        @group(0) @binding(0) var<uniform> G : Global;
+        @group(0) @binding(1) var<storage, read> I : array<Inst>;
+
+        struct VSOut {
+          @builtin(position) pos : vec4f,
+          @location(0) color : vec3f,
+          @location(1) uv : vec2f,
+          @location(2) @interpolate(flat) type : f32,
+          @location(3) @interpolate(flat) rot : f32,
+          @location(4) world : vec2f,
+        };
+
+        fn hash21(p: vec2f) -> f32{
+          let h = dot(p, vec2f(127.1, 311.7));
+          return fract(sin(h)*43758.5453);
+        }
+
+        @vertex
+        fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) ii: u32) -> VSOut{
+          let inst = I[ii];
+
+          var quad = array<vec2f,6>(
+            vec2f(-0.5,-0.5), vec2f( 0.5,-0.5), vec2f(-0.5, 0.5),
+            vec2f(-0.5, 0.5), vec2f( 0.5,-0.5), vec2f( 0.5, 0.5)
+          );
+
+          let lp = quad[v];
+          let uv = lp + 0.5;
+
+          var rp = lp;
+          if (inst.type < 5.0){
+            let c = cos(inst.rot);
+            let s = sin(inst.rot);
+            rp = vec2f(lp.x*c - lp.y*s, lp.x*s + lp.y*c);
+          }
+
+          let wp = rp * inst.size + inst.pos;
+
+          var o:VSOut;
+          o.pos   = G.viewProj * vec4f(wp, 0.0, 1.0);
+          o.color = inst.color;
+          o.uv    = uv;
+          o.type  = inst.type;
+          o.rot   = inst.rot;
+          o.world = wp;
+          return o;
+        }
+
+        fn glowFalloff(d: f32, k: f32) -> f32{
+          return 1.0 / (d*k + 1.0);
+        }
+
+        @fragment
+        fn fs(i:VSOut) -> @location(0) vec4f{
+          let uv = i.uv;
+          let p  = uv - 0.5;
+          let r  = length(p);
+
+          var col = i.color;
+          var a = 1.0;
+
+          if (i.type == 5.0){
+            let t = uv * vec2f(70.0, 50.0);
+            let f = fract(t);
+            let line = min(min(f.x, 1.0-f.x), min(f.y, 1.0-f.y));
+            let gline = smoothstep(0.06, 0.0, line);
+
+            let center = length(f - 0.5);
+            let cross = smoothstep(0.5, 0.43, center);
+
+            let base = vec3f(0.01,0.01,0.02);
+            let grid = vec3f(0.0,1.0,0.8) * 0.14 * gline;
+            let inter = vec3f(0.15,0.0,0.25) * cross * 0.20;
+
+            let scan = 0.015 * sin(G.time*1.2 + i.world.x*0.003 + i.world.y*0.002);
+            return vec4f(base + grid + inter + vec3f(scan), 1.0);
+          }
+
+          if (i.type == 6.0){
+            let edge = min(min(uv.x, 1.0-uv.x), min(uv.y, 1.0-uv.y));
+            a = smoothstep(0.0, 0.12, edge);
+            let beam = glowFalloff(edge, 18.0);
+            col *= (0.7 + 1.8*beam);
+            return vec4f(col, a);
+          }
+
+          if (i.type == 7.0){
+            if (r > 0.5){ discard; }
+            a = smoothstep(0.5, 0.0, r);
+            col *= 1.4 * glowFalloff(r, 10.0);
+            return vec4f(col, a);
+          }
+
+          if (i.type == 4.0){
+            if (r > 0.55){ discard; }
+            a = smoothstep(0.55, 0.0, r);
+            col *= 2.0 * glowFalloff(r, 9.0);
+            return vec4f(col, a);
+          }
+
+          if (i.type == 8.0){
+            let d = abs(p.x) + abs(p.y);
+            if (d > 0.58){ discard; }
+            a = smoothstep(0.58, 0.12, d);
+            let pulse = 0.65 + 0.35*sin(G.time*8.0 + hash21(i.world*0.1)*6.283);
+            col *= 1.2 * pulse * glowFalloff(d, 10.0);
+            return vec4f(col, a);
+          }
+
+          if (i.type == 9.0){
+            let d = max(abs(p.x), abs(p.y));
+            if (d > 0.45){ discard; }
+            let pulse = 0.6 + 0.4*sin(G.time*10.0);
+            let inner = smoothstep(0.18, 0.0, d);
+            col = vec3f(1.0,0.85,0.0) * (0.7 + 1.2*pulse) + vec3f(inner);
+            a = smoothstep(0.45, 0.22, d);
+            return vec4f(col, a);
+          }
+
+          if (i.type == 0.0){
+            let dart = max(abs(p.y)*2.7 + p.x, -p.x - 0.42);
+            if (dart > 0.40){ discard; }
+            col = vec3f(0.0,0.85,1.0);
+            if (p.x < -0.26){
+              col = vec3f(0.0,1.0,1.0) * (1.1 + 0.6*sin(G.time*22.0));
+            }
+            if (length(p - vec2f(0.12,0.0)) < 0.11){ col = vec3f(0.0); }
+            col += vec3f(G.flash*0.22, 0.0, G.flash*0.18);
+            return vec4f(col, 1.0);
+          }
+
+          if (i.type == 1.0){
+            let ang = atan2(p.y, p.x);
+            let gear = 0.36 + 0.11*sin(ang*6.0 + G.time*6.0);
+            if (r > gear){ discard; }
+            if (r < 0.14){
+              col = vec3f(1.0, 0.0, 0.2) * (1.1 + 0.7*sin(G.time*11.0));
+            } else {
+              col *= smoothstep(gear, gear-0.12, r);
+              col = col*0.85 + vec3f(0.05);
+            }
+            return vec4f(col, 1.0);
+          }
+
+          if (i.type == 2.0){
+            if (r > 0.45){ discard; }
+            let ring1 = abs(r - 0.33) < 0.02;
+            let ring2 = abs(r - 0.17) < 0.015;
+            if (ring1 || ring2){ col *= 2.3; }
+            else if (r < 0.08){ col = vec3f(1.0); }
+            else { a = 0.55; }
+            return vec4f(col, a);
+          }
+
+          if (i.type == 3.0){
+            if (r > 0.47){ discard; }
+            let ang = atan2(p.y, p.x);
+            let spike = 0.28 + 0.12*sin(ang*9.0 + G.time*7.0);
+            let rim = smoothstep(spike+0.03, spike-0.08, r);
+            col = vec3f(1.0,0.1,1.0) * (0.65 + 1.2*rim);
+            let core = smoothstep(0.18, 0.0, r);
+            col += vec3f(core);
+            a = 0.9;
+            return vec4f(col, a);
+          }
+
+          return vec4f(col, 1.0);
+        }
+      `;
+
+      const postWGSL = /* wgsl */`
+        struct Post {
+          time : f32,
+          bloomStrength : f32,
+          chroma : f32,
+          vignette : f32,
+          res : vec2f,
+          pad : vec2f,
+        };
+
+        @group(0) @binding(0) var sceneTex : texture_2d<f32>;
+        @group(0) @binding(1) var bloomTex : texture_2d<f32>;
+        @group(0) @binding(2) var samp : sampler;
+        @group(0) @binding(3) var<uniform> P : Post;
+
+        struct VSOut{
+          @builtin(position) pos : vec4f,
+          @location(0) uv : vec2f
+        };
+
+        @vertex
+        fn vs(@builtin(vertex_index) v:u32) -> VSOut{
+          var pos = array<vec2f,6>(
+            vec2f(-1.0,-1.0), vec2f( 1.0,-1.0), vec2f(-1.0, 1.0),
+            vec2f(-1.0, 1.0), vec2f( 1.0,-1.0), vec2f( 1.0, 1.0)
+          );
+          var uv = array<vec2f,6>(
+            vec2f(0.0,1.0), vec2f(1.0,1.0), vec2f(0.0,0.0),
+            vec2f(0.0,0.0), vec2f(1.0,1.0), vec2f(1.0,0.0)
+          );
+          var o:VSOut;
+          o.pos = vec4f(pos[v],0.0,1.0);
+          o.uv  = uv[v];
+          return o;
+        }
+
+        fn luma(c: vec3f) -> f32{
+          return dot(c, vec3f(0.2126,0.7152,0.0722));
+        }
+
+        fn filmGrain(uv:vec2f, t:f32, res:vec2f) -> f32{
+          let p = uv*res*0.5 + vec2f(t*60.0, t*37.0);
+          let h = fract(sin(dot(p, vec2f(127.1,311.7)))*43758.5453);
+          return (h - 0.5) * 0.06;
+        }
+
+        @fragment
+        fn fs(i:VSOut) -> @location(0) vec4f{
+          let uv = i.uv;
+          let px = 1.0 / P.res;
+
+          let ca = P.chroma;
+          let rUV = uv + vec2f(px.x*ca, 0.0);
+          let bUV = uv - vec2f(px.x*ca, 0.0);
+
+          let sR = textureSample(sceneTex, samp, rUV).rgb;
+          let sG = textureSample(sceneTex, samp, uv).rgb;
+          let sB = textureSample(sceneTex, samp, bUV).rgb;
+          var scene = vec3f(sR.r, sG.g, sB.b);
+
+          let bloom = textureSample(bloomTex, samp, uv).rgb;
+
+          var col = scene + bloom * P.bloomStrength;
+          col = col / (col + vec3f(1.0));
+
+          let scan = 0.96 + 0.04*sin((uv.y*P.res.y)*3.14159);
+          col *= scan;
+
+          let d = distance(uv, vec2f(0.5,0.5));
+          let vig = smoothstep(0.85, 0.35, d);
+          col *= mix(1.0 - P.vignette, 1.0, vig);
+
+          col += vec3f(filmGrain(uv, P.time, P.res));
+
+          let y = luma(col);
+          col += vec3f(y*y)*0.04;
+
+          return vec4f(col, 1.0);
+        }
+      `;
+
+      const bloomWGSL = /* wgsl */`
+        struct B {
+          texel : vec2f,
+          threshold : f32,
+          radius : f32,
+        };
+
+        @group(0) @binding(0) var srcTex : texture_2d<f32>;
+        @group(0) @binding(1) var samp : sampler;
+        @group(0) @binding(2) var<uniform> U : B;
+
+        struct VSOut{
+          @builtin(position) pos: vec4f,
+          @location(0) uv: vec2f
+        };
+
+        @vertex
+        fn vs(@builtin(vertex_index) v:u32) -> VSOut{
+          var pos=array<vec2f,6>(
+            vec2f(-1.0,-1.0), vec2f( 1.0,-1.0), vec2f(-1.0, 1.0),
+            vec2f(-1.0, 1.0), vec2f( 1.0,-1.0), vec2f( 1.0, 1.0)
+          );
+          var uv=array<vec2f,6>(
+            vec2f(0.0,1.0), vec2f(1.0,1.0), vec2f(0.0,0.0),
+            vec2f(0.0,0.0), vec2f(1.0,1.0), vec2f(1.0,0.0)
+          );
+          var o:VSOut;
+          o.pos=vec4f(pos[v],0.0,1.0);
+          o.uv=uv[v];
+          return o;
+        }
+
+        fn brightPass(c:vec3f, thr:f32) -> vec3f{
+          let m = max(max(c.r,c.g),c.b);
+          let w = smoothstep(thr, thr+0.35, m);
+          return c * w;
+        }
+
+        @fragment
+        fn fs(i:VSOut) -> @location(0) vec4f{
+          let uv=i.uv;
+          let t=U.texel;
+          let r=U.radius;
+
+          let o1 = vec2f( r, r) * t;
+          let o2 = vec2f(-r, r) * t;
+          let o3 = vec2f( r,-r) * t;
+          let o4 = vec2f(-r,-r) * t;
+
+          var c =
+            textureSample(srcTex,samp,uv).rgb +
+            textureSample(srcTex,samp,uv+o1).rgb +
+            textureSample(srcTex,samp,uv+o2).rgb +
+            textureSample(srcTex,samp,uv+o3).rgb +
+            textureSample(srcTex,samp,uv+o4).rgb;
+
+          c *= 0.2;
+
+          if (U.threshold > 0.0){
+            c = brightPass(c, U.threshold);
+          }
+          return vec4f(c,1.0);
+        }
+      `;
+
+      const sceneMod = device.createShaderModule({code: sceneWGSL});
+      const bloomMod = device.createShaderModule({code: bloomWGSL});
+      const postMod  = device.createShaderModule({code: postWGSL});
+
+      const scenePipe = device.createRenderPipeline({
+        layout: "auto",
+        vertex: { module: sceneMod, entryPoint:"vs" },
+        fragment: {
+          module: sceneMod, entryPoint:"fs",
+          targets: [{
+            format: SCENE_FMT,
+            blend:{
+              color:{srcFactor:"src-alpha", dstFactor:"one-minus-src-alpha"},
+              alpha:{srcFactor:"one", dstFactor:"one-minus-src-alpha"},
+            }
+          }]
+        },
+        primitive:{ topology:"triangle-list" }
+      });
+
+      const bloomPipe = device.createRenderPipeline({
+        layout:"auto",
+        vertex:{ module:bloomMod, entryPoint:"vs" },
+        fragment:{ module:bloomMod, entryPoint:"fs", targets:[{format:BLOOM_FMT}] },
+        primitive:{ topology:"triangle-list" }
+      });
+
+      const postPipe = device.createRenderPipeline({
+        layout:"auto",
+        vertex:{ module:postMod, entryPoint:"vs" },
+        fragment:{ module:postMod, entryPoint:"fs", targets:[{format}] },
+        primitive:{ topology:"triangle-list" }
+      });
+
+      const sceneBG = device.createBindGroup({
+        layout: scenePipe.getBindGroupLayout(0),
+        entries:[
+          {binding:0, resource:{buffer: uniBuf}},
+          {binding:1, resource:{buffer: instBuf}},
+        ]
+      });
+
+      const sampler = device.createSampler({ magFilter:"linear", minFilter:"linear" });
+
+      const bloomUBuf = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      });
+
+      function makeBloomBG(srcView){
+        return device.createBindGroup({
+          layout: bloomPipe.getBindGroupLayout(0),
+          entries:[
+            {binding:0, resource: srcView},
+            {binding:1, resource: sampler},
+            {binding:2, resource:{buffer:bloomUBuf}},
+          ]
+        });
+      }
+
+      const postUBuf = device.createBuffer({
+        size: 32,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      });
+
+      function makePostBG(){
+        return device.createBindGroup({
+          layout: postPipe.getBindGroupLayout(0),
+          entries:[
+            {binding:0, resource: sceneView},
+            {binding:1, resource: bloomAView},
+            {binding:2, resource: sampler},
+            {binding:3, resource:{buffer: postUBuf}},
+          ]
+        });
+      }
+      let postBG = makePostBG();
+
+      function writeInst(idx, x,y, sx,sy, r,g,b, type, rot){
+        const o = idx*instStrideFloats;
+        instData[o+0]=x; instData[o+1]=y;
+        instData[o+2]=sx; instData[o+3]=sy;
+        instData[o+4]=r; instData[o+5]=g; instData[o+6]=b;
+        instData[o+7]=type;
+        instData[o+8]=rot;
+        instData[o+9]=0; instData[o+10]=0; instData[o+11]=0;
+      }
+
+      function buildInstances(timeSec){
+        let n=0;
+
+        writeInst(n++, 0,0, ARENA_W, ARENA_H, 0,0,0, 5, 0);
+
+        writeInst(n++, 0,-ARENA_H/2, ARENA_W, 70, 0,1,1, 6, 0);
+        writeInst(n++, 0, ARENA_H/2, ARENA_W, 70, 0,1,1, 6, 0);
+        writeInst(n++, -ARENA_W/2, 0, 70, ARENA_H, 1,0,1, 6, 0);
+        writeInst(n++,  ARENA_W/2, 0, 70, ARENA_H, 1,0,1, 6, 0);
+
+        const p=S.player;
+        writeInst(n++, p.x, p.y, PLAYER_R*2.1, PLAYER_R*2.1, 0.0, 0.85, 1.0, 0, p.rot);
+
+        for (let i=0;i<S.enemies.length && n<MAX_INST;i++){
+          const e=S.enemies[i];
+          if (e.type===1) writeInst(n++, e.x,e.y, ENEMY_R*2.1, ENEMY_R*2.1, 0.35,0.45,0.48, 1, e.rot);
+          else if (e.type===2) writeInst(n++, e.x,e.y, ORB_R*2.1, ORB_R*2.1, 0.8,0.0,1.0, 2, e.rot);
+          else writeInst(n++, e.x,e.y, ORB_R*2.25, ORB_R*2.25, 1.0,0.1,1.0, 3, e.rot);
+        }
+
+        for (let i=0;i<S.bullets.length && n<MAX_INST;i++){
+          const b=S.bullets[i];
+          writeInst(n++, b.x,b.y, BULLET_R*2.2, BULLET_R*2.2, 0.0,1.0,1.0, 4, 0);
+        }
+
+        for (let i=0;i<S.pickups.length && n<MAX_INST;i++){
+          const u=S.pickups[i];
+          if (u.kind===3) writeInst(n++, u.x,u.y, (PICKUP_R+10)*2.1, (PICKUP_R+10)*2.1, 1.0,0.85,0.0, 9, 0);
+          else {
+            const c = (u.kind===0) ? [0.2,1.0,0.3] : (u.kind===1) ? [0.0,0.9,1.0] : [1.0,0.2,1.0];
+            writeInst(n++, u.x,u.y, PICKUP_R*2.1, PICKUP_R*2.1, c[0],c[1],c[2], 8, 0);
+          }
+        }
+
+        for (let i=0;i<S.parts.length && n<MAX_INST;i++){
+          const q=S.parts[i];
+          writeInst(n++, q.x,q.y, q.r*2.0, q.r*2.0, q.color[0],q.color[1],q.color[2], 7, 0);
+        }
+
+        return n;
+      }
+
+      let last = performance.now();
+      function loop(){
+        const now = performance.now();
+        const dt = Math.min(0.1, (now-last)/1000);
+        last = now;
+
+        update(dt);
+
+        const instCount = buildInstances(now/1000);
+        device.queue.writeBuffer(instBuf, 0, instData.subarray(0, instCount*instStrideFloats));
+
+        const aspect = canvas.width / canvas.height;
+        const zoom = 1850;
+        const left = -zoom*aspect/2, right = zoom*aspect/2, top = -zoom/2, bottom = zoom/2;
+
+        const shake = S.camShake;
+        const sx = (Math.random()*2-1) * shake * 14;
+        const sy = (Math.random()*2-1) * shake * 12;
+
+        const vp = new Float32Array([
+          2/(right-left), 0, 0, 0,
+          0, 2/(top-bottom), 0, 0,
+          0, 0, 1, 0,
+          -(right+left)/(right-left), -(top+bottom)/(top-bottom), 0, 1
+        ]);
+
+        const camX = S.camX + sx;
+        const camY = S.camY + sy;
+        vp[12] -= camX * vp[0];
+        vp[13] -= camY * vp[5];
+
+        const flash = (S.player.invuln>0) ? (0.9 * (0.5 + 0.5*Math.sin(now*0.06*18))) : 0.0;
+
+        const uni = new Float32Array(24);
+        uni.set(vp, 0);
+        uni[16]=camX; uni[17]=camY;
+        uni[18]=now/1000;
+        uni[19]=flash;
+        uni[20]=canvas.width; uni[21]=canvas.height;
+        device.queue.writeBuffer(uniBuf, 0, uni);
+
+        const bw = Math.max(1, (canvas.width/2)|0);
+        const bh = Math.max(1, (canvas.height/2)|0);
+        const texel = [1/bw, 1/bh];
+
+        const enc = device.createCommandEncoder();
+
+        // Scene -> sceneTex
+        {
+          const pass = enc.beginRenderPass({
+            colorAttachments:[{
+              view: sceneView,
+              clearValue:{r:0,g:0,b:0,a:1},
+              loadOp:"clear",
+              storeOp:"store"
+            }]
+          });
+          pass.setPipeline(scenePipe);
+          pass.setBindGroup(0, sceneBG);
+          pass.draw(6, instCount, 0, 0);
+          pass.end();
+        }
+
+        // Bloom extract scene -> bloomA
+        {
+          device.queue.writeBuffer(bloomUBuf, 0, new Float32Array([texel[0]*2, texel[1]*2, 0.55, 1.8]));
+          const bg = makeBloomBG(sceneView);
+
+          const pass = enc.beginRenderPass({
+            colorAttachments:[{
+              view: bloomAView,
+              clearValue:{r:0,g:0,b:0,a:1},
+              loadOp:"clear",
+              storeOp:"store"
+            }]
+          });
+          pass.setPipeline(bloomPipe);
+          pass.setBindGroup(0, bg);
+          pass.draw(6,1,0,0);
+          pass.end();
+        }
+
+        // Bloom blur bloomA -> bloomB -> bloomA
+        {
+          device.queue.writeBuffer(bloomUBuf, 0, new Float32Array([texel[0], texel[1], 0.0, 2.6]));
+          const bgA = makeBloomBG(bloomAView);
+          const p1 = enc.beginRenderPass({
+            colorAttachments:[{ view:bloomBView, clearValue:{r:0,g:0,b:0,a:1}, loadOp:"clear", storeOp:"store" }]
+          });
+          p1.setPipeline(bloomPipe);
+          p1.setBindGroup(0, bgA);
+          p1.setViewport(0,0,bw,bh,0,1);
+          p1.draw(6,1,0,0);
+          p1.end();
+
+          device.queue.writeBuffer(bloomUBuf, 0, new Float32Array([texel[0], texel[1], 0.0, 3.6]));
+          const bgB = makeBloomBG(bloomBView);
+          const p2 = enc.beginRenderPass({
+            colorAttachments:[{ view:bloomAView, clearValue:{r:0,g:0,b:0,a:1}, loadOp:"clear", storeOp:"store" }]
+          });
+          p2.setPipeline(bloomPipe);
+          p2.setBindGroup(0, bgB);
+          p2.setViewport(0,0,bw,bh,0,1);
+          p2.draw(6,1,0,0);
+          p2.end();
+        }
+
+        // Composite -> swapchain
+        {
+          const bloomStrength = 1.25;
+          const chroma = 1.35;
+          const vignette = 0.36;
+
+          device.queue.writeBuffer(postUBuf, 0, new Float32Array([
+            now/1000,
+            bloomStrength,
+            chroma,
+            vignette,
+            canvas.width,
+            canvas.height,
+            0,0
+          ]));
+
+          const pass = enc.beginRenderPass({
+            colorAttachments:[{
+              view: ctx.getCurrentTexture().createView(),
+              clearValue:{r:0,g:0,b:0,a:1},
+              loadOp:"clear",
+              storeOp:"store"
+            }]
+          });
+          pass.setPipeline(postPipe);
+          pass.setBindGroup(0, postBG);
+          pass.draw(6,1,0,0);
+          pass.end();
+        }
+
+        device.queue.submit([enc.finish()]);
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // show menu initially
+    menu.style.display="flex";
+  </script>
+</body>
+</html>

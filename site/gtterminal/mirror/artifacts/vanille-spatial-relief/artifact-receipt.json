@@ -1,0 +1,36 @@
+{
+  "slice_id": "GOG_SPATIAL_RELIEF_02B_COHESION_MESH",
+  "parent_slice": "GOG_SPATIAL_RELIEF_02A_MOBILE_QA_PATCH",
+  "scope": "girls-of-gaming",
+  "research_lane": "research:spatial-web-systems",
+  "status": "CANDIDATE_SESSION_ARTIFACT / TEST_READY",
+  "new_insights": [
+    "single-view relief needs structural continuity, not only transparency sorting",
+    "depth-aware neighbor stitching can preserve continuity while rejecting likely silhouette bridges",
+    "single-view relief should expose a bounded novel-view envelope instead of implying 360-degree geometry"
+  ],
+  "new_primitives": [
+    "DEPTH_AWARE_RELIEF_STITCHING",
+    "BOUNDED_NOVEL_VIEW_ENVELOPE",
+    "ANGLE_AWARE_DEPTH_COMPRESSION",
+    "HYBRID_SURFACE_PLUS_SPLAT_RENDERING"
+  ],
+  "anti_patterns_under_test": [
+    "independent points treated as a continuous surface",
+    "full 360 orbit on single-view inferred geometry",
+    "connecting all neighbors across depth discontinuities",
+    "using larger splats as the only crack-hiding strategy"
+  ],
+  "acceptance_targets": [
+    "hybrid visibly reduces separation versus splats-only at moderate angles",
+    "surface-only exposes bad bridges for inspection",
+    "foreground/background discontinuities remain selectively unstitched",
+    "prior iPhone target remains near 60 FPS"
+  ],
+  "governance": {
+    "notion_write": false,
+    "drive_write": false,
+    "canon_promotion": false,
+    "reason": "live-device QA required before promotion"
+  }
+}

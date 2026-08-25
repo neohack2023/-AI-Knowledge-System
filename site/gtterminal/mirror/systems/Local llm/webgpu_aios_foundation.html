@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIOS GPU-Resident Foundation</title>
+  <style>
+    body { font-family: system-ui; max-width: 600px; margin: 0 auto; padding: 20px; }
+    .panel { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 6px; }
+    textarea, input, select { width: 100%; margin-top: 5px; margin-bottom: 10px; }
+    button { background: #007AFF; color: white; padding: 10px; width: 100%; border: none; font-weight: bold; border-radius: 6px; }
+    pre { font-size: 0.85em; background: #f4f4f4; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <h2>AIOS Spatial Web App</h2>
+
+  <div class="panel">
+    <h3>Capability Fingerprint</h3>
+    <button onclick="detectCapabilities()">Detect Hardware</button>
+    <pre id="fingerprintOut">Awaiting detection...</pre>
+  </div>
+
+  <div class="panel">
+    <h3>Quality Tier Override</h3>
+    <select id="qualityTier">
+      <option value="LOW">LOW - Thermal/Battery Saver</option>
+      <option value="BALANCED" selected>BALANCED - Default Mobile</option>
+      <option value="HIGH">HIGH - Max Utilization</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <h3>Notion & Local Model Setup</h3>
+    <label>Notion Proxy URL (Worker):</label>
+    <input type="text" id="proxyUrl" placeholder="https://your-worker.workers.dev">
+    <label>Integration Token:</label>
+    <input type="password" id="notionToken" placeholder="secret_...">
+    <label>Target ID:</label>
+    <input type="text" id="notionTarget" placeholder="Page or Database ID">
+  </div>
+
+  <div class="panel">
+    <h3>Execution Pipeline</h3>
+    <textarea id="promptInput" rows="3" placeholder="Enter task for local LLM..."></textarea>
+    <button onclick="runPipeline()">Execute Local GPU & Sync</button>
+    <pre id="logOut">Pipeline Status: Ready.</pre>
+  </div>
+
+  <script type="module">
+    import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+
+    let engine = null;
+    const log = (msg) => document.getElementById("logOut").innerText += `\n> ${msg}`;
+
+    window.detectCapabilities = async () => {
+      const out = document.getElementById("fingerprintOut");
+      if (!navigator.gpu) {
+        out.innerText = "FAIL VISIBLE: WebGPU not available on this browser.";
+        return;
+      }
+      
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        out.innerText = "FAIL VISIBLE: GPU Adapter request failed.";
+        return;
+      }
+
+      const f16 = adapter.features.has("shader-f16");
+      const ts = adapter.features.has("timestamp-query");
+      
+      out.innerText = [
+        `User Agent: ${navigator.userAgent}`,
+        `WebGPU: Available`,
+        `Architecture: ${adapter.info?.architecture || 'Unknown'}`,
+        `shader-f16: ${f16}`,
+        `timestamp-query: ${ts ? 'Available' : 'GPU_TIME_UNAVAILABLE'}`
+      ].join('\n');
+    };
+
+    window.runPipeline = async () => {
+      const token = document.getElementById("notionToken").value;
+      const proxy = document.getElementById("proxyUrl").value;
+      const target = document.getElementById("notionTarget").value;
+      const prompt = document.getElementById("promptInput").value;
+      
+      document.getElementById("logOut").innerText = "Pipeline Started...";
+      
+      try {
+        if (!engine) {
+          log("Initializing WebLLM Engine (IndexedDB Cache)...");
+          engine = await CreateMLCEngine("Llama-3.2-1B-Instruct-q4f16_1-MLC", {
+            initProgressCallback: (p) => { log(`Loading weights: ${(p.progress * 100).toFixed(1)}%`); }
+          });
+        }
+        
+        log("Executing local model on GPU...");
+        const reply = await engine.chat.completions.create({
+          messages: [{ role: "user", content: prompt }]
+        });
+        
+        const output = reply.choices[0].message.content;
+        log(`Model Output: ${output}`);
+        
+        if (!proxy || !token) {
+          log("Skipping Notion sync (Missing Proxy/Token).");
+          return;
+        }
+
+        log("Dispatching to Notion via proxy...");
+        const res = await fetch(proxy, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Notion-Token": token, "X-Target-Id": target },
+          body: JSON.stringify({ text: output })
+        });
+        
+        if (res.ok) log("PASS: Notion update successful.");
+        else log(`FAIL VISIBLE: Sync failed - ${await res.text()}`);
+        
+      } catch (err) {
+        log(`FAIL VISIBLE: ${err.message}`);
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+{
+  "file_count": 52,
+  "files": [
+    {
+      "created_at": "Fri, 27 Feb 2026 13:08:41 -0000",
+      "downloaded_size": 9269,
+      "is_directory": false,
+      "path": "Games/Index.html",
+      "sha1_hash": "42e659fc6a36c24bbc6c19197993a624b96ad2b7",
+      "size": 9269,
+      "updated_at": "Fri, 27 Feb 2026 13:13:27 -0000"
+    },
+    {
+      "created_at": "Thu, 26 Feb 2026 22:15:11 -0000",
+      "downloaded_size": 50149,
+      "is_directory": false,
+      "path": "Games/Smash.the.tv.html",
+      "sha1_hash": "7f8ec6755e26064b511118634b1baa8c0ee2df32",
+      "size": 50149,
+      "updated_at": "Thu, 26 Feb 2026 23:54:06 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:20:52 -0000",
+      "downloaded_size": 509,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/index.html",
+      "sha1_hash": "5f044733e3676f389c6f348e113914955bf9a51b",
+      "size": 509,
+      "updated_at": "Fri, 27 Feb 2026 13:24:34 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:25:52 -0000",
+      "downloaded_size": 91,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/js/globals.js",
+      "sha1_hash": "54687103f5e9dbaa3e0f07ec8e8bd9870642415f",
+      "size": 91,
+      "updated_at": "Fri, 27 Feb 2026 13:26:10 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:26:33 -0000",
+      "downloaded_size": 2454,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/js/input.js",
+      "sha1_hash": "da9f0538846a7691290a9d2917cc4d4ec325d4be",
+      "size": 2454,
+      "updated_at": "Fri, 27 Feb 2026 13:26:47 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:30:14 -0000",
+      "downloaded_size": 2324,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/js/main.js",
+      "sha1_hash": "ad050f86042bd8a019fadc9b75130e492f6e036e",
+      "size": 2324,
+      "updated_at": "Fri, 27 Feb 2026 13:30:30 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:29:30 -0000",
+      "downloaded_size": 1590,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/js/player.js",
+      "sha1_hash": "3a052c8baef57f4dca169b8b4839612e8f98435b",
+      "size": 1590,
+      "updated_at": "Fri, 27 Feb 2026 13:29:46 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:27:12 -0000",
+      "downloaded_size": 489,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/js/projectile.js",
+      "sha1_hash": "ee2ced321bdbb57afb07e4b468a6a4461f918c56",
+      "size": 489,
+      "updated_at": "Fri, 27 Feb 2026 13:27:24 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 13:21:32 -0000",
+      "downloaded_size": 214,
+      "is_directory": false,
+      "path": "Games/Top-down-shooter /Carnage_tv/style.css",
+      "sha1_hash": "5bd1dd11ab21cd8324053ba1fafae9c857f28da2",
+      "size": 214,
+      "updated_at": "Fri, 27 Feb 2026 13:25:01 -0000"
+    },
+    {
+      "created_at": "Tue, 07 Apr 2026 02:38:13 -0000",
+      "downloaded_size": 30222,
+      "is_directory": false,
+      "path": "Lab tools/Index.HTML",
+      "sha1_hash": "fc6639850674510e4408075977e1450e3a6e26c3",
+      "size": 30222,
+      "updated_at": "Tue, 07 Apr 2026 02:38:51 -0000"
+    },
+    {
+      "created_at": "Sun, 23 Aug 2026 05:38:33 -0000",
+      "downloaded_size": 586,
+      "is_directory": false,
+      "path": "artifacts/vanille-spatial-relief/README.md",
+      "sha1_hash": "a5abc2ba3be29dc5ca642351f5ef0a3c683038ab",
+      "size": 586,
+      "updated_at": "Sun, 23 Aug 2026 16:44:36 -0000"
+    },
+    {
+      "created_at": "Sun, 23 Aug 2026 05:38:33 -0000",
+      "downloaded_size": 1472,
+      "is_directory": false,
+      "path": "artifacts/vanille-spatial-relief/artifact-receipt.json",
+      "sha1_hash": "d418093db3044455789c0860e3c67b7ec7a661e9",
+      "size": 1472,
+      "updated_at": "Sun, 23 Aug 2026 16:44:36 -0000"
+    },
+    {
+      "created_at": "Sun, 23 Aug 2026 05:38:33 -0000",
+      "downloaded_size": 4649029,
+      "is_directory": false,
+      "path": "artifacts/vanille-spatial-relief/index.html",
+      "sha1_hash": "fa7e348463062dcbf7eda71ac4a720647765b5c9",
+      "size": 4649029,
+      "updated_at": "Sun, 23 Aug 2026 16:44:34 -0000"
+    },
+    {
+      "created_at": "Sun, 23 Aug 2026 05:38:33 -0000",
+      "downloaded_size": 410076,
+      "is_directory": false,
+      "path": "artifacts/vanille-spatial-relief/preview.png",
+      "sha1_hash": "ace5dde0f37c362a4e9a84260415293eb00f97e7",
+      "size": 410076,
+      "updated_at": "Sun, 23 Aug 2026 05:38:33 -0000"
+    },
+    {
+      "created_at": "Sun, 23 Aug 2026 05:45:07 -0000",
+      "downloaded_size": 454863,
+      "is_directory": false,
+      "path": "artifacts/vanille-spatial-relief/source.jpg",
+      "sha1_hash": "218163e294e7a58f72e1f4e05c63e948f4424cda",
+      "size": 454863,
+      "updated_at": "Sun, 23 Aug 2026 05:45:07 -0000"
+    },
+    {
+      "created_at": "Tue, 24 Feb 2026 23:51:13 -0000",
+      "downloaded_size": 2720,
+      "is_directory": false,
+      "path": "changelog.html",
+      "sha1_hash": "152bf9b505251249e33613b13a02cb41da9f5dff",
+      "size": 2720,
+      "updated_at": "Wed, 25 Feb 2026 03:05:51 -0000"
+    },
+    {
+      "created_at": "Mon, 24 Aug 2026 23:51:21 -0000",
+      "downloaded_size": 11242,
+      "is_directory": false,
+      "path": "index-v2.html",
+      "sha1_hash": "58e4b9af3262a5a0eb8aca5cdde151ae0e44e6d5",
+      "size": 11242,
+      "updated_at": "Mon, 24 Aug 2026 23:51:21 -0000"
+    },
+    {
+      "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
+      "downloaded_size": 11355,
+      "is_directory": false,
+      "path": "index.html",
+      "sha1_hash": "834f14988a0d6ca6544a933cb18cd9713e522d23",
+      "size": 11355,
+      "updated_at": "Tue, 25 Aug 2026 00:20:28 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 21:18:46 -0000",
+      "downloaded_size": 19260,
+      "is_directory": false,
+      "path": "indextest.html",
+      "sha1_hash": "5bd7a84b5cf2c946b850a866a4389ccb031479a5",
+      "size": 19260,
+      "updated_at": "Wed, 25 Feb 2026 21:19:02 -0000"
+    },
+    {
+      "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
+      "downloaded_size": 13232,
+      "is_directory": false,
+      "path": "neocities.png",
+      "sha1_hash": "fd2ee41b1922a39a716cacb88c323d613b0955e4",
+      "size": 13232,
+      "updated_at": "Tue, 24 Feb 2026 23:30:34 -0000"
+    },
+    {
+      "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
+      "downloaded_size": 347,
+      "is_directory": false,
+      "path": "not_found.html",
+      "sha1_hash": "d7f004e9d3b2eaaa8827f741356f1122dc9eb030",
+      "size": 347,
+      "updated_at": "Tue, 24 Feb 2026 23:30:34 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 03:22:09 -0000",
+      "downloaded_size": 15756,
+      "is_directory": false,
+      "path": "research.html",
+      "sha1_hash": "715617080fbbbf90906039d6155ba59fc52c6830",
+      "size": 15756,
+      "updated_at": "Wed, 25 Feb 2026 03:29:53 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 03:41:15 -0000",
+      "downloaded_size": 10797,
+      "is_directory": false,
+      "path": "research/directional-collapse.html",
+      "sha1_hash": "5c8cde45b52808752e49846da641124d37ee7670",
+      "size": 10797,
+      "updated_at": "Wed, 25 Feb 2026 03:42:46 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 03:50:56 -0000",
+      "downloaded_size": 9603,
+      "is_directory": false,
+      "path": "research/local-file-workflow.html",
+      "sha1_hash": "ebe28c5dc67216d651c03fbda41ff587ef39783c",
+      "size": 9603,
+      "updated_at": "Wed, 25 Feb 2026 03:51:23 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 03:45:38 -0000",
+      "downloaded_size": 10284,
+      "is_directory": false,
+      "path": "research/stop-humming.html",
+      "sha1_hash": "7b3d4f18de8fa0eef21bb86ff581ab239b6bb856",
+      "size": 10284,
+      "updated_at": "Wed, 25 Feb 2026 03:46:03 -0000"
+    },
+    {
+      "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
+      "downloaded_size": 1335,
+      "is_directory": false,
+      "path": "robots.txt",
+      "sha1_hash": "325cfbf8b4d14d23022694f0e8af7f94a0ea22dc",
+      "size": 1335,
+      "updated_at": "Tue, 24 Feb 2026 23:30:34 -0000"
+    },
+    {
+      "created_at": "Mon, 24 Aug 2026 23:51:20 -0000",
+      "downloaded_size": 19260,
+      "is_directory": false,
+      "path": "snapshots/GT_TERMINAL_LANDING_AUDIT_01/index.html",
+      "sha1_hash": "5bd7a84b5cf2c946b850a866a4389ccb031479a5",
+      "size": 19260,
+      "updated_at": "Mon, 24 Aug 2026 23:51:20 -0000"
+    },
+    {
+      "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
+      "downloaded_size": 298,
+      "is_directory": false,
+      "path": "style.css",
+      "sha1_hash": "e516457acdb0d00710ab62cc257109ef67209ce8",
+      "size": 298,
+      "updated_at": "Tue, 24 Feb 2026 23:30:34 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 03:14:18 -0000",
+      "downloaded_size": 13688,
+      "is_directory": false,
+      "path": "systems.html",
+      "sha1_hash": "f5086ecfc2f19422ab92b25e44dd014dec2a2156",
+      "size": 13688,
+      "updated_at": "Wed, 25 Feb 2026 20:49:06 -0000"
+    },
+    {
+      "created_at": "Thu, 28 May 2026 00:45:54 -0000",
+      "downloaded_size": 303,
+      "is_directory": false,
+      "path": "systems/Atlas/Index.html",
+      "sha1_hash": "670d6e5e3f3c62ca34419191ccf083d6363feb6d",
+      "size": 303,
+      "updated_at": "Thu, 28 May 2026 00:46:32 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:26:28 -0000",
+      "downloaded_size": 77596,
+      "is_directory": false,
+      "path": "systems/Gef/Index.html",
+      "sha1_hash": "c8d6c3421d0bbb9de823aa78bfca87c831f098b2",
+      "size": 77596,
+      "updated_at": "Tue, 02 Jun 2026 02:26:28 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:26:28 -0000",
+      "downloaded_size": 3515,
+      "is_directory": false,
+      "path": "systems/Gef/README.md",
+      "sha1_hash": "0fa897b04d68620a86fc943b20822ea93d4487a1",
+      "size": 3515,
+      "updated_at": "Tue, 02 Jun 2026 02:26:28 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:27:11 -0000",
+      "downloaded_size": 21457,
+      "is_directory": false,
+      "path": "systems/Gef/Src/app.js",
+      "sha1_hash": "429f923aa9c540d078704f9ec9920066e30c581f",
+      "size": 21457,
+      "updated_at": "Tue, 02 Jun 2026 02:27:11 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:28:12 -0000",
+      "downloaded_size": 3227,
+      "is_directory": false,
+      "path": "systems/Gef/Src/audio/analyzer.js",
+      "sha1_hash": "67421ad4e3bf81752ee72f8b7111f905484ab886",
+      "size": 3227,
+      "updated_at": "Tue, 02 Jun 2026 02:28:12 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:30:44 -0000",
+      "downloaded_size": 2309,
+      "is_directory": false,
+      "path": "systems/Gef/Src/autopilot/autopilotStub.js",
+      "sha1_hash": "791aa774f01f68a98ae76ee102be30afaf87fc39",
+      "size": 2309,
+      "updated_at": "Tue, 02 Jun 2026 02:30:44 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:31:36 -0000",
+      "downloaded_size": 740,
+      "is_directory": false,
+      "path": "systems/Gef/Src/core/constants.js",
+      "sha1_hash": "02172d936a4483671da61d8c424367e368b22b9b",
+      "size": 740,
+      "updated_at": "Tue, 02 Jun 2026 02:31:36 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:32:35 -0000",
+      "downloaded_size": 3239,
+      "is_directory": false,
+      "path": "systems/Gef/Src/render/canvasRuntime.js",
+      "sha1_hash": "9250459b4fd4aee6f2b66da9ceaf0fd2a08204aa",
+      "size": 3239,
+      "updated_at": "Tue, 02 Jun 2026 02:32:35 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:32:34 -0000",
+      "downloaded_size": 3167,
+      "is_directory": false,
+      "path": "systems/Gef/Src/render/visualModules.js",
+      "sha1_hash": "6cfe6f8dae70d5d7bd241c40871393b05c3c91d6",
+      "size": 3167,
+      "updated_at": "Tue, 02 Jun 2026 02:32:34 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:34:04 -0000",
+      "downloaded_size": 1558,
+      "is_directory": false,
+      "path": "systems/Gef/Src/storage/localLibrary.js",
+      "sha1_hash": "670ebe4bab10321e8d7471317e1411ea938ec008",
+      "size": 1558,
+      "updated_at": "Tue, 02 Jun 2026 02:34:04 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:27:11 -0000",
+      "downloaded_size": 8746,
+      "is_directory": false,
+      "path": "systems/Gef/Src/styles.css",
+      "sha1_hash": "7e92c5dc2411d280e250542dae622b88de20f020",
+      "size": 8746,
+      "updated_at": "Tue, 02 Jun 2026 02:27:11 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:26:28 -0000",
+      "downloaded_size": 12299,
+      "is_directory": false,
+      "path": "systems/Gef/TODO.md",
+      "sha1_hash": "5528700de62b1721314b43be62641c7dd90c29f4",
+      "size": 12299,
+      "updated_at": "Tue, 02 Jun 2026 02:26:28 -0000"
+    },
+    {
+      "created_at": "Tue, 02 Jun 2026 02:26:28 -0000",
+      "downloaded_size": 11227,
+      "is_directory": false,
+      "path": "systems/Gef/index.html",
+      "sha1_hash": "b0ded765db7eef02172b6ac5873303560f55feed",
+      "size": 11227,
+      "updated_at": "Tue, 02 Jun 2026 02:26:28 -0000"
+    },
+    {
+      "created_at": "Sun, 12 Apr 2026 12:11:35 -0000",
+      "downloaded_size": 65407,
+      "is_directory": false,
+      "path": "systems/Glitch canvas /Index.HTML",
+      "sha1_hash": "e8ea6efe35343f133456b33c09a012e334c93bc2",
+      "size": 65407,
+      "updated_at": "Sun, 12 Apr 2026 12:11:52 -0000"
+    },
+    {
+      "created_at": "Sat, 22 Aug 2026 17:55:47 -0000",
+      "downloaded_size": 4642,
+      "is_directory": false,
+      "path": "systems/Local llm/webgpu_aios_foundation.html",
+      "sha1_hash": "4f708b581cddd397bf1e4e5b80996f1d481d1c75",
+      "size": 4642,
+      "updated_at": "Sat, 22 Aug 2026 17:56:06 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 05:42:03 -0000",
+      "downloaded_size": 17125,
+      "is_directory": false,
+      "path": "systems/Visualizer/SPECTRE v7.html",
+      "sha1_hash": "cdff942e6e928d69ce33972b9a59d3c09d1fa011",
+      "size": 17125,
+      "updated_at": "Fri, 27 Feb 2026 05:42:24 -0000"
+    },
+    {
+      "created_at": "Fri, 27 Feb 2026 06:09:16 -0000",
+      "downloaded_size": 40088,
+      "is_directory": false,
+      "path": "systems/Visualizer/Soniclens.html",
+      "sha1_hash": "a49c4cf019a682826008fa647fbbb65f7d9bac85",
+      "size": 40088,
+      "updated_at": "Fri, 27 Feb 2026 06:18:55 -0000"
+    },
+    {
+      "created_at": "Thu, 26 Feb 2026 02:24:55 -0000",
+      "downloaded_size": 18540,
+      "is_directory": false,
+      "path": "systems/Waveforms.html",
+      "sha1_hash": "24a8196e49421fe7b7d4da3d4168266b5f96153a",
+      "size": 18540,
+      "updated_at": "Thu, 26 Feb 2026 05:22:25 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 19:52:57 -0000",
+      "downloaded_size": 63345,
+      "is_directory": false,
+      "path": "systems/glitch-synth/index.html",
+      "sha1_hash": "9efb997db5f98cd568450ff2137b76ffc879ff50",
+      "size": 63345,
+      "updated_at": "Sat, 14 Mar 2026 16:25:17 -0000"
+    },
+    {
+      "created_at": "Wed, 25 Feb 2026 20:12:31 -0000",
+      "downloaded_size": 31030,
+      "is_directory": false,
+      "path": "systems/lumasort/index.html",
+      "sha1_hash": "a1d03807760052e6857da607dbd7b6342e1a960b",
+      "size": 31030,
+      "updated_at": "Wed, 25 Feb 2026 20:46:30 -0000"
+    },
+    {
+      "created_at": "Wed, 11 Mar 2026 01:30:36 -0000",
+      "downloaded_size": 271,
+      "is_directory": false,
+      "path": "systems/test/b.html",
+      "sha1_hash": "c653da62b48323a215dac14278375cd6877ce007",
+      "size": 271,
+      "updated_at": "Wed, 11 Mar 2026 01:30:36 -0000"
+    },
+    {
+      "created_at": "Wed, 19 Aug 2026 18:24:58 -0000",
+      "downloaded_size": 34475,
+      "is_directory": false,
+      "path": "systems/test/signal_breach_iphone_figma_sync.html",
+      "sha1_hash": "a734e26a91cb1d6e45177d58581ee603be5c1feb",
+      "size": 34475,
+      "updated_at": "Wed, 19 Aug 2026 18:24:58 -0000"
+    },
+    {
+      "created_at": "Thu, 20 Aug 2026 22:10:30 -0000",
+      "downloaded_size": 15881,
+      "is_directory": false,
+      "path": "systems/test/webgpu_adaptive_kernel_bench_01.html",
+      "sha1_hash": "4a0dee6fe24ee634b7310c721c4ddd58f58c295e",
+      "size": 15881,
+      "updated_at": "Thu, 20 Aug 2026 22:10:30 -0000"
+    }
+  ],
+  "site_origin": "https://gtterminal.neocities.org",
+  "snapshot_id": "gt-terminal-20260825T175832Z",
+  "source": "Neocities authenticated /api/list plus public file reads",
+  "total_downloaded_bytes": 6192701
+}

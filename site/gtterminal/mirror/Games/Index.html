@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Touch Top-Down Shooter - Marine Update</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            overflow: hidden;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            background-color: #1a1a1a;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        joystickL.baseX = 100;
+        joystickL.baseY = canvas.height - 100;
+        joystickR.baseX = canvas.width - 100;
+        joystickR.baseY = canvas.height - 100;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- GAME OBJECTS ---
+    class Player {
+        constructor(x, y, radius) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius; // Hitbox
+            this.speed = 5;
+            this.velocity = { x: 0, y: 0 };
+            this.angle = 0; // The direction the marine faces
+        }
+        draw() {
+            ctx.save();
+            // Move the canvas origin to the player's center, then rotate it
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle);
+
+            // --- DRAW TOP-DOWN SPACE MARINE ---
+            // (Note: Facing Right is 0 degrees/radians)
+
+            // Left Shoulder
+            ctx.fillStyle = '#1e3d23'; // Dark green
+            ctx.fillRect(-8, -16, 16, 10);
+            
+            // Right Shoulder
+            ctx.fillStyle = '#1e3d23'; 
+            ctx.fillRect(-8, 6, 16, 10);
+
+            // Gun (Held on the right side)
+            ctx.fillStyle = '#444'; // Gun metal grey
+            ctx.fillRect(0, 5, 25, 6); // Barrel
+            ctx.fillStyle = '#222';
+            ctx.fillRect(20, 4, 8, 8); // Muzzle
+
+            // Torso/Body
+            ctx.fillStyle = '#2d5a36'; // Base armor green
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Helmet
+            ctx.fillStyle = '#3a7546'; // Lighter green
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Visor (Light blue, front of helmet)
+            ctx.fillStyle = '#77c9ff';
+            ctx.beginPath();
+            ctx.arc(2, 0, 6, -Math.PI / 2.5, Math.PI / 2.5);
+            ctx.lineTo(4, 0); 
+            ctx.fill();
+
+            ctx.restore(); // Reset canvas transformation for the rest of the game
+        }
+        update() {
+            if (this.x + this.radius > canvas.width) this.x = canvas.width - this.radius;
+            if (this.x - this.radius < 0) this.x = this.radius;
+            if (this.y + this.radius > canvas.height) this.y = canvas.height - this.radius;
+            if (this.y - this.radius < 0) this.y = this.radius;
+
+            this.x += this.velocity.x;
+            this.y += this.velocity.y;
+            this.draw();
+        }
+    }
+
+    class Projectile {
+        constructor(x, y, radius, color, velocity) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.color = color;
+            this.velocity = velocity;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+        }
+        update() {
+            this.x += this.velocity.x;
+            this.y += this.velocity.y;
+            this.draw();
+        }
+    }
+
+    // --- VIRTUAL JOYSTICKS ---
+    const joystickL = { active: false, id: null, baseX: 0, baseY: 0, x: 0, y: 0, dx: 0, dy: 0 };
+    const joystickR = { active: false, id: null, baseX: 0, baseY: 0, x: 0, y: 0, dx: 0, dy: 0, angle: 0 };
+    const maxJoystickRadius = 50;
+
+    function drawJoystick(stick) {
+        if (!stick.active) return;
+        ctx.beginPath();
+        ctx.arc(stick.baseX, stick.baseY, maxJoystickRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(stick.x, stick.y, 20, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fill();
+    }
+
+    // --- INITIALIZATION ---
+    resizeCanvas();
+    const player = new Player(canvas.width / 2, canvas.height / 2, 15);
+    const projectiles = [];
+    let lastShotTime = 0;
+
+    // --- TOUCH HANDLING ---
+    function handleTouch(e) {
+        e.preventDefault(); 
+        
+        joystickL.active = false;
+        joystickR.active = false;
+
+        for (let i = 0; i < e.touches.length; i++) {
+            const touch = e.touches[i];
+            
+            if (touch.clientX < canvas.width / 2) {
+                joystickL.active = true;
+                joystickL.id = touch.identifier;
+                
+                let dx = touch.clientX - joystickL.baseX;
+                let dy = touch.clientY - joystickL.baseY;
+                let distance = Math.hypot(dx, dy);
+                
+                if (distance > maxJoystickRadius) {
+                    dx = (dx / distance) * maxJoystickRadius;
+                    dy = (dy / distance) * maxJoystickRadius;
+                }
+                
+                joystickL.x = joystickL.baseX + dx;
+                joystickL.y = joystickL.baseY + dy;
+                joystickL.dx = dx / maxJoystickRadius;
+                joystickL.dy = dy / maxJoystickRadius;
+            } 
+            else {
+                joystickR.active = true;
+                joystickR.id = touch.identifier;
+                
+                let dx = touch.clientX - joystickR.baseX;
+                let dy = touch.clientY - joystickR.baseY;
+                let distance = Math.hypot(dx, dy);
+                
+                if (distance > maxJoystickRadius) {
+                    dx = (dx / distance) * maxJoystickRadius;
+                    dy = (dy / distance) * maxJoystickRadius;
+                }
+                
+                joystickR.x = joystickR.baseX + dx;
+                joystickR.y = joystickR.baseY + dy;
+                joystickR.angle = Math.atan2(dy, dx);
+            }
+        }
+    }
+
+    canvas.addEventListener('touchstart', handleTouch, {passive: false});
+    canvas.addEventListener('touchmove', handleTouch, {passive: false});
+    canvas.addEventListener('touchend', handleTouch);
+    canvas.addEventListener('touchcancel', handleTouch);
+
+    // --- MAIN GAME LOOP ---
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        ctx.fillStyle = 'rgba(26, 26, 26, 0.4)'; // Darker background for contrast
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Movement mapping
+        if (joystickL.active) {
+            player.velocity.x = joystickL.dx * player.speed;
+            player.velocity.y = joystickL.dy * player.speed;
+            
+            // If we aren't shooting, face the direction we are walking
+            if (!joystickR.active) {
+                player.angle = Math.atan2(joystickL.dy, joystickL.dx);
+            }
+        } else {
+            player.velocity.x = 0;
+            player.velocity.y = 0;
+        }
+
+        // Aiming mapping
+        if (joystickR.active) {
+            player.angle = joystickR.angle; // Override rotation to face aiming direction
+
+            const currentTime = Date.now();
+            if (currentTime - lastShotTime > 120) { // Slightly faster fire rate
+                const velocity = {
+                    x: Math.cos(joystickR.angle) * 12, // Faster bullets
+                    y: Math.sin(joystickR.angle) * 12
+                };
+                
+                // Calculate barrel position so bullets spawn at the end of the gun
+                const spawnX = player.x + Math.cos(player.angle) * 25;
+                const spawnY = player.y + Math.sin(player.angle) * 25 + (Math.sin(player.angle + Math.PI/2) * 8);
+
+                projectiles.push(new Projectile(spawnX, spawnY, 4, '#ffdd00', velocity)); // Yellow tracer bullets
+                lastShotTime = currentTime;
+            }
+        }
+
+        player.update();
+
+        // Update projectiles
+        projectiles.forEach((projectile, index) => {
+            projectile.update();
+
+            // Add a trail effect to the bullets
+            ctx.beginPath();
+            ctx.arc(projectile.x - projectile.velocity.x, projectile.y - projectile.velocity.y, projectile.radius * 0.8, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255, 100, 0, 0.5)'; // Orange trail
+            ctx.fill();
+
+            if (projectile.x < 0 || projectile.x > canvas.width || 
+                projectile.y < 0 || projectile.y > canvas.height) {
+                setTimeout(() => { projectiles.splice(index, 1); }, 0);
+            }
+        });
+
+        drawJoystick(joystickL);
+        drawJoystick(joystickR);
+    }
+
+    animate();
+</script>
+
+</body>
+</html>

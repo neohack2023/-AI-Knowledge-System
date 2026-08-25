@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>gtterminal :: research :: stop-humming</title>
+  <meta name="description" content="Stopping auto-humming and unwanted la-de-da intros in Suno." />
+
+  <style>
+    :root{
+      --bg:#06090c; --panel:#0b1318; --line:rgba(130, 255, 230, .18);
+      --text:#d7fff3; --muted:rgba(215,255,243,.72); --cyan:#62ffe0;
+      --amber:#ffd37a; --red:#ff4d6d; --shadow: rgba(0,0,0,.6);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:var(--mono);color:var(--text);
+      background: radial-gradient(1200px 700px at 50% 30%, #0a1c20 0%, var(--bg) 55%, #040506 100%);
+      overflow-x:hidden;
+    }
+    .crt::before{
+      content:"";position:fixed;inset:0;pointer-events:none;
+      background:
+        linear-gradient(to bottom, rgba(255,255,255,.05), rgba(255,255,255,0) 2px, rgba(0,0,0,.12) 4px),
+        radial-gradient(900px 600px at 50% 30%, rgba(98,255,224,.08), rgba(0,0,0,.55) 70%);
+      background-size:100% 6px, 100% 100%;mix-blend-mode:overlay;opacity:.75;
+    }
+    .crt::after{
+      content:"";position:fixed;inset:-30%;pointer-events:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+      opacity:.06;animation: noiseShift 6s steps(6) infinite;
+    }
+    @keyframes noiseShift{
+      0%{transform:translate3d(-2%, -3%, 0)} 20%{transform:translate3d(3%, 1%, 0)}
+      40%{transform:translate3d(-1%, 4%, 0)} 60%{transform:translate3d(2%, -1%, 0)}
+      80%{transform:translate3d(-3%, 2%, 0)} 100%{transform:translate3d(0%, 0%, 0)}
+    }
+    .wrap{max-width:980px;margin:0 auto;padding:28px 16px 56px;}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:10px 12px;border:1px solid var(--line);
+      background:rgba(8,14,18,.72);border-radius:12px;
+      box-shadow:0 20px 60px var(--shadow);
+    }
+    .status{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;user-select:none;}
+    .dot{width:10px;height:10px;border-radius:999px;background:radial-gradient(circle at 30% 30%, #c8fff2, var(--cyan));box-shadow:0 0 18px rgba(98,255,224,.35);animation:pulse 2.6s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{transform:scale(.92);opacity:.9}50%{transform:scale(1.06);opacity:1}}
+    .right{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);user-select:none;white-space:nowrap;}
+    .chip{border:1px solid var(--line);background:rgba(10,22,26,.6);padding:6px 10px;border-radius:999px;}
+    #statusText{display:inline-block;max-width:58vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+    .panel{
+      margin-top:16px;border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(10,22,26,.72), rgba(6,10,12,.72));
+      border-radius:16px;padding:16px;box-shadow:0 20px 60px var(--shadow);
+      position:relative;overflow:hidden;
+    }
+    .panel::before{
+      content:"";position:absolute;inset:0;
+      background: linear-gradient(90deg, rgba(98,255,224,.07), rgba(255,255,255,0), rgba(255,77,109,.05));
+      opacity:.35;pointer-events:none;
+    }
+
+    .head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+    h1{margin:0;font-size:18px;letter-spacing:.02em}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.55;max-width:78ch}
+
+    .nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .btn{
+      font-size:12px;text-decoration:none;color:rgba(215,255,243,.82);
+      border:1px solid rgba(130,255,230,.18);background:rgba(8,14,18,.5);
+      padding:8px 10px;border-radius:12px;
+    }
+    .btn:hover{border-color:rgba(98,255,224,.45)}
+
+    .hr{height:1px;background:linear-gradient(90deg, transparent, rgba(98,255,224,.22), transparent);margin:14px 0;border:0;}
+
+    .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    .tag{
+      font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+      padding:6px 9px;border-radius:999px;border:1px solid rgba(130,255,230,.18);
+      background:rgba(10,22,26,.55);color:rgba(215,255,243,.78);
+    }
+    .tag.gold{border-color:rgba(255,211,122,.35);color:rgba(255,211,122,.95)}
+
+    .content{position:relative}
+    .content h2{margin:18px 0 8px;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,211,122,.92)}
+    .content p,.content li{color:rgba(215,255,243,.78);font-size:13px;line-height:1.65}
+    ul{margin:8px 0 0 18px;padding:0}
+
+    pre{
+      margin:10px 0 0;
+      border:1px dashed rgba(98,255,224,.25);
+      background:rgba(6,10,12,.55);
+      border-radius:12px;
+      padding:12px;
+      color:rgba(215,255,243,.88);
+      font-size:12px;
+      line-height:1.55;
+      overflow:auto;
+      white-space:pre;
+    }
+    code{color:rgba(255,211,122,.92)}
+  </style>
+</head>
+
+<body class="crt">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="statusText">research node active</span>
+      </div>
+      <div class="right">
+        <span class="chip" id="clock">00:00:00</span>
+        <span class="chip">ESC: back</span>
+      </div>
+    </div>
+
+    <main class="panel">
+      <div class="head">
+        <div>
+          <h1>Stopping Auto-Humming: Diction Anchors + Early Suppression</h1>
+          <p class="sub">
+            Problem: Suno sometimes injects “la-de-da / mm-mm-mm” before lyrics even when you didn’t ask.
+            This entry documents suppression tactics that reduce that behavior.
+          </p>
+          <div class="meta">
+            <span class="tag">promptlab</span>
+            <span class="tag">suno</span>
+            <span class="tag gold">workflow</span>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <a class="btn" href="../research.html">Research</a>
+          <a class="btn" href="../index.html">Home</a>
+          <a class="btn" href="../changelog.html">Changelog</a>
+        </nav>
+      </div>
+
+      <hr class="hr" />
+
+      <div class="content">
+        <h2>Why it happens (likely)</h2>
+        <ul>
+          <li>Some vocal styles are biased toward “warm-up” syllables in the intro.</li>
+          <li>Open-ended intros with no explicit <em>first phoneme</em> invite filler.</li>
+          <li>Long/soft first lines can get treated like “pre-chorus ambience”.</li>
+        </ul>
+
+        <h2>Primary fix: force the first consonant</h2>
+        <p>
+          Give the model a clean first strike: a hard consonant and clear diction instruction.
+          The first sung sound matters more than a paragraph of rules.
+        </p>
+
+        <h2>Suppression wording you can reuse</h2>
+        <pre>[INTRO — NO VOCAL FILL]
+[no humming, no la-la, no mm-mm]
+[first lyric begins immediately on a consonant]
+[precise diction, crisp consonants]
+[no ad-lib syllables before line 1]</pre>
+
+        <h2>Structural trick: “cold open” boot line</h2>
+        <p>
+          Add a very short “cold open” line that starts with a consonant and ends quickly.
+          It acts like a clapboard.
+        </p>
+
+        <pre>LINE 1 (cold open):
+"Click. Confirm. Begin."
+
+LINE 2 (normal verse starts):
+"Now the piano snaps, the snare cuts clean..."</pre>
+
+        <h2>If it still sneaks in</h2>
+        <ul>
+          <li>Shorten the intro section header.</li>
+          <li>Increase “precise diction / clear enunciation / no slur” instructions.</li>
+          <li>Try changing the first word to start with <code>T</code>, <code>K</code>, <code>P</code>, <code>B</code>, <code>D</code>.</li>
+          <li>Replace any leading ellipses or soft vowels with a hard start.</li>
+        </ul>
+
+        <h2>Next experiment</h2>
+        <p>
+          Test whether the model respects suppression better when the first line is a “command” line:
+          short, percussive, and rhythmically tight.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // clock
+    const clockEl = document.getElementById("clock");
+    function tick(){
+      const d = new Date();
+      clockEl.textContent =
+        String(d.getHours()).padStart(2,"0") + ":" +
+        String(d.getMinutes()).padStart(2,"0") + ":" +
+        String(d.getSeconds()).padStart(2,"0");
+    }
+    tick(); setInterval(tick, 1000);
+
+    // esc back
+    document.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") window.location.href = "../research.html";
+    });
+
+    // changelog status feed
+    async function loadLatestChangelog(){
+      try{
+        const res = await fetch("../changelog.html", { cache: "no-store" });
+        if(!res.ok) throw new Error("changelog fetch failed");
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const first = doc.querySelector(".entry");
+        if(!first) return;
+
+        const dateText = first.querySelector(".date")?.textContent?.trim() || "";
+        const iso = first.querySelector(".iso")?.getAttribute("data-iso") || "";
+        const update = first.querySelector(".update")?.textContent?.trim() || "UPDATE";
+        const tags = Array.from(first.querySelectorAll(".tag")).slice(0, 3).map(t => t.textContent.trim()).filter(Boolean);
+
+        const stamp = iso || dateText || "UNKNOWN-DATE";
+        const statusEl = document.getElementById("statusText");
+        if(statusEl) statusEl.textContent = `${stamp} :: ${update}${tags.length ? " :: " + tags.join(", ") : ""}`;
+      }catch(e){}
+    }
+    loadLatestChangelog();
+  </script>
+</body>
+</html>

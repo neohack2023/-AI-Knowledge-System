@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LumaSort Studio: Advanced Pixel Sorting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Cyberpunk UI Styling */
+        :root {
+            --primary: #f43f5e; /* Rose */
+            --bg: #0f172a;      /* Slate 950 */
+            --panel: #1e293b;   /* Slate 800 */
+        }
+        
+        body { background-color: var(--bg); color: #e2e8f0; }
+
+        /* Range Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px; /* Larger touch target */
+            width: 20px;
+            border-radius: 50%; /* Rounded for better touch feel */
+            background: var(--primary);
+            cursor: pointer;
+            margin-top: -8px;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Checkboxes */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: var(--primary);
+        }
+        
+        /* Canvas Background */
+        .canvas-bg {
+            background-image: 
+                linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<!-- Use h-[100dvh] for mobile browsers to handle address bar collapsing -->
+<body class="h-[100dvh] flex flex-col overflow-hidden font-mono text-sm">
+
+    <!-- Header -->
+    <header class="h-14 bg-slate-900 border-b border-slate-700 flex items-center justify-between px-4 lg:px-6 shrink-0 z-20">
+        <div class="flex items-center gap-2">
+            <div class="w-3 h-3 bg-rose-500 rounded-sm animate-pulse"></div>
+            <h1 class="text-md lg:text-lg font-bold tracking-widest text-white">LUMASORT<span class="text-rose-500 hidden sm:inline">.STUDIO</span></h1>
+        </div>
+        <div class="flex gap-2 lg:gap-4">
+             <button onclick="document.getElementById('fileInput').click()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded border border-slate-600 transition flex items-center gap-2 text-xs lg:text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span class="hidden sm:inline">Load Image</span>
+                <span class="sm:hidden">Upload</span>
+            </button>
+            <input type="file" id="fileInput" class="hidden" accept="image/*">
+            <button id="downloadBtn" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded font-bold transition text-xs lg:text-sm shadow-lg shadow-rose-900/50">
+                Export / Save
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout: Flex-col-reverse on mobile (Canvas top, Controls bottom), Flex-row on desktop -->
+    <div class="flex flex-col-reverse lg:flex-row flex-1 overflow-hidden relative">
+        
+        <!-- Controls Sidebar -->
+        <!-- Mobile: w-full, h-auto (scrollable). Desktop: w-80, h-full. -->
+        <aside class="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-r border-slate-800 flex flex-col overflow-y-auto custom-scrollbar z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.5)] lg:shadow-none h-1/2 lg:h-full">
+            <div class="p-5 lg:p-6 space-y-6 lg:space-y-8 pb-20 lg:pb-6">
+                
+                <!-- Section: Sorting Rules -->
+                <div>
+                    <h2 class="text-rose-400 font-bold mb-4 uppercase text-xs tracking-wider border-b border-slate-700 pb-1 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        1. Configuration
+                    </h2>
+                    
+                    <!-- Direction -->
+                    <div class="mb-5">
+                        <label class="block text-slate-400 mb-2 text-xs uppercase font-semibold">Direction</label>
+                        <div class="flex bg-slate-800 rounded p-1 border border-slate-700 h-10">
+                            <button class="flex-1 rounded bg-slate-600 text-white font-medium transition-colors" id="dirHorz">Horizontal</button>
+                            <button class="flex-1 rounded hover:text-white text-slate-400 font-medium transition-colors" id="dirVert">Vertical</button>
+                        </div>
+                    </div>
+
+                    <!-- Sort By -->
+                    <div class="mb-5">
+                        <label class="block text-slate-400 mb-2 text-xs uppercase font-semibold">Sort Value</label>
+                        <div class="relative">
+                            <select id="sortKey" class="w-full bg-slate-800 border border-slate-700 text-white h-10 pl-3 pr-8 rounded focus:border-rose-500 outline-none appearance-none">
+                                <option value="luma">Luminance (Brightness)</option>
+                                <option value="red">Red Channel</option>
+                                <option value="green">Green Channel</option>
+                                <option value="blue">Blue Channel</option>
+                                <option value="sum">Total (R+G+B)</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between py-2 border border-slate-800 rounded px-3 bg-slate-800/50">
+                        <label class="text-slate-300 select-none cursor-pointer" for="reverseSort">Reverse Order</label>
+                        <input type="checkbox" id="reverseSort" class="w-5 h-5 accent-rose-500 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Section: Thresholds -->
+                <div>
+                    <h2 class="text-rose-400 font-bold mb-4 uppercase text-xs tracking-wider border-b border-slate-700 pb-1 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        2. Targeting
+                    </h2>
+                    
+                    <div class="mb-6">
+                        <div class="flex justify-between text-xs mb-2">
+                            <span class="text-slate-400 uppercase font-semibold">Black Limit</span>
+                            <span id="threshLowVal" class="text-rose-400 font-mono font-bold bg-rose-950/50 px-2 rounded">25</span>
+                        </div>
+                        <input type="range" id="threshLow" min="0" max="255" value="50" class="touch-pan-y">
+                    </div>
+
+                    <div class="mb-6">
+                        <div class="flex justify-between text-xs mb-2">
+                            <span class="text-slate-400 uppercase font-semibold">White Limit</span>
+                            <span id="threshHighVal" class="text-rose-400 font-mono font-bold bg-rose-950/50 px-2 rounded">255</span>
+                        </div>
+                        <input type="range" id="threshHigh" min="0" max="255" value="255" class="touch-pan-y">
+                    </div>
+
+                    <div class="flex items-center gap-3 mt-4 bg-rose-900/10 p-3 rounded border border-rose-900/30">
+                        <input type="checkbox" id="showMask" class="w-5 h-5 accent-rose-500 cursor-pointer">
+                        <div>
+                            <label for="showMask" class="text-sm text-white font-medium cursor-pointer select-none">Show Mask (Debug)</label>
+                            <p class="text-[10px] text-slate-400">Highlights active areas in white.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Education Section -->
+                <div>
+                    <h2 class="text-rose-400 font-bold mb-4 uppercase text-xs tracking-wider border-b border-slate-700 pb-1 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        3. The Glitch Explained
+                    </h2>
+
+                    <div class="space-y-4">
+                        <!-- In the Wild -->
+                        <div class="bg-slate-800/50 rounded p-3 border border-slate-700/50">
+                            <h3 class="text-xs font-bold text-white mb-1">In The Wild</h3>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                Natural pixel sorting often occurs due to <strong>buffer errors</strong> or corrupted data streams. In video compression (datamoshing), if a keyframe is missing, the motion vectors from subsequent frames drag the old pixels across the screen, creating a "melting" look. It essentially signifies the computer losing track of where one object ends and another begins.
+                            </p>
+                        </div>
+
+                        <!-- Under the Hood -->
+                        <div class="bg-slate-800/50 rounded p-3 border border-slate-700/50">
+                            <h3 class="text-xs font-bold text-white mb-1">How We Recreate It</h3>
+                            <p class="text-[11px] text-slate-400 leading-relaxed mb-2">
+                                We iterate through the image's pixel array. Instead of sorting the whole image, we only target "spans" of pixels that fall within your <strong>Targeting Thresholds</strong> (Black/White Limits).
+                            </p>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                Once a span is isolated, we use an algorithm to rearrange those specific pixels based on their values (Brightness, Red, etc.), creating the artificial drift.
+                            </p>
+                            
+                            <!-- Java Logic Snippet -->
+                            <div class="mt-2 bg-black/40 rounded p-2 border border-slate-800">
+                                <p class="text-[10px] text-slate-500 font-mono mb-1">// Java Logic Concept</p>
+                                <pre class="text-[9px] text-rose-300 font-mono overflow-x-auto">
+while(x < width) {
+  if(luma(x) > threshold) {
+     int start = x;
+     // Find end of bright span
+     while(luma(x) > threshold) x++;
+     // Sort just this section
+     sortPixels(start, x); 
+  }
+  x++;
+}</pre>
+                            </div>
+                        </div>
+
+                        <!-- Tip -->
+                        <div class="bg-rose-900/10 rounded p-3 border border-rose-900/20">
+                            <p class="text-[10px] text-slate-300">
+                                <strong class="text-rose-400">Pro Tip:</strong> High contrast images work best. Try narrowing the thresholds to only sort the "mid-tones" for a subtle effect, or sort the "highlights" for a dripping light effect.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Canvas Area -->
+        <!-- Mobile: h-1/2 (top half), lg:h-full (right side) -->
+        <main class="w-full h-1/2 lg:h-full lg:flex-1 relative bg-black flex items-center justify-center canvas-bg p-4 lg:p-8 overflow-hidden z-0">
+            <div class="relative shadow-2xl border border-slate-700 flex max-w-full max-h-full">
+                <!-- Object-contain ensures image fits within the split view without distortion -->
+                <canvas id="mainCanvas" class="block object-contain max-w-full max-h-full"></canvas>
+                
+                <!-- Overlay Stats -->
+                <div class="absolute bottom-0 right-0 bg-black/80 backdrop-blur px-3 py-1 text-[10px] lg:text-xs text-rose-500 font-mono border-t border-l border-slate-700 rounded-tl">
+                    <span id="resStats">...</span> | <span id="procStats">Idle</span>
+                </div>
+            </div>
+            
+            <!-- Loading State -->
+            <div id="loading" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50 backdrop-blur-sm" style="display:none;">
+                <div class="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <div class="text-white font-bold tracking-widest text-xs">PROCESSING...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Save Modal (Hidden by default) -->
+    <div id="saveModal" class="fixed inset-0 z-[100] bg-black/90 backdrop-blur flex flex-col items-center justify-center p-6 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg max-w-md w-full p-4 relative shadow-2xl flex flex-col max-h-[90vh]">
+            <button id="closeModal" class="absolute top-3 right-3 text-slate-400 hover:text-white bg-slate-800 rounded-full p-1 z-10">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-white font-bold mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Save Image
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">If the download didn't start automatically:</p>
+            <div class="bg-rose-900/20 text-rose-200 text-xs p-3 rounded mb-4 text-center border border-rose-900/50">
+                👉 <strong>Long Press</strong> the image below and select <strong>"Add to Photos"</strong>
+            </div>
+            <div class="overflow-auto flex-1 flex items-center justify-center bg-black/50 rounded border border-slate-800 p-2">
+                <img id="saveImg" src="" class="max-w-full max-h-[50vh] object-contain">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        const state = {
+            direction: 'horizontal', // horizontal | vertical
+            sortKey: 'luma',         // luma | red | green | blue | sum
+            reverse: false,
+            thresholdLow: 50,
+            thresholdHigh: 255,
+            showMask: false,
+            img: null
+        };
+
+        // --- DOM Elements ---
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const loading = document.getElementById('loading');
+        const fileInput = document.getElementById('fileInput');
+        
+        // Modal Elements
+        const saveModal = document.getElementById('saveModal');
+        const saveImg = document.getElementById('saveImg');
+        const closeModal = document.getElementById('closeModal');
+        
+        // Stats
+        const elResStats = document.getElementById('resStats');
+        const elProcStats = document.getElementById('procStats');
+
+        // Inputs
+        const btnHorz = document.getElementById('dirHorz');
+        const btnVert = document.getElementById('dirVert');
+        const selSortKey = document.getElementById('sortKey');
+        const chkReverse = document.getElementById('reverseSort');
+        const chkMask = document.getElementById('showMask');
+        const rngLow = document.getElementById('threshLow');
+        const rngHigh = document.getElementById('threshHigh');
+        const lblLow = document.getElementById('threshLowVal');
+        const lblHigh = document.getElementById('threshHighVal');
+
+        // --- Initialization ---
+        function init() {
+            createDemoImage();
+            setupListeners();
+            // Handle resize to fix canvas size on orientation change
+            window.addEventListener('resize', () => {
+                requestRender();
+            });
+        }
+
+        function createDemoImage() {
+            const temp = document.createElement('canvas');
+            temp.width = 800;
+            temp.height = 600;
+            const t = temp.getContext('2d');
+            
+            // Background
+            const g = t.createLinearGradient(0,0,0,600);
+            g.addColorStop(0, '#111');
+            g.addColorStop(1, '#333');
+            t.fillStyle = g;
+            t.fillRect(0,0,800,600);
+
+            // Circle
+            t.fillStyle = '#f43f5e';
+            t.beginPath();
+            t.arc(400, 300, 150, 0, Math.PI*2);
+            t.fill();
+
+            // Text
+            t.fillStyle = '#fff';
+            t.font = 'bold 80px Arial';
+            t.textAlign = 'center';
+            t.fillText('SORT', 400, 330);
+            
+            // Noise
+            for(let i=0; i<100; i++){
+                t.fillStyle = `rgba(255,255,255,${Math.random()})`;
+                t.fillRect(Math.random()*800, Math.random()*600, Math.random()*100, 2);
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                state.img = img;
+                render();
+            };
+            img.src = temp.toDataURL();
+        }
+
+        // --- Event Listeners ---
+        function setupListeners() {
+            // File Upload
+            fileInput.addEventListener('change', (e) => {
+                const f = e.target.files[0];
+                if(f) {
+                    const r = new FileReader();
+                    r.onload = (evt) => {
+                        const i = new Image();
+                        i.onload = () => {
+                            state.img = i;
+                            render();
+                        };
+                        i.src = evt.target.result;
+                    };
+                    r.readAsDataURL(f);
+                }
+            });
+
+            // Direction Buttons
+            btnHorz.addEventListener('click', () => setDirection('horizontal'));
+            btnVert.addEventListener('click', () => setDirection('vertical'));
+
+            // Selects & Checks
+            selSortKey.addEventListener('change', (e) => { state.sortKey = e.target.value; requestRender(); });
+            chkReverse.addEventListener('change', (e) => { state.reverse = e.target.checked; requestRender(); });
+            chkMask.addEventListener('change', (e) => { state.showMask = e.target.checked; requestRender(); });
+
+            // Range Sliders
+            rngLow.addEventListener('input', (e) => { 
+                state.thresholdLow = parseInt(e.target.value); 
+                lblLow.innerText = state.thresholdLow;
+                if(state.thresholdLow > state.thresholdHigh) {
+                    state.thresholdHigh = state.thresholdLow;
+                    rngHigh.value = state.thresholdLow;
+                    lblHigh.innerText = state.thresholdLow;
+                }
+                requestRender(); 
+            });
+
+            rngHigh.addEventListener('input', (e) => { 
+                state.thresholdHigh = parseInt(e.target.value); 
+                lblHigh.innerText = state.thresholdHigh;
+                if(state.thresholdHigh < state.thresholdLow) {
+                    state.thresholdLow = state.thresholdHigh;
+                    rngLow.value = state.thresholdHigh;
+                    lblLow.innerText = state.thresholdHigh;
+                }
+                requestRender(); 
+            });
+
+            // Improved Download Handler for Mobile
+            document.getElementById('downloadBtn').addEventListener('click', () => {
+                const dataURL = canvas.toDataURL('image/png');
+                
+                // 1. Try Standard Download
+                const link = document.createElement('a');
+                link.download = 'lumasort_export.png';
+                link.href = dataURL;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // 2. Show Modal as Backup (for iOS/Android restrictions)
+                saveImg.src = dataURL;
+                saveModal.classList.remove('hidden');
+                saveModal.classList.add('flex');
+            });
+
+            // Close Modal
+            closeModal.addEventListener('click', () => {
+                saveModal.classList.add('hidden');
+                saveModal.classList.remove('flex');
+            });
+
+            // Close modal on click outside
+            saveModal.addEventListener('click', (e) => {
+                if(e.target === saveModal) {
+                    saveModal.classList.add('hidden');
+                    saveModal.classList.remove('flex');
+                }
+            });
+        }
+
+        function setDirection(dir) {
+            state.direction = dir;
+            if(dir === 'horizontal') {
+                btnHorz.classList.add('bg-slate-600', 'text-white');
+                btnHorz.classList.remove('hover:text-white', 'text-slate-400');
+                btnVert.classList.remove('bg-slate-600', 'text-white');
+                btnVert.classList.add('hover:text-white', 'text-slate-400');
+            } else {
+                btnVert.classList.add('bg-slate-600', 'text-white');
+                btnVert.classList.remove('hover:text-white', 'text-slate-400');
+                btnHorz.classList.remove('bg-slate-600', 'text-white');
+                btnHorz.classList.add('hover:text-white', 'text-slate-400');
+            }
+            requestRender();
+        }
+
+        let frameId;
+        function requestRender() {
+            if(frameId) cancelAnimationFrame(frameId);
+            elProcStats.innerText = "Pending...";
+            frameId = requestAnimationFrame(render);
+        }
+
+        // --- Core Rendering Logic ---
+        function render() {
+            if(!state.img) return;
+
+            elProcStats.innerText = "Processing...";
+            
+            // 1. Determine size. 
+            // We want to keep the original image resolution as much as possible for export quality,
+            // but limit it for performance in the browser loop.
+            let w = state.img.width;
+            let h = state.img.height;
+            const maxDim = 1200; // Increased slighty
+            
+            if(w > maxDim || h > maxDim) {
+                const r = w / h;
+                if(w > h) { w = maxDim; h = maxDim / r; }
+                else { h = maxDim; w = maxDim * r; }
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            elResStats.innerText = `${Math.floor(w)}x${Math.floor(h)}`;
+
+            ctx.drawImage(state.img, 0, 0, w, h);
+            
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+
+            // MASK MODE: Just show what would be sorted
+            if(state.showMask) {
+                for(let i=0; i<data.length; i+=4) {
+                    const val = getValue(data, i, state.sortKey);
+                    if(val >= state.thresholdLow && val <= state.thresholdHigh) {
+                        data[i] = 255; data[i+1] = 255; data[i+2] = 255; // White
+                    } else {
+                        // Dim background
+                        data[i] = data[i] * 0.2; 
+                        data[i+1] = data[i+1] * 0.2; 
+                        data[i+2] = data[i+2] * 0.2; 
+                    }
+                }
+                ctx.putImageData(imageData, 0, 0);
+                elProcStats.innerText = "Idle (Mask)";
+                return;
+            }
+
+            // SORT MODE
+            if(state.direction === 'horizontal') {
+                processHorizontal(data, w, h);
+            } else {
+                processVertical(data, w, h);
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            elProcStats.innerText = "Idle";
+        }
+
+        // --- Helpers ---
+
+        function getValue(data, idx, key) {
+            const r = data[idx];
+            const g = data[idx+1];
+            const b = data[idx+2];
+            
+            switch(key) {
+                case 'red': return r;
+                case 'green': return g;
+                case 'blue': return b;
+                case 'sum': return (r+g+b)/3; // Avg
+                case 'luma': default: return 0.299*r + 0.587*g + 0.114*b;
+            }
+        }
+
+        function processHorizontal(data, w, h) {
+            for(let y=0; y<h; y++) {
+                const rowStart = y * w * 4;
+                let x = 0;
+                while(x < w) {
+                    const idx = rowStart + (x*4);
+                    const val = getValue(data, idx, state.sortKey);
+                    
+                    if(val >= state.thresholdLow && val <= state.thresholdHigh) {
+                        let endX = x + 1;
+                        while(endX < w) {
+                            const nIdx = rowStart + (endX*4);
+                            const nVal = getValue(data, nIdx, state.sortKey);
+                            if(nVal < state.thresholdLow || nVal > state.thresholdHigh) break;
+                            endX++;
+                        }
+                        sortSpan(data, x, endX, rowStart, 4); // 4 = horizontal step
+                        x = endX;
+                    } else {
+                        x++;
+                    }
+                }
+            }
+        }
+
+        function processVertical(data, w, h) {
+            // For vertical, we iterate columns
+            for(let x=0; x<w; x++) {
+                let y = 0;
+                while(y < h) {
+                    const idx = (y * w + x) * 4;
+                    const val = getValue(data, idx, state.sortKey);
+
+                    if(val >= state.thresholdLow && val <= state.thresholdHigh) {
+                        let endY = y + 1;
+                        while(endY < h) {
+                            const nIdx = (endY * w + x) * 4;
+                            const nVal = getValue(data, nIdx, state.sortKey);
+                            if(nVal < state.thresholdLow || nVal > state.thresholdHigh) break;
+                            endY++;
+                        }
+                        // To reuse sortSpan logic for vertical, we need to extract pixels manually
+                        sortVerticalSpan(data, x, y, endY, w);
+                        y = endY;
+                    } else {
+                        y++;
+                    }
+                }
+            }
+        }
+
+        function sortSpan(data, start, end, offset, step) {
+            const len = end - start;
+            if(len < 2) return;
+            
+            const pixels = [];
+            for(let k=0; k<len; k++) {
+                const i = offset + (start+k)*step;
+                pixels.push({
+                    r: data[i], g: data[i+1], b: data[i+2], a: data[i+3],
+                    val: getValue(data, i, state.sortKey)
+                });
+            }
+
+            pixels.sort((a,b) => state.reverse ? b.val - a.val : a.val - b.val);
+
+            for(let k=0; k<len; k++) {
+                const i = offset + (start+k)*step;
+                data[i] = pixels[k].r;
+                data[i+1] = pixels[k].g;
+                data[i+2] = pixels[k].b;
+                data[i+3] = pixels[k].a;
+            }
+        }
+
+        function sortVerticalSpan(data, x, startY, endY, w) {
+            const len = endY - startY;
+            if(len < 2) return;
+
+            const pixels = [];
+            for(let k=0; k<len; k++) {
+                const i = ((startY + k) * w + x) * 4;
+                pixels.push({
+                    r: data[i], g: data[i+1], b: data[i+2], a: data[i+3],
+                    val: getValue(data, i, state.sortKey)
+                });
+            }
+
+            pixels.sort((a,b) => state.reverse ? b.val - a.val : a.val - b.val);
+
+            for(let k=0; k<len; k++) {
+                const i = ((startY + k) * w + x) * 4;
+                data[i] = pixels[k].r;
+                data[i+1] = pixels[k].g;
+                data[i+2] = pixels[k].b;
+                data[i+3] = pixels[k].a;
+            }
+        }
+
+        // Start the application
+        init();
+
+    </script>
+</body>
+</html>
+
+
