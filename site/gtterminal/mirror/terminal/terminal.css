@@ -144,6 +144,8 @@ a { color: inherit; }
 .crt {
   position: relative;
   isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   padding: clamp(18px, 3vw, 42px);
   overflow: hidden;
@@ -239,6 +241,7 @@ a { color: inherit; }
 .terminal-grid {
   display: grid;
   grid-template-columns: minmax(190px, .34fr) minmax(0, 1fr);
+  min-height: 0;
   gap: clamp(16px, 2.4vw, 34px);
   padding-block: clamp(20px, 3vw, 38px);
 }
