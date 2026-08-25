@@ -14,9 +14,7 @@ function setSignalState(label, mode) {
 async function startSignalLayer() {
   if (!canvas || !crt) return;
 
-  const hasWebGPU = Boolean(navigator.gpu);
-  const hasWebGL2 = hasWebGPU || Boolean(document.createElement("canvas").getContext("webgl2"));
-  if (!hasWebGPU && !hasWebGL2) {
+  if (!navigator.gpu) {
     setSignalState("CSS", "css");
     canvas.hidden = true;
     return;
