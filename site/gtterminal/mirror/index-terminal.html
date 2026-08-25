@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#050806">
+  <meta name="description" content="GT Terminal: browser-native systems, research, playable experiments, and spatial artifacts.">
+  <meta name="gt-build" content="terminal-shell-01-2026-08-25">
+  <title>GT Terminal :: Command Deck</title>
+  <link rel="stylesheet" href="terminal/terminal.css">
+  <script type="module" src="terminal/terminal.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#terminal-output">Skip to terminal output</a>
+
+  <main class="device-shell" aria-label="GT Terminal command deck">
+    <div class="hardware hardware-left" aria-hidden="true">
+      <span class="vent"></span>
+      <span class="power-lamp"></span>
+      <span class="dial dial-one"></span>
+      <span class="dial dial-two"></span>
+    </div>
+
+    <section class="crt" data-terminal-state="booting">
+      <div class="glass-noise" aria-hidden="true"></div>
+
+      <header class="terminal-header">
+        <a class="brand" href="index.html" aria-label="GT Terminal home">GT TERMINAL</a>
+        <div class="node-status" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="node-state">NODE BOOTING</span>
+        </div>
+      </header>
+
+      <div class="terminal-grid">
+        <nav class="route-rail" aria-label="GT Terminal sections">
+          <a class="route is-active" href="systems.html" data-command="systems">
+            <span class="route-index">01</span><span>SYSTEMS</span><span aria-hidden="true">›</span>
+          </a>
+          <a class="route" href="artifacts/vanille-spatial-relief/" data-command="artifacts">
+            <span class="route-index">02</span><span>ARTIFACTS</span><span aria-hidden="true">›</span>
+          </a>
+          <a class="route" href="research.html" data-command="research">
+            <span class="route-index">03</span><span>RESEARCH</span><span aria-hidden="true">›</span>
+          </a>
+          <a class="route" href="Games/Index.html" data-command="play">
+            <span class="route-index">04</span><span>PLAY</span><span aria-hidden="true">›</span>
+          </a>
+          <a class="route" href="Lab%20tools/Index.HTML" data-command="tools">
+            <span class="route-index">05</span><span>TOOLS</span><span aria-hidden="true">›</span>
+          </a>
+        </nav>
+
+        <section class="terminal-panel" aria-labelledby="panel-title">
+          <h1 id="panel-title" class="sr-only">GT Terminal output</h1>
+          <div id="terminal-output" class="terminal-output" tabindex="0" aria-live="polite">
+            <ol id="boot-log" class="boot-log" aria-label="Boot log">
+              <li data-delay="0"><span>[ OK ]</span> Power rail check</li>
+              <li data-delay="1"><span>[ OK ]</span> CRT phosphor matrix</li>
+              <li data-delay="2"><span>[ OK ]</span> Filesystem mirror / 52 files</li>
+              <li data-delay="3"><span>[ OK ]</span> Route index mounted</li>
+              <li data-delay="4"><span>[ OK ]</span> Visitor controls enabled</li>
+            </ol>
+
+            <article class="transmission">
+              <div class="transmission-heading">
+                <p>INCOMING TRANSMISSION</p>
+                <span>ARTIFACT / ACTIVE</span>
+              </div>
+              <div class="transmission-body">
+                <div class="artifact-glyph" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <div>
+                  <h2>Spatial Relief Lab</h2>
+                  <p>Interactive browser-native relief experiments combining depth, splat rendering, cohesion studies, and mobile WebGL diagnostics.</p>
+                  <a href="artifacts/vanille-spatial-relief/">OPEN FIXTURE 01 <span aria-hidden="true">→</span></a>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <form id="command-form" class="command-line" autocomplete="off">
+            <label for="command-input" class="prompt" aria-label="Command prompt">›</label>
+            <input id="command-input" name="command" type="text" inputmode="text" spellcheck="false" placeholder="Enter command…" aria-describedby="command-help">
+            <button type="submit">RUN</button>
+          </form>
+          <p id="command-help" class="sr-only">Commands: help, systems, artifacts, research, play, tools, status, clear.</p>
+        </section>
+      </div>
+
+      <footer class="system-footer" aria-label="System status">
+        <span>STATUS: <strong id="system-status">BOOTING</strong></span>
+        <span>POWER: <strong>STABLE</strong></span>
+        <span>LINK: <strong>PUBLIC</strong></span>
+        <span>BUILD: <strong>TERMINAL-SHELL-01</strong></span>
+      </footer>
+    </section>
+
+    <div class="hardware hardware-right" aria-hidden="true">
+      <span>SYNC</span><span>SCAN</span><span>HOLD</span><span>RESET</span>
+    </div>
+  </main>
+
+  <noscript>
+    <p class="noscript">JavaScript is disabled. Navigation remains available through the section links.</p>
+  </noscript>
+</body>
+</html>
