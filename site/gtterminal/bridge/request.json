@@ -1,4 +1,4 @@
 {
-  "request_id": "gt-terminal-full-inventory-20260825T1757Z",
-  "op": "list"
+  "request_id": "gt-terminal-full-mirror-20260825T1800Z",
+  "op": "snapshot"
 }
