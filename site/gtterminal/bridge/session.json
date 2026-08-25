@@ -1,6 +1,6 @@
 {
-  "enabled": false,
-  "expires_at": "2026-08-25T19:30:00Z",
+  "enabled": true,
+  "expires_at": "2026-08-25T20:00:00Z",
   "scope": "gt-terminal",
-  "note": "Terminal-shell candidate deployed and QA completed. Production index.html remains untouched; the API secret remains only in the repository Actions secret."
+  "note": "Temporary candidate-only deployment window for terminal-signal-02. Production index.html remains out of scope."
 }
