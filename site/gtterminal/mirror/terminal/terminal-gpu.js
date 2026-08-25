@@ -14,7 +14,12 @@ function setSignalState(label, mode) {
 async function startSignalLayer() {
   if (!canvas || !crt) return;
 
-  if (!navigator.gpu) {
+  let adapter = null;
+  try {
+    adapter = await navigator.gpu?.requestAdapter({ powerPreference: "low-power" });
+  } catch {}
+
+  if (!adapter) {
     setSignalState("CSS", "css");
     canvas.hidden = true;
     return;
