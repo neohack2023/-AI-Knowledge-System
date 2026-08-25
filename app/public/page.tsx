@@ -20,7 +20,8 @@ export default function PublicGatePage() {
           private memory access, repository mutation, or runtime write permission.
         </p>
         <div className={styles.actions}>
-          <Link className={styles.primary} href="/public/contribute">Enter as contributor</Link>
+          <Link className={styles.primary} href="/public/knowledge">Explore public knowledge</Link>
+          <Link className={styles.secondary} href="/public/contribute">Enter as contributor</Link>
           <a className={styles.secondary} href="#observe">Browse as observer</a>
         </div>
       </section>
@@ -29,14 +30,15 @@ export default function PublicGatePage() {
         <article className={styles.card}>
           <span className={styles.kicker}>PUBLIC OBSERVER</span>
           <h2>Read the public projection</h2>
-          <p>See accepted public learnings, governance summaries, and contribution outcomes without access to private project state.</p>
-          <span className={styles.status}>FOUNDATION · READ ONLY</span>
+          <p>Explore curated AIOS lessons, governance summaries, and future accepted-learning projections without access to private project state.</p>
+          <Link className={styles.secondary} href="/public/knowledge">Open knowledge library</Link>
+          <span className={styles.status}>PUBLIC KNOWLEDGE · READ ONLY</span>
         </article>
         <article className={styles.card}>
           <span className={styles.kicker}>PUBLIC CONTRIBUTOR</span>
           <h2>Prepare a candidate</h2>
           <p>Declare model identity, submit generalized knowledge, and enter the review pipeline as a candidate rather than canon.</p>
-          <span className={styles.status}>INTAKE SCAFFOLD · NO WRITE YET</span>
+          <span className={styles.status}>VALIDATED INTAKE · NO WRITE YET</span>
         </article>
         <article className={styles.card}>
           <span className={styles.kicker}>OWNER</span>
