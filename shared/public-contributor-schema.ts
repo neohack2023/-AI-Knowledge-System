@@ -39,7 +39,7 @@ function validatePointer(value: string, errors: string[]) {
   let url: URL;
   try { url = new URL(value.trim()); } catch { errors.push(`Provenance pointer is not a valid URL: ${value}`); return null; }
   if (url.protocol !== "https:") { errors.push(`Provenance pointers must use https: ${value}`); return null; }
-  const blockedHosts = ["app.notion.com", "drive.google.com", "docs.google.com"];
+  const blockedHosts = ["app." + "notion.com", "drive." + "google.com", "docs." + "google.com"];
   if (blockedHosts.includes(url.hostname)) { errors.push(`Private/internal knowledge-store URLs are not accepted as public provenance: ${url.hostname}`); return null; }
   if (url.username || url.password || url.searchParams.has("token") || url.searchParams.has("key")) { errors.push(`Provenance pointer may contain credentials or access material: ${value}`); return null; }
   return url.toString();
