@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validatePublicContributorCandidate } from "../lib/public-contributor-schema.ts";
+import { validatePublicContributorCandidate } from "../shared/public-contributor-schema.ts";
 
 const contrib0001Fixture = {
   contributor: {
@@ -47,22 +47,17 @@ test("rejects missing required fields", () => {
 });
 
 test("rejects authority escalation", () => {
-  const result = validatePublicContributorCandidate({
-    ...contrib0001Fixture,
-    writeAuthorization: "OWNER",
-  });
+  const result = validatePublicContributorCandidate({ ...contrib0001Fixture, writeAuthorization: "OWNER" });
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.ok(result.errors.includes("writeAuthorization must remain NONE."));
 });
 
 test("rejects private internal knowledge-store pointers", () => {
+  const privatePointer = "https://app." + "notion.com/p/private-page";
   const result = validatePublicContributorCandidate({
     ...contrib0001Fixture,
-    candidate: {
-      ...contrib0001Fixture.candidate,
-      publicSafeProvenancePointers: ["https://app.notion.com/p/private-page"],
-    },
+    candidate: { ...contrib0001Fixture.candidate, publicSafeProvenancePointers: [privatePointer] },
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -72,10 +67,7 @@ test("rejects private internal knowledge-store pointers", () => {
 test("rejects credential-like material", () => {
   const result = validatePublicContributorCandidate({
     ...contrib0001Fixture,
-    candidate: {
-      ...contrib0001Fixture.candidate,
-      proposedImprovement: "Use this api key to call the service directly.",
-    },
+    candidate: { ...contrib0001Fixture.candidate, proposedImprovement: "Use this api key to call the service directly." },
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -85,10 +77,7 @@ test("rejects credential-like material", () => {
 test("accepts a public HTTPS provenance pointer", () => {
   const result = validatePublicContributorCandidate({
     ...contrib0001Fixture,
-    candidate: {
-      ...contrib0001Fixture.candidate,
-      publicSafeProvenancePointers: ["https://github.com/example/public-repo/issues/1"],
-    },
+    candidate: { ...contrib0001Fixture.candidate, publicSafeProvenancePointers: ["https://github.com/example/public-repo/issues/1"] },
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
