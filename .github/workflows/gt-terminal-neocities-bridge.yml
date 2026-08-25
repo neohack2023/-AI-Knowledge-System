@@ -19,7 +19,7 @@ concurrency:
 jobs:
   bridge:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       NEOCITIES_GTTERMINAL_API_KEY: ${{ secrets.NEOCITIES_GTTERMINAL_API_KEY }}
       BRIDGE_REQUEST: site/gtterminal/bridge/request.json
@@ -32,15 +32,18 @@ jobs:
           ref: gt-terminal-neocities-bridge-01
 
       - name: Execute bounded Neocities request
-        run: python site/gtterminal/bridge/bridge.py
+        run: python site/gtterminal/bridge/snapshot.py
 
-      - name: Commit sanitized result
+      - name: Commit sanitized result and mirror when present
         run: |
-          if git diff --quiet -- "$BRIDGE_RESULT"; then
+          if git diff --quiet; then
             exit 0
           fi
           git config user.name "gt-terminal-bridge"
           git config user.email "actions@users.noreply.github.com"
           git add "$BRIDGE_RESULT"
+          if [ -d site/gtterminal/mirror ]; then
+            git add -A site/gtterminal/mirror
+          fi
           git commit -m "bridge: store sanitized Neocities result"
           git push origin HEAD:gt-terminal-neocities-bridge-01
