@@ -1,6 +1,6 @@
 {
-  "enabled": true,
+  "enabled": false,
   "expires_at": "2026-08-25T20:00:00Z",
   "scope": "gt-terminal",
-  "note": "Temporary candidate-only deployment window for terminal-signal-02. Production index.html remains out of scope."
+  "note": "Terminal signal/audio candidate deployed, browser QA completed, and Notion receipt recorded. Production index.html remains untouched."
 }
