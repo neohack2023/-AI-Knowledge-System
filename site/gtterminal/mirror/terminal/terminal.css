@@ -180,6 +180,22 @@ a { color: inherit; }
   background: radial-gradient(ellipse, transparent 48%, rgba(0,0,0,.72) 82%);
 }
 
+ .signal-canvas {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: .92;
+}
+
+.crt[data-signal-renderer="webgpu"] .glass-noise,
+.crt[data-signal-renderer="webgl2"] .glass-noise {
+  opacity: .025;
+}
+
 .glass-noise {
   position: absolute;
   z-index: 7;
@@ -444,14 +460,38 @@ a { color: inherit; }
   letter-spacing: .08em;
 }
 
-.system-footer span {
+.system-footer > span,
+.system-footer > button {
+  min-width: 0;
   padding: 9px 12px;
+  border: 0;
   border-right: 1px solid var(--line-soft);
+  color: var(--phosphor);
+  background: transparent;
+  font-size: 10px;
+  letter-spacing: .08em;
   text-align: center;
 }
 
-.system-footer span:last-child { border-right: 0; }
+.system-footer > button {
+  cursor: pointer;
+}
+
+.system-footer > button:hover,
+.system-footer > button:focus-visible,
+.system-footer > button[aria-pressed="true"] {
+  outline: none;
+  color: var(--amber);
+  background: rgba(240,184,92,.09);
+  box-shadow: inset 0 0 14px rgba(240,184,92,.08);
+}
+
+.system-footer > :last-child { border-right: 0; }
 .system-footer strong { color: var(--phosphor-soft); }
+.system-footer > button[aria-pressed="true"] strong {
+  color: var(--amber);
+  text-shadow: 0 0 10px rgba(240,184,92,.48);
+}
 
 .noscript {
   width: min(900px, calc(100% - 32px));
@@ -506,8 +546,8 @@ a { color: inherit; }
   .transmission-body { grid-template-columns: 72px 1fr; gap: 14px; }
   .transmission p { font-size: 11px; line-height: 1.6; }
   .system-footer { grid-template-columns: 1fr 1fr; }
-  .system-footer span:nth-child(2) { border-right: 0; }
-  .system-footer span:nth-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
+  .system-footer > :nth-child(2) { border-right: 0; }
+  .system-footer > :nth-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
 }
 
 @media (prefers-reduced-motion: reduce) {
