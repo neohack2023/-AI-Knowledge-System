@@ -1,6 +1,6 @@
 {
-  "enabled": true,
+  "enabled": false,
   "expires_at": "2026-08-25T19:30:00Z",
   "scope": "gt-terminal",
-  "note": "Bounded session for deploying and verifying the non-production terminal landing candidate. Production index.html remains untouched."
+  "note": "Terminal-shell candidate deployed and QA completed. Production index.html remains untouched; the API secret remains only in the repository Actions secret."
 }
