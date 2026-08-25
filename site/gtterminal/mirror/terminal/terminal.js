@@ -1,3 +1,5 @@
+import { pipBoyAudio } from "./terminal-audio.js";
+
 const ROUTES = Object.freeze({
   systems: "systems.html",
   artifacts: "artifacts/vanille-spatial-relief/",
@@ -6,7 +8,7 @@ const ROUTES = Object.freeze({
   tools: "Lab%20tools/Index.HTML"
 });
 
-const COMMAND_HELP = "AVAILABLE: help · systems · artifacts · research · play · tools · status · clear";
+const COMMAND_HELP = "AVAILABLE: help · systems · artifacts · research · play · tools · status · audio · clear";
 
 const crt = document.querySelector(".crt");
 const nodeState = document.querySelector("#node-state");
@@ -16,6 +18,8 @@ const bootLines = [...document.querySelectorAll("#boot-log li")];
 const form = document.querySelector("#command-form");
 const input = document.querySelector("#command-input");
 const routeLinks = [...document.querySelectorAll("[data-command]")];
+const audioToggle = document.querySelector("#audio-toggle");
+const audioState = document.querySelector("#audio-state");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function appendResult(message, tone = "normal") {
@@ -56,8 +60,34 @@ function runBoot() {
   window.setTimeout(finishBoot, 160 + bootLines.length * 230);
 }
 
+function updateAudioControl(enabled) {
+  audioToggle.setAttribute("aria-pressed", String(enabled));
+  audioState.textContent = enabled ? "ON" : "OFF";
+}
+
+async function toggleAudio({ report = true } = {}) {
+  audioToggle.disabled = true;
+
+  try {
+    const enabled = await pipBoyAudio.toggle();
+    updateAudioControl(enabled);
+    if (report) appendResult(enabled
+      ? "AUDIO BUS ONLINE · 60 HZ CORE HUM · PROCEDURAL STATIC ACTIVE"
+      : "AUDIO BUS SUSPENDED");
+    return enabled;
+  } catch (error) {
+    updateAudioControl(false);
+    if (report) appendResult("AUDIO BUS UNAVAILABLE IN THIS BROWSER.", "fault");
+    console.warn("[GT Terminal] Audio engine unavailable.", error);
+    return false;
+  } finally {
+    audioToggle.disabled = false;
+  }
+}
+
 function executeCommand(rawCommand) {
   const command = rawCommand.trim().toLowerCase();
+  pipBoyAudio.click();
 
   if (!command) {
     appendResult(COMMAND_HELP);
@@ -70,7 +100,14 @@ function executeCommand(rawCommand) {
   }
 
   if (command === "status") {
-    appendResult("NODE ONLINE · 52-FILE MIRROR VERIFIED · POWER STABLE · PUBLIC LINK ACTIVE");
+    const signal = document.querySelector("#signal-state")?.textContent || "CSS";
+    const audio = pipBoyAudio.enabled ? "AUDIO ON" : "AUDIO OFF";
+    appendResult(`NODE ONLINE · 52-FILE MIRROR VERIFIED · ${signal} SIGNAL · ${audio} · PUBLIC LINK ACTIVE`);
+    return;
+  }
+
+  if (command === "audio") {
+    toggleAudio();
     return;
   }
 
@@ -97,9 +134,14 @@ form.addEventListener("submit", (event) => {
   input.select();
 });
 
+audioToggle.addEventListener("click", () => {
+  toggleAudio();
+});
+
 for (const link of routeLinks) {
   link.addEventListener("focus", () => selectRoute(link.dataset.command));
   link.addEventListener("pointerenter", () => selectRoute(link.dataset.command));
+  link.addEventListener("click", () => pipBoyAudio.click());
 }
 
 window.addEventListener("keydown", (event) => {
@@ -111,5 +153,18 @@ window.addEventListener("keydown", (event) => {
     input.blur();
   }
 });
+
+document.addEventListener("visibilitychange", () => {
+  if (!pipBoyAudio.ctx || !pipBoyAudio.enabled) return;
+  if (document.hidden) {
+    pipBoyAudio.ctx.suspend().catch(() => {});
+  } else {
+    pipBoyAudio.ctx.resume().catch(() => {});
+  }
+});
+
+window.addEventListener("pagehide", () => {
+  pipBoyAudio.destroy().catch(() => {});
+}, { once: true });
 
 runBoot();
