@@ -2,7 +2,7 @@ export const IDENTITY_CONFIDENCE = ["SELF_DECLARED", "UNKNOWN"] as const;
 export const CONTRIBUTION_CLASSIFICATION = [
   "DOCUMENTED_GAP",
   "OBSERVED_GAP",
-  "PROPOSED_IMROVEMENT",
+  "PROPOSED_IMPROVEMENT",
 ] as const;
 export const REVIEW_RECOMMENDATION = [
   "KEEP_AS_CANDIDATE",
@@ -181,12 +181,8 @@ export function validatePublicContributorCandidate(input: unknown): PublicContri
     errors,
   );
 
-  if (input.candidateState !== "CANDIDATE") {
-    errors.push("candidateState must remain CANDIDATE.");
-  }
-  if (input.writeAuthorization !== "NONE") {
-    errors.push("writeAuthorization must remain NONE.");
-  }
+  if (input.candidateState !== "CANDIDATE") errors.push("candidateState must remain CANDIDATE.");
+  if (input.writeAuthorization !== "NONE") errors.push("writeAuthorization must remain NONE.");
 
   const rawPointers = candidateInput.publicSafeProvenancePointers;
   const publicSafeProvenancePointers: string[] = [];
@@ -211,29 +207,17 @@ export function validatePublicContributorCandidate(input: unknown): PublicContri
       model: nonEmptyString(contributorInput.model, "model", errors),
       version: optionalString(contributorInput.version),
       runtime: nonEmptyString(contributorInput.runtime, "runtime", errors),
-      pseudonymousContributorId: nonEmptyString(
-        contributorInput.pseudonymousContributorId,
-        "pseudonymousContributorId",
-        errors,
-      ),
+      pseudonymousContributorId: nonEmptyString(contributorInput.pseudonymousContributorId, "pseudonymousContributorId", errors),
       identityConfidence: identityConfidence ?? "UNKNOWN",
     },
     candidate: {
       title: nonEmptyString(candidateInput.title, "title", errors),
       classification: classification ?? "OBSERVED_GAP",
       affectedScope: nonEmptyString(candidateInput.affectedScope, "affectedScope", errors),
-      documentedOrObservedGap: nonEmptyString(
-        candidateInput.documentedOrObservedGap,
-        "documentedOrObservedGap",
-        errors,
-      ),
+      documentedOrObservedGap: nonEmptyString(candidateInput.documentedOrObservedGap, "documentedOrObservedGap", errors),
       proposedImprovement: nonEmptyString(candidateInput.proposedImprovement, "proposedImprovement", errors),
       publicSafeProvenancePointers,
-      compatibilityAndRegressionSurface: nonEmptyString(
-        candidateInput.compatibilityAndRegressionSurface,
-        "compatibilityAndRegressionSurface",
-        errors,
-      ),
+      compatibilityAndRegressionSurface: nonEmptyString(candidateInput.compatibilityAndRegressionSurface, "compatibilityAndRegressionSurface", errors),
       risksAndFailureModes: nonEmptyString(candidateInput.risksAndFailureModes, "risksAndFailureModes", errors),
       verificationPlan: nonEmptyString(candidateInput.verificationPlan, "verificationPlan", errors),
       overlapResult: nonEmptyString(candidateInput.overlapResult, "overlapResult", errors),
@@ -245,12 +229,8 @@ export function validatePublicContributorCandidate(input: unknown): PublicContri
 
   inspectTextFields(value, errors);
 
-  if (value.contributor.identityConfidence === "UNKNOWN") {
-    warnings.push("Model identity is unverified and should be presented as UNKNOWN.");
-  }
-  if (value.candidate.publicSafeProvenancePointers.length === 0) {
-    warnings.push("No public provenance pointer supplied. Review may classify the candidate as NEEDS_EVIDENCE.");
-  }
+  if (value.contributor.identityConfidence === "UNKNOWN") warnings.push("Model identity is unverified and should be presented as UNKNOWN.");
+  if (value.candidate.publicSafeProvenancePointers.length === 0) warnings.push("No public provenance pointer supplied. Review may classify the candidate as NEEDS_EVIDENCE.");
 
   return errors.length > 0 ? { ok: false, errors, warnings } : { ok: true, value, warnings };
 }
