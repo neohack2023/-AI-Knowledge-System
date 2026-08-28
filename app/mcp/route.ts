@@ -1,5 +1,5 @@
 import { MCP_TOOLS } from '../../server/swarm-glassbox/mcp-schema.mjs';
-import { invoke as invokeRemoteGlassboxTool } from '../../server/swarm-glassbox/runtime.mjs';
+import { invoke as invokeRemoteGlassboxTool } from '../../server/swarm-glassbox/remote-runtime.mjs';
 import { GLASSBOX_WIDGET_HTML } from '../../server/swarm-glassbox/widget-html.mjs';
 
 export const runtime = 'edge';
