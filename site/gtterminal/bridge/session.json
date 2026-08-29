@@ -1,6 +1,6 @@
 {
-  "enabled": true,
+  "enabled": false,
   "expires_at": "2026-08-29T19:15:00Z",
   "scope": "gt-terminal",
-  "note": "Temporary bounded snapshot window authorized by operator on 2026-08-29 for authenticated Neocities inventory plus public file mirror. No deployment mutation requested."
+  "note": "2026-08-29 authenticated snapshot completed successfully: 57 files mirrored, 6221454 bytes. Bounded session closed after verified receipt."
 }
