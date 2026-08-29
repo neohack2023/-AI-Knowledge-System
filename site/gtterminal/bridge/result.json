@@ -1,12 +1,14 @@
 {
   "bridge": "GT_TERMINAL_NEOCITIES_BRIDGE_01",
-  "completed_at": "2026-08-25T20:09:43.181909+00:00",
+  "completed_at": "2026-08-29T18:32:48.043241+00:00",
   "ok": true,
-  "op": "upload_text",
-  "request_id": "terminal-channel-04-production-index",
+  "op": "snapshot",
+  "request_id": "gt-terminal-snapshot-2026-08-29",
   "response": {
-    "message": "your file(s) have been successfully uploaded",
-    "result": "success"
+    "file_count": 57,
+    "mirror_root": "site/gtterminal/mirror",
+    "result": "success",
+    "total_downloaded_bytes": 6221454
   },
   "site_origin": "https://gtterminal.neocities.org"
 }

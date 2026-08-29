@@ -1,5 +1,5 @@
 {
-  "file_count": 52,
+  "file_count": 57,
   "files": [
     {
       "created_at": "Fri, 27 Feb 2026 13:08:41 -0000",
@@ -146,6 +146,15 @@
       "updated_at": "Wed, 25 Feb 2026 03:05:51 -0000"
     },
     {
+      "created_at": "Tue, 25 Aug 2026 18:28:46 -0000",
+      "downloaded_size": 5910,
+      "is_directory": false,
+      "path": "index-terminal.html",
+      "sha1_hash": "0ab0793b4362bda570d7923b6c9237c823330975",
+      "size": 5910,
+      "updated_at": "Tue, 25 Aug 2026 18:54:44 -0000"
+    },
+    {
       "created_at": "Mon, 24 Aug 2026 23:51:21 -0000",
       "downloaded_size": 11242,
       "is_directory": false,
@@ -156,12 +165,12 @@
     },
     {
       "created_at": "Tue, 24 Feb 2026 23:30:34 -0000",
-      "downloaded_size": 11355,
+      "downloaded_size": 7632,
       "is_directory": false,
       "path": "index.html",
-      "sha1_hash": "834f14988a0d6ca6544a933cb18cd9713e522d23",
-      "size": 11355,
-      "updated_at": "Tue, 25 Aug 2026 00:20:28 -0000"
+      "sha1_hash": "63cd92f82c17f889f8fc46f0dd3aa6ae3fe81a74",
+      "size": 7632,
+      "updated_at": "Tue, 25 Aug 2026 20:09:43 -0000"
     },
     {
       "created_at": "Wed, 25 Feb 2026 21:18:46 -0000",
@@ -468,10 +477,46 @@
       "sha1_hash": "4a0dee6fe24ee634b7310c721c4ddd58f58c295e",
       "size": 15881,
       "updated_at": "Thu, 20 Aug 2026 22:10:30 -0000"
+    },
+    {
+      "created_at": "Tue, 25 Aug 2026 18:49:22 -0000",
+      "downloaded_size": 5008,
+      "is_directory": false,
+      "path": "terminal/terminal-audio.js",
+      "sha1_hash": "778fc9a6a9e91e5d3f48ecae097526c3890dae54",
+      "size": 5008,
+      "updated_at": "Tue, 25 Aug 2026 18:49:22 -0000"
+    },
+    {
+      "created_at": "Tue, 25 Aug 2026 18:49:38 -0000",
+      "downloaded_size": 3348,
+      "is_directory": false,
+      "path": "terminal/terminal-gpu.js",
+      "sha1_hash": "051ba01e297f488a3b6febaf76428d2366c10e0e",
+      "size": 3348,
+      "updated_at": "Tue, 25 Aug 2026 18:54:24 -0000"
+    },
+    {
+      "created_at": "Tue, 25 Aug 2026 18:29:09 -0000",
+      "downloaded_size": 13140,
+      "is_directory": false,
+      "path": "terminal/terminal.css",
+      "sha1_hash": "9b9169987eb1ea86d801050e53a56485cf819178",
+      "size": 13140,
+      "updated_at": "Tue, 25 Aug 2026 18:48:43 -0000"
+    },
+    {
+      "created_at": "Tue, 25 Aug 2026 18:29:35 -0000",
+      "downloaded_size": 5070,
+      "is_directory": false,
+      "path": "terminal/terminal.js",
+      "sha1_hash": "8d3040920f70acd653e891796ba59201b17e140d",
+      "size": 5070,
+      "updated_at": "Tue, 25 Aug 2026 18:48:58 -0000"
     }
   ],
   "site_origin": "https://gtterminal.neocities.org",
-  "snapshot_id": "gt-terminal-20260825T175832Z",
+  "snapshot_id": "gt-terminal-20260829T183248Z",
   "source": "Neocities authenticated /api/list plus public file reads",
-  "total_downloaded_bytes": 6192701
+  "total_downloaded_bytes": 6221454
 }
