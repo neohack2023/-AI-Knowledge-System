@@ -1,6 +1,6 @@
 {
-  "enabled": false,
-  "expires_at": "2026-08-25T20:30:00Z",
+  "enabled": true,
+  "expires_at": "2026-08-29T19:15:00Z",
   "scope": "gt-terminal",
-  "note": "terminal-channel-04 promoted to production index.html on Neocities and bridge receipt verified successful. Temporary production promotion window closed."
+  "note": "Temporary bounded snapshot window authorized by operator on 2026-08-29 for authenticated Neocities inventory plus public file mirror. No deployment mutation requested."
 }
