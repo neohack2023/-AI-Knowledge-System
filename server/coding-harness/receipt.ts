@@ -378,7 +378,9 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
   if (receipt.schema_version !== rebuilt.schema_version) issues.push("schema_version mismatch");
   if (receipt.verifier_acceptance_schema !== rebuilt.verifier_acceptance_schema) issues.push("verifier_acceptance_schema mismatch");
   if (receipt.terminal_status !== rebuilt.terminal_status) issues.push(`terminal_status must be mechanically derived as ${rebuilt.terminal_status}`);
-  if (JSON.stringify(receipt.obligations) !== JSON.stringify(rebuilt.obligations)) issues.push("obligation resolutions do not match mechanical recomputation");
+  if (JSON.stringify(stableValue(receipt.obligations)) !== JSON.stringify(stableValue(rebuilt.obligations))) {
+    issues.push("obligation resolutions do not match mechanical recomputation");
+  }
   const { receipt_digest, ...providedBody } = receipt;
   if (receipt_digest !== await sha256(providedBody)) issues.push("receipt_digest mismatch");
   return issues;
