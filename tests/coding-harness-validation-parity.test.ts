@@ -160,6 +160,40 @@ test("published harness receipt schema mirrors runtime canonical obligation iden
   }
 });
 
+test("published harness receipt schema mirrors runtime trimmed-nonempty obligation descriptions", async () => {
+  await assert.rejects(
+    () => createCodingHarnessExecutionReceipt(executionInput({
+      obligations: [{ obligation_id: "proof-validity", description: "   ", required: true }],
+      verifier_acceptance_inputs: [],
+    })),
+    (error) => {
+      assert.ok(error instanceof CodingHarnessReceiptValidationError);
+      assert.ok(error.issues.includes("description must be a non-empty string"));
+      return true;
+    },
+  );
+
+  const schema = JSON.parse(await readFile(
+    new URL("../schemas/aios-coding-harness-receipt-v0.1.schema.json", import.meta.url),
+    "utf8",
+  )) as {
+    properties?: {
+      obligations?: {
+        items?: {
+          properties?: {
+            description?: { pattern?: string };
+          };
+        };
+      };
+    };
+  };
+
+  const descriptionPattern = schema.properties?.obligations?.items?.properties?.description?.pattern;
+  assert.equal(descriptionPattern, "\\S");
+  assert.equal(new RegExp(descriptionPattern ?? "").test("   "), false);
+  assert.equal(new RegExp(descriptionPattern ?? "").test("Proof validity"), true);
+});
+
 test("verifier node IDs and priority references reject surrounding whitespace before graph matching", () => {
   assert.throws(
     () => createVerifierAcceptanceReceipt(acceptance({ verifier_id: " kernel-01 " })),
