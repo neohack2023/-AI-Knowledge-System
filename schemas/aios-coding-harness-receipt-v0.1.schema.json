@@ -52,7 +52,7 @@
         "required": ["obligation_id", "description", "required", "state", "acceptance_ids", "advisory_acceptance_ids", "reason_codes"],
         "properties": {
           "obligation_id": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" },
-          "description": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1, "pattern": "\\S" },
           "required": { "type": "boolean" },
           "state": { "enum": ["ACCEPTED", "REJECTED", "PARTIAL", "BLOCKED", "OPEN"] },
           "acceptance_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
