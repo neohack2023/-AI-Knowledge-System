@@ -51,7 +51,7 @@
     "higher_priority_verifier_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" } },
     "lower_priority_evidence_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" } },
     "retry_allowed": { "type": "boolean" },
-    "repair_feedback_pointer": { "type": ["string", "null"] },
-    "receipt_pointer": { "type": ["string", "null"] }
+    "repair_feedback_pointer": { "type": ["string", "null"], "minLength": 1 },
+    "receipt_pointer": { "type": ["string", "null"], "minLength": 1 }
   }
 }
