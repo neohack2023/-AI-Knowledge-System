@@ -30,20 +30,20 @@
   ],
   "properties": {
     "schema": { "const": "aios_verifier_acceptance_v0_1" },
-    "acceptance_id": { "type": "string", "minLength": 1 },
-    "scope_key": { "type": "string", "minLength": 1 },
-    "task_id": { "type": "string", "minLength": 1 },
-    "artifact_or_object_id": { "type": "string", "minLength": 1 },
-    "artifact_version_or_head": { "type": "string", "minLength": 1 },
-    "artifact_digest": { "type": "string", "minLength": 1 },
-    "obligation_id": { "type": "string", "minLength": 1 },
-    "obligation_description": { "type": "string", "minLength": 1 },
+    "acceptance_id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "scope_key": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "task_id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "artifact_or_object_id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "artifact_version_or_head": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "artifact_digest": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "obligation_id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "obligation_description": { "type": "string", "minLength": 1, "pattern": "\\S" },
     "verifier_id": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" },
-    "verifier_version": { "type": "string", "minLength": 1 },
+    "verifier_version": { "type": "string", "minLength": 1, "pattern": "\\S" },
     "verifier_authority_class": {
       "enum": ["HARD_KERNEL", "DETERMINISTIC_TASK_NATIVE", "EXACT_COMPARATOR", "EXECUTABLE_SCOPED", "HUMAN_GOVERNED", "MODEL_ADVISORY"]
     },
-    "verifier_input_digest": { "type": "string", "minLength": 1 },
+    "verifier_input_digest": { "type": "string", "minLength": 1, "pattern": "\\S" },
     "verifier_freshness_state": { "enum": ["CURRENT", "STALE", "UNKNOWN"] },
     "coverage_state": { "enum": ["COMPLETE_FOR_OBLIGATION", "PARTIAL", "UNKNOWN"] },
     "result": { "enum": ["PASS", "FAIL", "PARTIAL", "BLOCKED", "UNKNOWN"] },
@@ -51,7 +51,7 @@
     "higher_priority_verifier_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" } },
     "lower_priority_evidence_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" } },
     "retry_allowed": { "type": "boolean" },
-    "repair_feedback_pointer": { "type": ["string", "null"], "minLength": 1 },
-    "receipt_pointer": { "type": ["string", "null"], "minLength": 1 }
+    "repair_feedback_pointer": { "type": ["string", "null"], "minLength": 1, "pattern": "\\S" },
+    "receipt_pointer": { "type": ["string", "null"], "minLength": 1, "pattern": "\\S" }
   }
 }
