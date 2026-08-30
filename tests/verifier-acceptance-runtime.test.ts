@@ -7,11 +7,16 @@ import {
   createVerifierAcceptanceReceipt,
   resolveObligationAcceptance,
   verifyCodingHarnessReceipt,
+  type CodingHarnessExecutionInput,
   type VerifierAcceptanceInput,
 } from "../server/coding-harness/index.ts";
 
 const HEAD = "38917a9028ef64161adf3d9a4d2212a3917e1b31";
 const BASE = "4088c690ab8e0fbee761ff8e503bbe4273e4ed58";
+
+const DEFAULT_OBLIGATIONS = [
+  { obligation_id: "proof-validity", description: "Proof validity", required: true },
+];
 
 const acceptance = (overrides: Partial<VerifierAcceptanceInput> = {}): VerifierAcceptanceInput => ({
   acceptance_id: "acc-proof-001",
@@ -37,9 +42,11 @@ const acceptance = (overrides: Partial<VerifierAcceptanceInput> = {}): VerifierA
   ...overrides,
 });
 
-const harness = (verifier_acceptance_inputs: VerifierAcceptanceInput[], obligations = [
-  { obligation_id: "proof-validity", description: "Proof validity", required: true },
-]) => createCodingHarnessExecutionReceipt({
+const harness = (
+  verifier_acceptance_inputs: VerifierAcceptanceInput[],
+  obligations = DEFAULT_OBLIGATIONS,
+  overrides: Partial<CodingHarnessExecutionInput> = {},
+) => createCodingHarnessExecutionReceipt({
   repository: "neohack2023/-AI-Knowledge-System",
   head_sha: HEAD,
   base_sha: BASE,
@@ -50,6 +57,7 @@ const harness = (verifier_acceptance_inputs: VerifierAcceptanceInput[], obligati
   artifacts: [],
   known_regressions_loaded: ["VOA-01", "VOA-07"],
   failed_reason_codes: [],
+  ...overrides,
   obligations,
   verifier_acceptance_inputs,
 });
@@ -153,6 +161,46 @@ test("receipt digest and obligation states are mechanically replayable", async (
   const issues = await verifyCodingHarnessReceipt(tampered);
   assert.ok(issues.some((issue) => issue.includes("terminal_status must be mechanically derived")));
   assert.ok(issues.some((issue) => issue.includes("receipt_digest mismatch")));
+});
+
+test("receipt digest canonicalization does not depend on localeCompare", async () => {
+  const originalLocaleCompare = String.prototype.localeCompare;
+  try {
+    String.prototype.localeCompare = () => {
+      throw new Error("localeCompare must not participate in receipt canonicalization");
+    };
+    const receipt = await harness([acceptance()], DEFAULT_OBLIGATIONS, {
+      environment: { z: "last-ascii", "ä": "non-ascii" },
+    });
+    assert.match(receipt.receipt_digest, /^sha256:[0-9a-f]{64}$/);
+    assert.deepEqual(await verifyCodingHarnessReceipt(receipt), []);
+  } finally {
+    String.prototype.localeCompare = originalLocaleCompare;
+  }
+});
+
+test("schema-bound check and artifact arrays reject non-object entries", async () => {
+  await assert.rejects(
+    () => harness([acceptance()], DEFAULT_OBLIGATIONS, {
+      checks: [null as unknown as Record<string, unknown>],
+    }),
+    (error) => {
+      assert.ok(error instanceof CodingHarnessReceiptValidationError);
+      assert.ok(error.issues.includes("checks[0] must be an object"));
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => harness([acceptance()], DEFAULT_OBLIGATIONS, {
+      artifacts: ["build" as unknown as Record<string, unknown>],
+    }),
+    (error) => {
+      assert.ok(error instanceof CodingHarnessReceiptValidationError);
+      assert.ok(error.issues.includes("artifacts[0] must be an object"));
+      return true;
+    },
+  );
 });
 
 test("unresolved conflicting terminal verifiers fail closed", () => {
