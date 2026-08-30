@@ -4,8 +4,12 @@ import test from "node:test";
 
 import {
   CodingHarnessReceiptValidationError,
+  VerifierAcceptanceValidationError,
   createCodingHarnessExecutionReceipt,
+  createCodingHarnessReceipt,
+  createVerifierAcceptanceReceipt,
   type CodingHarnessExecutionInput,
+  type CodingHarnessReceiptInput,
   type VerifierAcceptanceInput,
 } from "../server/coding-harness/index.ts";
 
@@ -110,4 +114,39 @@ test("published receipt schema and runtime both require at least one mandatory o
   assert.equal(obligations?.minContains, 1);
   assert.deepEqual(obligations?.contains?.required, ["required"]);
   assert.equal(obligations?.contains?.properties?.required?.const, true);
+});
+
+test("verifier node IDs and priority references reject surrounding whitespace before graph matching", () => {
+  assert.throws(
+    () => createVerifierAcceptanceReceipt(acceptance({ verifier_id: " kernel-01 " })),
+    (error) => {
+      assert.ok(error instanceof VerifierAcceptanceValidationError);
+      assert.ok(error.issues.includes("verifier_id must not have leading or trailing whitespace"));
+      return true;
+    },
+  );
+
+  assert.throws(
+    () => createVerifierAcceptanceReceipt(acceptance({
+      higher_priority_verifier_ids: [" kernel-high "],
+    })),
+    (error) => {
+      assert.ok(error instanceof VerifierAcceptanceValidationError);
+      assert.ok(error.issues.includes("higher_priority_verifier_ids must not contain identifiers with leading or trailing whitespace"));
+      return true;
+    },
+  );
+});
+
+test("direct CodingHarness receipt construction guards null and array roots", async () => {
+  for (const malformed of [null, []]) {
+    await assert.rejects(
+      () => createCodingHarnessReceipt(malformed as unknown as CodingHarnessReceiptInput),
+      (error) => {
+        assert.ok(error instanceof CodingHarnessReceiptValidationError);
+        assert.ok(error.issues.includes("receipt input must be an object"));
+        return true;
+      },
+    );
+  }
 });
