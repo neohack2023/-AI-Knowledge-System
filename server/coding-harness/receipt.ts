@@ -81,6 +81,37 @@ const isJsonObject = (value: unknown): value is JsonObject => value !== null && 
 const repositoryName = /^[^/]+\/[^/]+$/;
 const gitSha = /^[0-9a-f]{40}$/i;
 
+const obligationInputFields = new Set(["obligation_id", "description", "required"]);
+const codingHarnessReceiptFields = new Set([
+  "schema_version",
+  "verifier_acceptance_schema",
+  "repository",
+  "head_sha",
+  "base_sha",
+  "profile",
+  "environment",
+  "changed_paths",
+  "checks",
+  "artifacts",
+  "known_regressions_loaded",
+  "failed_reason_codes",
+  "obligations",
+  "verifier_acceptances",
+  "terminal_status",
+  "receipt_digest",
+]);
+
+const validateAllowedFields = (
+  record: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  field: string,
+  issues: string[],
+) => {
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) issues.push(`${field} contains unknown field ${key}`);
+  }
+};
+
 const validateStringList = (value: unknown, field: string, issues: string[]) => {
   if (!Array.isArray(value)) {
     issues.push(`${field} must be an array`);
@@ -125,6 +156,8 @@ const validateObligations = (value: unknown, issues: string[]): Set<string> => {
       issues.push(`obligations[${index}] must be an object`);
       return;
     }
+
+    validateAllowedFields(entry, obligationInputFields, `obligations[${index}]`, issues);
 
     const obligationId = entry.obligation_id;
     if (!nonEmpty(obligationId)) {
@@ -232,7 +265,9 @@ export const createCodingHarnessReceipt = async (input: CodingHarnessReceiptInpu
   const obligations: CodingHarnessObligation[] = input.obligations.map((obligation) => {
     const resolution = resolveObligationAcceptance(input.verifier_acceptances, input.head_sha, obligation.obligation_id);
     return {
-      ...obligation,
+      obligation_id: obligation.obligation_id,
+      description: obligation.description,
+      required: obligation.required,
       state: resolution.state,
       acceptance_ids: resolution.decisive_acceptance_ids,
       advisory_acceptance_ids: resolution.advisory_acceptance_ids,
@@ -276,7 +311,11 @@ export const createCodingHarnessExecutionReceipt = async (
 };
 
 export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt): Promise<string[]> => {
-  const issues = validateInput({
+  const issues: string[] = [];
+  if (!isJsonObject(receipt)) return ["receipt must be an object"];
+  validateAllowedFields(receipt, codingHarnessReceiptFields, "receipt", issues);
+
+  issues.push(...validateInput({
     repository: receipt.repository,
     head_sha: receipt.head_sha,
     base_sha: receipt.base_sha,
@@ -289,7 +328,7 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
     failed_reason_codes: receipt.failed_reason_codes,
     obligations: receipt.obligations.map(({ obligation_id, description, required }) => ({ obligation_id, description, required })),
     verifier_acceptances: receipt.verifier_acceptances,
-  });
+  }));
 
   const rebuilt = await createCodingHarnessReceipt({
     repository: receipt.repository,
