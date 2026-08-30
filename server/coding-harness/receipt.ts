@@ -40,7 +40,6 @@ export type CodingHarnessReceiptInput = {
   failed_reason_codes?: string[];
   obligations: CodingHarnessObligationInput[];
   verifier_acceptances: VerifierAcceptanceReceipt[];
-  flaky?: boolean;
 };
 
 export type CodingHarnessExecutionInput = Omit<CodingHarnessReceiptInput, "verifier_acceptances"> & {
@@ -78,6 +77,7 @@ export class CodingHarnessReceiptValidationError extends Error {
 }
 
 const nonEmpty = (value: unknown) => typeof value === "string" && value.trim().length > 0;
+const repositoryName = /^[^/]+\/[^/]+$/;
 const gitSha = /^[0-9a-f]{40}$/i;
 
 const validateStringList = (value: unknown, field: string, issues: string[]) => {
@@ -99,7 +99,7 @@ const validateStringList = (value: unknown, field: string, issues: string[]) => 
 
 const validateInput = (input: CodingHarnessReceiptInput): string[] => {
   const issues: string[] = [];
-  if (!nonEmpty(input.repository) || !input.repository.includes("/")) issues.push("repository must be owner/repo");
+  if (!nonEmpty(input.repository) || !repositoryName.test(input.repository)) issues.push("repository must be owner/repo");
   if (!gitSha.test(input.head_sha)) issues.push("head_sha must be an exact 40-character Git SHA");
   if (input.base_sha !== undefined && input.base_sha !== null && !gitSha.test(input.base_sha)) {
     issues.push("base_sha must be null or an exact 40-character Git SHA");
@@ -144,7 +144,6 @@ const validateInput = (input: CodingHarnessReceiptInput): string[] => {
   if (input.environment !== undefined && (input.environment === null || typeof input.environment !== "object" || Array.isArray(input.environment))) {
     issues.push("environment must be an object");
   }
-  if (input.flaky !== undefined && typeof input.flaky !== "boolean") issues.push("flaky must be boolean");
   return issues;
 };
 
@@ -166,12 +165,13 @@ const sha256 = async (value: unknown) => {
   return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 };
 
-const terminalStatusFor = (obligations: readonly CodingHarnessObligation[], flaky: boolean): CodingHarnessTerminalStatus => {
+const terminalStatusFor = (obligations: readonly CodingHarnessObligation[], checks: readonly JsonObject[]): CodingHarnessTerminalStatus => {
   const required = obligations.filter((obligation) => obligation.required);
   if (required.some((obligation) => obligation.state === "REJECTED")) return "FAIL";
   if (required.some((obligation) => obligation.state === "BLOCKED")) return "BLOCKED";
   if (required.some((obligation) => obligation.state !== "ACCEPTED")) return "PARTIAL";
-  return flaky ? "FLAKY" : "PASS";
+  const hasFlakyCheck = checks.some((check) => check.status === "FLAKY");
+  return hasFlakyCheck ? "FLAKY" : "PASS";
 };
 
 export const createCodingHarnessReceipt = async (input: CodingHarnessReceiptInput): Promise<CodingHarnessReceipt> => {
@@ -204,7 +204,7 @@ export const createCodingHarnessReceipt = async (input: CodingHarnessReceiptInpu
     failed_reason_codes: [...(input.failed_reason_codes ?? [])],
     obligations,
     verifier_acceptances: input.verifier_acceptances.map((receipt) => ({ ...receipt })),
-    terminal_status: terminalStatusFor(obligations, input.flaky ?? false),
+    terminal_status: terminalStatusFor(obligations, input.checks ?? []),
   };
 
   return {
@@ -235,7 +235,6 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
     failed_reason_codes: receipt.failed_reason_codes,
     obligations: receipt.obligations.map(({ obligation_id, description, required }) => ({ obligation_id, description, required })),
     verifier_acceptances: receipt.verifier_acceptances,
-    flaky: receipt.terminal_status === "FLAKY",
   });
 
   const rebuilt = await createCodingHarnessReceipt({
@@ -251,7 +250,6 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
     failed_reason_codes: receipt.failed_reason_codes,
     obligations: receipt.obligations.map(({ obligation_id, description, required }) => ({ obligation_id, description, required })),
     verifier_acceptances: receipt.verifier_acceptances,
-    flaky: receipt.terminal_status === "FLAKY",
   }).catch(() => null);
 
   if (!rebuilt) return issues.length > 0 ? issues : ["receipt could not be mechanically rebuilt"];

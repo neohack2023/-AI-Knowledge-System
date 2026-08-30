@@ -14,8 +14,10 @@ jobs:
       PUBLIC_RELEASE_PRIVATE_TERMS: aios-ci-private-term-${{ github.run_id }}
       PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
-      - name: Checkout
+      - name: Checkout exact PR head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -48,7 +50,8 @@ jobs:
         if: always()
         env:
           BUILD_TEST_OUTCOME: ${{ steps.build_test.outcome }}
-          AIOS_HEAD_SHA: ${{ github.sha }}
+          AIOS_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AIOS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           AIOS_REPOSITORY: ${{ github.repository }}
           AIOS_RUN_ID: ${{ github.run_id }}
         run: |
@@ -59,12 +62,13 @@ jobs:
           const result = outcome === 'success' ? 'PASS' : outcome === 'failure' ? 'FAIL' : 'BLOCKED';
           const coverage = result === 'BLOCKED' ? 'UNKNOWN' : 'COMPLETE_FOR_OBLIGATION';
           const head = process.env.AIOS_HEAD_SHA;
+          const base = process.env.AIOS_BASE_SHA;
           const repository = process.env.AIOS_REPOSITORY;
           const runId = process.env.AIOS_RUN_ID;
           const input = {
             repository,
             head_sha: head,
-            base_sha: null,
+            base_sha: base,
             profile: 'PR',
             environment: { github_actions_run_id: runId, runner: 'ubuntu-latest', node: '22' },
             changed_paths: [],

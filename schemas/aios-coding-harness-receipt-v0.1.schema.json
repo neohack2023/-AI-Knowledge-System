@@ -55,7 +55,7 @@
     },
     "verifier_acceptances": {
       "type": "array",
-      "items": { "$ref": "aios-verifier-acceptance-v0.1.schema.json" }
+      "items": { "$ref": "urn:aios:schemas:verifier-acceptance:v0.1" }
     },
     "terminal_status": { "enum": ["PASS", "FAIL", "PARTIAL", "FLAKY", "BLOCKED"] },
     "receipt_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
