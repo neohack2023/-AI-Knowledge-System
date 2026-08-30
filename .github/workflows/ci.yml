@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -57,6 +58,7 @@ jobs:
         run: |
           mkdir -p outputs
           node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
           import { writeFile } from 'node:fs/promises';
           const outcome = process.env.BUILD_TEST_OUTCOME || 'skipped';
           const result = outcome === 'success' ? 'PASS' : outcome === 'failure' ? 'FAIL' : 'BLOCKED';
@@ -65,13 +67,18 @@ jobs:
           const base = process.env.AIOS_BASE_SHA;
           const repository = process.env.AIOS_REPOSITORY;
           const runId = process.env.AIOS_RUN_ID;
+          const changedPaths = execFileSync('git', ['diff', '--name-only', '-z', base, head])
+            .toString('utf8')
+            .split('\0')
+            .filter(Boolean)
+            .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
           const input = {
             repository,
             head_sha: head,
             base_sha: base,
             profile: 'PR',
             environment: { github_actions_run_id: runId, runner: 'ubuntu-latest', node: '22' },
-            changed_paths: [],
+            changed_paths: changedPaths,
             checks: [{ id: 'build-and-test', outcome }],
             artifacts: [],
             known_regressions_loaded: ['VERIFIER_OWNED_ACCEPTANCE_01'],
