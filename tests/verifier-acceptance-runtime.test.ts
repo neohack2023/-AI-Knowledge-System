@@ -27,7 +27,7 @@ const acceptance = (overrides: Partial<VerifierAcceptanceInput> = {}): VerifierA
   artifact_version_or_head: HEAD,
   artifact_digest: `git-sha:${HEAD}`,
   obligation_id: "proof-validity",
-  obligation_description: "The declared proof obligation is mechanically valid.",
+  obligation_description: "Proof validity",
   verifier_id: "kernel-01",
   verifier_version: "1.0.0",
   verifier_authority_class: "HARD_KERNEL",
@@ -115,7 +115,7 @@ test("scoped exact comparator cannot close unrelated required obligations", asyn
   const comparator = acceptance({
     acceptance_id: "acc-provenance-001",
     obligation_id: "protected-provenance",
-    obligation_description: "Protected provenance fields exact-match.",
+    obligation_description: "Protected provenance exact match",
     verifier_id: "protected-field-comparator-v1",
     verifier_authority_class: "EXACT_COMPARATOR",
   });
