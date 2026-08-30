@@ -309,3 +309,34 @@ test("undeclared top-level receipt fields are rejected during verification", asy
   const issues = await verifyCodingHarnessReceipt(malformed);
   assert.ok(issues.includes("receipt contains unknown field undeclared_receipt_note"));
 });
+
+test("verification requires schema-required top-level fields even when creation would default them", async () => {
+  const receipt = await harness([acceptance()]);
+  const { environment: _removed, ...malformed } = receipt;
+  const issues = await verifyCodingHarnessReceipt(malformed as unknown as typeof receipt);
+  assert.ok(issues.includes("receipt missing required field environment"));
+});
+
+test("verification requires normalized verifier receipt fields before priority traversal", async () => {
+  const receipt = await harness([acceptance()]);
+  const [first, ...rest] = receipt.verifier_acceptances;
+  const { higher_priority_verifier_ids: _removed, ...malformedAcceptance } = first;
+  const malformed = {
+    ...receipt,
+    verifier_acceptances: [malformedAcceptance, ...rest],
+  } as unknown as typeof receipt;
+
+  const issues = await verifyCodingHarnessReceipt(malformed);
+  assert.ok(issues.some((issue) => issue.includes("missing required field higher_priority_verifier_ids")));
+});
+
+test("verification shape-checks receipt obligations before projecting their fields", async () => {
+  const receipt = await harness([acceptance()]);
+  const malformed = {
+    ...receipt,
+    obligations: [null],
+  } as unknown as typeof receipt;
+
+  const issues = await verifyCodingHarnessReceipt(malformed);
+  assert.ok(issues.includes("receipt obligations[0] must be an object"));
+});
