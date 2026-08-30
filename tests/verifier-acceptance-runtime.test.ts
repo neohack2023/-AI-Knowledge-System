@@ -164,6 +164,26 @@ test("receipt digest and obligation states are mechanically replayable", async (
   assert.ok(issues.some((issue) => issue.includes("receipt_digest mismatch")));
 });
 
+test("receipt verification ignores semantically irrelevant obligation key order", async () => {
+  const receipt = await harness([acceptance()]);
+  const obligation = receipt.obligations[0];
+  const reordered = {
+    ...receipt,
+    obligations: [{
+      reason_codes: obligation.reason_codes,
+      advisory_acceptance_ids: obligation.advisory_acceptance_ids,
+      acceptance_ids: obligation.acceptance_ids,
+      state: obligation.state,
+      required: obligation.required,
+      description: obligation.description,
+      obligation_id: obligation.obligation_id,
+    }],
+  };
+
+  assert.equal(reordered.receipt_digest, receipt.receipt_digest);
+  assert.deepEqual(await verifyCodingHarnessReceipt(reordered), []);
+});
+
 test("receipt digest canonicalization does not depend on localeCompare", async () => {
   const originalLocaleCompare = String.prototype.localeCompare;
   try {
