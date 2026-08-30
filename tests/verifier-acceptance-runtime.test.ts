@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   CodingHarnessReceiptValidationError,
+  VerifierAcceptanceValidationError,
   createCodingHarnessExecutionReceipt,
   createVerifierAcceptanceReceipt,
   resolveObligationAcceptance,
@@ -225,4 +226,57 @@ test("cyclic verifier priority declarations fail closed", () => {
   const resolution = resolveObligationAcceptance([first, second], HEAD, "proof-validity");
   assert.equal(resolution.state, "BLOCKED");
   assert.ok(resolution.reason_codes.includes("VERIFIER_PRIORITY_CYCLE_OR_NO_MAXIMAL_OWNER"));
+});
+
+test("a priority cycle cannot be hidden by an unrelated maximal verifier", () => {
+  const first = createVerifierAcceptanceReceipt(acceptance({
+    acceptance_id: "acc-cycle-hidden-a",
+    verifier_id: "kernel-cycle-a",
+    higher_priority_verifier_ids: ["kernel-cycle-b"],
+    result: "PASS",
+  }));
+  const second = createVerifierAcceptanceReceipt(acceptance({
+    acceptance_id: "acc-cycle-hidden-b",
+    verifier_id: "kernel-cycle-b",
+    higher_priority_verifier_ids: ["kernel-cycle-a"],
+    result: "FAIL",
+  }));
+  const unrelated = createVerifierAcceptanceReceipt(acceptance({
+    acceptance_id: "acc-unrelated-maximal",
+    verifier_id: "kernel-independent",
+    result: "PASS",
+  }));
+  const resolution = resolveObligationAcceptance([first, second, unrelated], HEAD, "proof-validity");
+  assert.equal(resolution.state, "BLOCKED");
+  assert.ok(resolution.reason_codes.includes("VERIFIER_PRIORITY_CYCLE_OR_NO_MAXIMAL_OWNER"));
+});
+
+test("undeclared verifier fields are rejected before a schema-bound receipt is emitted", () => {
+  const malformed = {
+    ...acceptance(),
+    undeclared_review_hint: "should-not-survive",
+  } as unknown as VerifierAcceptanceInput;
+
+  assert.throws(
+    () => createVerifierAcceptanceReceipt(malformed),
+    (error) => {
+      assert.ok(error instanceof VerifierAcceptanceValidationError);
+      assert.ok(error.issues.includes("unknown field undeclared_review_hint"));
+      return true;
+    },
+  );
+});
+
+test("malformed obligation entries fail with a controlled validation error before dereference", async () => {
+  await assert.rejects(
+    () => harness(
+      [acceptance()],
+      [null as unknown as (typeof DEFAULT_OBLIGATIONS)[number]],
+    ),
+    (error) => {
+      assert.ok(error instanceof CodingHarnessReceiptValidationError);
+      assert.ok(error.issues.includes("obligations[0] must be an object"));
+      return true;
+    },
+  );
 });
