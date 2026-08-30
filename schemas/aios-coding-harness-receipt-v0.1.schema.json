@@ -51,7 +51,7 @@
         "additionalProperties": false,
         "required": ["obligation_id", "description", "required", "state", "acceptance_ids", "advisory_acceptance_ids", "reason_codes"],
         "properties": {
-          "obligation_id": { "type": "string", "minLength": 1 },
+          "obligation_id": { "type": "string", "minLength": 1, "pattern": "^(?:\\S|\\S[\\s\\S]*\\S)$" },
           "description": { "type": "string", "minLength": 1 },
           "required": { "type": "boolean" },
           "state": { "enum": ["ACCEPTED", "REJECTED", "PARTIAL", "BLOCKED", "OPEN"] },
