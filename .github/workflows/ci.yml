@@ -67,7 +67,7 @@ jobs:
           const base = process.env.AIOS_BASE_SHA;
           const repository = process.env.AIOS_REPOSITORY;
           const runId = process.env.AIOS_RUN_ID;
-          const changedPaths = execFileSync('git', ['diff', '--name-only', '-z', base, head])
+          const changedPaths = execFileSync('git', ['diff', '--name-only', '-z', `${base}...${head}`])
             .toString('utf8')
             .split('\0')
             .filter(Boolean)
