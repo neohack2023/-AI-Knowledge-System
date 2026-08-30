@@ -272,7 +272,10 @@ const terminalStatusFor = (obligations: readonly CodingHarnessObligation[], chec
 };
 
 export const createCodingHarnessReceipt = async (input: CodingHarnessReceiptInput): Promise<CodingHarnessReceipt> => {
-  const issues = validateInput(input);
+  if (!isJsonObject(input)) {
+    throw new CodingHarnessReceiptValidationError(["receipt input must be an object"]);
+  }
+  const issues = validateInput(input as CodingHarnessReceiptInput);
   if (issues.length > 0) throw new CodingHarnessReceiptValidationError(issues);
 
   const obligations: CodingHarnessObligation[] = input.obligations.map((obligation) => {
