@@ -174,7 +174,9 @@ const validateObligations = (value: unknown, issues: string[]): Set<string> => {
     if (!nonEmpty(obligationId)) {
       issues.push("obligation_id must be a non-empty string");
     } else {
-      const normalizedId = (obligationId as string).trim();
+      const rawId = obligationId as string;
+      const normalizedId = rawId.trim();
+      if (rawId !== normalizedId) issues.push("obligation_id must not have leading or trailing whitespace");
       if (obligationIds.has(normalizedId)) issues.push(`duplicate obligation ${normalizedId}`);
       obligationIds.add(normalizedId);
     }
@@ -313,12 +315,15 @@ export const createCodingHarnessReceipt = async (input: CodingHarnessReceiptInpu
 export const createCodingHarnessExecutionReceipt = async (
   input: CodingHarnessExecutionInput,
 ): Promise<CodingHarnessReceipt> => {
+  if (!isJsonObject(input)) {
+    throw new CodingHarnessReceiptValidationError(["execution input must be an object"]);
+  }
   if (!Array.isArray(input.verifier_acceptance_inputs)) {
     throw new CodingHarnessReceiptValidationError(["verifier_acceptance_inputs must be an array"]);
   }
   const { verifier_acceptance_inputs, ...harnessInput } = input;
   const verifier_acceptances = verifier_acceptance_inputs.map(createVerifierAcceptanceReceipt);
-  return createCodingHarnessReceipt({ ...harnessInput, verifier_acceptances });
+  return createCodingHarnessReceipt({ ...harnessInput, verifier_acceptances } as CodingHarnessReceiptInput);
 };
 
 export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt): Promise<string[]> => {
