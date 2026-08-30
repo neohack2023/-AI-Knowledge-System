@@ -204,6 +204,15 @@ const validateInput = (input: CodingHarnessReceiptInput): string[] => {
   if (!codingHarnessProfiles.includes(input.profile)) issues.push(`profile must be one of ${codingHarnessProfiles.join(" | ")}`);
 
   const obligationIds = validateObligations(input.obligations, issues);
+  const obligationDescriptions = new Map<string, string>();
+  if (Array.isArray(input.obligations)) {
+    for (const obligation of input.obligations) {
+      if (!isJsonObject(obligation) || !nonEmpty(obligation.obligation_id) || !nonEmpty(obligation.description)) continue;
+      const obligationId = obligation.obligation_id as string;
+      if (obligationId !== obligationId.trim()) continue;
+      obligationDescriptions.set(obligationId, obligation.description as string);
+    }
+  }
 
   if (!Array.isArray(input.verifier_acceptances)) {
     issues.push("verifier_acceptances must be an array");
@@ -227,8 +236,11 @@ const validateInput = (input: CodingHarnessReceiptInput): string[] => {
       if (receipt.artifact_version_or_head !== input.head_sha) {
         issues.push(`acceptance ${acceptanceId}: artifact_version_or_head must equal harness head_sha`);
       }
-      if (!obligationIds.has(receipt.obligation_id as string)) {
+      const obligationId = receipt.obligation_id as string;
+      if (!obligationIds.has(obligationId)) {
         issues.push(`acceptance ${acceptanceId}: obligation ${String(receipt.obligation_id ?? "<missing>")} is not declared by the harness receipt`);
+      } else if (receipt.obligation_description !== obligationDescriptions.get(obligationId)) {
+        issues.push(`acceptance ${acceptanceId}: obligation_description must equal harness obligation description for ${obligationId}`);
       }
     });
   }
