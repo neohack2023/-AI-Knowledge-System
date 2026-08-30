@@ -77,6 +77,7 @@ export class CodingHarnessReceiptValidationError extends Error {
 }
 
 const nonEmpty = (value: unknown) => typeof value === "string" && value.trim().length > 0;
+const isJsonObject = (value: unknown): value is JsonObject => value !== null && typeof value === "object" && !Array.isArray(value);
 const repositoryName = /^[^/]+\/[^/]+$/;
 const gitSha = /^[0-9a-f]{40}$/i;
 
@@ -95,6 +96,16 @@ const validateStringList = (value: unknown, field: string, issues: string[]) => 
     if (seen.has(normalized)) issues.push(`${field} contains duplicate ${normalized}`);
     seen.add(normalized);
   }
+};
+
+const validateJsonObjectList = (value: unknown, field: string, issues: string[]) => {
+  if (!Array.isArray(value)) {
+    issues.push(`${field} must be an array`);
+    return;
+  }
+  value.forEach((entry, index) => {
+    if (!isJsonObject(entry)) issues.push(`${field}[${index}] must be an object`);
+  });
 };
 
 const validateInput = (input: CodingHarnessReceiptInput): string[] => {
@@ -139,20 +150,20 @@ const validateInput = (input: CodingHarnessReceiptInput): string[] => {
   validateStringList(input.changed_paths ?? [], "changed_paths", issues);
   validateStringList(input.known_regressions_loaded ?? [], "known_regressions_loaded", issues);
   validateStringList(input.failed_reason_codes ?? [], "failed_reason_codes", issues);
-  if (input.checks !== undefined && !Array.isArray(input.checks)) issues.push("checks must be an array");
-  if (input.artifacts !== undefined && !Array.isArray(input.artifacts)) issues.push("artifacts must be an array");
-  if (input.environment !== undefined && (input.environment === null || typeof input.environment !== "object" || Array.isArray(input.environment))) {
-    issues.push("environment must be an object");
-  }
+  if (input.checks !== undefined) validateJsonObjectList(input.checks, "checks", issues);
+  if (input.artifacts !== undefined) validateJsonObjectList(input.artifacts, "artifacts", issues);
+  if (input.environment !== undefined && !isJsonObject(input.environment)) issues.push("environment must be an object");
   return issues;
 };
+
+const compareCodeUnits = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
 
 const stableValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(stableValue);
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareCodeUnits(left, right))
         .map(([key, entry]) => [key, stableValue(entry)]),
     );
   }
