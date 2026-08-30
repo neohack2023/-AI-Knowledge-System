@@ -168,7 +168,7 @@ test("published harness receipt schema mirrors runtime trimmed-nonempty obligati
     })),
     (error) => {
       assert.ok(error instanceof CodingHarnessReceiptValidationError);
-      assert.ok(error.issues.includes("description must be a non-empty string"));
+      assert.ok(error.issues.includes("obligation proof-validity needs a description"));
       return true;
     },
   );
