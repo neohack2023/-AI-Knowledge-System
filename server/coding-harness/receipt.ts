@@ -140,6 +140,22 @@ const validateStringList = (value: unknown, field: string, issues: string[]) => 
   }
 };
 
+const validateRawStringList = (value: unknown, field: string, issues: string[]) => {
+  if (!Array.isArray(value)) {
+    issues.push(`${field} must be an array`);
+    return;
+  }
+  const seen = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string" || entry.length === 0) {
+      issues.push(`${field} must contain non-empty strings`);
+      continue;
+    }
+    if (seen.has(entry)) issues.push(`${field} contains duplicate ${entry}`);
+    seen.add(entry);
+  }
+};
+
 const validateJsonObjectList = (value: unknown, field: string, issues: string[]) => {
   if (!Array.isArray(value)) {
     issues.push(`${field} must be an array`);
@@ -245,7 +261,7 @@ const validateInput = (input: CodingHarnessReceiptInput): string[] => {
     });
   }
 
-  validateStringList(input.changed_paths ?? [], "changed_paths", issues);
+  validateRawStringList(input.changed_paths ?? [], "changed_paths", issues);
   validateStringList(input.known_regressions_loaded ?? [], "known_regressions_loaded", issues);
   validateStringList(input.failed_reason_codes ?? [], "failed_reason_codes", issues);
   if (input.checks !== undefined) validateJsonObjectList(input.checks, "checks", issues);
