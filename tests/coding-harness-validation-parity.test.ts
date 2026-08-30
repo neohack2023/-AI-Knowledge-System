@@ -138,6 +138,31 @@ test("verifier node IDs and priority references reject surrounding whitespace be
   );
 });
 
+test("published verifier schema mirrors runtime canonical identifier boundaries", async () => {
+  const schema = JSON.parse(await readFile(
+    new URL("../schemas/aios-verifier-acceptance-v0.1.schema.json", import.meta.url),
+    "utf8",
+  )) as {
+    properties?: {
+      verifier_id?: { pattern?: string };
+      higher_priority_verifier_ids?: { items?: { pattern?: string } };
+      lower_priority_evidence_ids?: { items?: { pattern?: string } };
+    };
+  };
+
+  const canonicalIdentifierPattern = /^(?:\S|\S[\s\S]*\S)$/;
+  assert.equal(schema.properties?.verifier_id?.pattern, canonicalIdentifierPattern.source);
+  assert.equal(schema.properties?.higher_priority_verifier_ids?.items?.pattern, canonicalIdentifierPattern.source);
+  assert.equal(schema.properties?.lower_priority_evidence_ids?.items?.pattern, canonicalIdentifierPattern.source);
+
+  for (const candidate of [" kernel-01 ", "kernel-01 ", " kernel-01", "\tkernel-01", "kernel-01\n"]) {
+    assert.equal(canonicalIdentifierPattern.test(candidate), false);
+  }
+  for (const candidate of ["kernel-01", "kernel high", "κernel-01"]) {
+    assert.equal(canonicalIdentifierPattern.test(candidate), true);
+  }
+});
+
 test("direct CodingHarness receipt construction guards null and array roots", async () => {
   for (const malformed of [null, []]) {
     await assert.rejects(
