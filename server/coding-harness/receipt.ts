@@ -108,6 +108,46 @@ const validateJsonObjectList = (value: unknown, field: string, issues: string[])
   });
 };
 
+const validateObligations = (value: unknown, issues: string[]): Set<string> => {
+  const obligationIds = new Set<string>();
+  if (!Array.isArray(value)) {
+    issues.push("obligations must be an array");
+    return obligationIds;
+  }
+  if (value.length === 0) {
+    issues.push("at least one obligation is required");
+    return obligationIds;
+  }
+
+  let hasRequired = false;
+  value.forEach((entry, index) => {
+    if (!isJsonObject(entry)) {
+      issues.push(`obligations[${index}] must be an object`);
+      return;
+    }
+
+    const obligationId = entry.obligation_id;
+    if (!nonEmpty(obligationId)) {
+      issues.push("obligation_id must be a non-empty string");
+    } else {
+      const normalizedId = (obligationId as string).trim();
+      if (obligationIds.has(normalizedId)) issues.push(`duplicate obligation ${normalizedId}`);
+      obligationIds.add(normalizedId);
+    }
+
+    if (!nonEmpty(entry.description)) {
+      issues.push(`obligation ${nonEmpty(obligationId) ? (obligationId as string) : "<missing>"} needs a description`);
+    }
+    if (typeof entry.required !== "boolean") {
+      issues.push(`obligation ${nonEmpty(obligationId) ? (obligationId as string) : "<missing>"} required must be boolean`);
+    }
+    if (entry.required === true) hasRequired = true;
+  });
+
+  if (!hasRequired) issues.push("at least one obligation must be required");
+  return obligationIds;
+};
+
 const validateInput = (input: CodingHarnessReceiptInput): string[] => {
   const issues: string[] = [];
   if (!nonEmpty(input.repository) || !repositoryName.test(input.repository)) issues.push("repository must be owner/repo");
@@ -116,35 +156,35 @@ const validateInput = (input: CodingHarnessReceiptInput): string[] => {
     issues.push("base_sha must be null or an exact 40-character Git SHA");
   }
   if (!codingHarnessProfiles.includes(input.profile)) issues.push(`profile must be one of ${codingHarnessProfiles.join(" | ")}`);
-  if (!Array.isArray(input.obligations) || input.obligations.length === 0) issues.push("at least one obligation is required");
-  if (Array.isArray(input.obligations) && !input.obligations.some((obligation) => obligation.required)) {
-    issues.push("at least one obligation must be required");
-  }
-  const obligationIds = new Set<string>();
-  for (const obligation of input.obligations ?? []) {
-    if (!nonEmpty(obligation.obligation_id)) issues.push("obligation_id must be a non-empty string");
-    if (!nonEmpty(obligation.description)) issues.push(`obligation ${obligation.obligation_id || "<missing>"} needs a description`);
-    if (typeof obligation.required !== "boolean") issues.push(`obligation ${obligation.obligation_id || "<missing>"} required must be boolean`);
-    if (obligationIds.has(obligation.obligation_id)) issues.push(`duplicate obligation ${obligation.obligation_id}`);
-    obligationIds.add(obligation.obligation_id);
-  }
 
-  if (!Array.isArray(input.verifier_acceptances)) issues.push("verifier_acceptances must be an array");
-  const acceptanceIds = new Set<string>();
-  for (const receipt of input.verifier_acceptances ?? []) {
-    const receiptIssues = validateVerifierAcceptanceReceipt(receipt);
-    issues.push(...receiptIssues.map((issue) => `acceptance ${receipt.acceptance_id || "<missing>"}: ${issue}`));
-    if (acceptanceIds.has(receipt.acceptance_id)) issues.push(`duplicate acceptance_id ${receipt.acceptance_id}`);
-    acceptanceIds.add(receipt.acceptance_id);
-    if (receipt.artifact_or_object_id !== input.repository) {
-      issues.push(`acceptance ${receipt.acceptance_id}: artifact_or_object_id must equal harness repository`);
-    }
-    if (receipt.artifact_version_or_head !== input.head_sha) {
-      issues.push(`acceptance ${receipt.acceptance_id}: artifact_version_or_head must equal harness head_sha`);
-    }
-    if (!obligationIds.has(receipt.obligation_id)) {
-      issues.push(`acceptance ${receipt.acceptance_id}: obligation ${receipt.obligation_id} is not declared by the harness receipt`);
-    }
+  const obligationIds = validateObligations(input.obligations, issues);
+
+  if (!Array.isArray(input.verifier_acceptances)) {
+    issues.push("verifier_acceptances must be an array");
+  } else {
+    const acceptanceIds = new Set<string>();
+    input.verifier_acceptances.forEach((receipt, index) => {
+      if (!isJsonObject(receipt)) {
+        issues.push(`verifier_acceptances[${index}] must be an object`);
+        return;
+      }
+      const receiptIssues = validateVerifierAcceptanceReceipt(receipt);
+      const acceptanceId = nonEmpty(receipt.acceptance_id) ? (receipt.acceptance_id as string) : "<missing>";
+      issues.push(...receiptIssues.map((issue) => `acceptance ${acceptanceId}: ${issue}`));
+      if (acceptanceId !== "<missing>") {
+        if (acceptanceIds.has(acceptanceId)) issues.push(`duplicate acceptance_id ${acceptanceId}`);
+        acceptanceIds.add(acceptanceId);
+      }
+      if (receipt.artifact_or_object_id !== input.repository) {
+        issues.push(`acceptance ${acceptanceId}: artifact_or_object_id must equal harness repository`);
+      }
+      if (receipt.artifact_version_or_head !== input.head_sha) {
+        issues.push(`acceptance ${acceptanceId}: artifact_version_or_head must equal harness head_sha`);
+      }
+      if (!obligationIds.has(receipt.obligation_id as string)) {
+        issues.push(`acceptance ${acceptanceId}: obligation ${String(receipt.obligation_id ?? "<missing>")} is not declared by the harness receipt`);
+      }
+    });
   }
 
   validateStringList(input.changed_paths ?? [], "changed_paths", issues);
@@ -227,6 +267,9 @@ export const createCodingHarnessReceipt = async (input: CodingHarnessReceiptInpu
 export const createCodingHarnessExecutionReceipt = async (
   input: CodingHarnessExecutionInput,
 ): Promise<CodingHarnessReceipt> => {
+  if (!Array.isArray(input.verifier_acceptance_inputs)) {
+    throw new CodingHarnessReceiptValidationError(["verifier_acceptance_inputs must be an array"]);
+  }
   const { verifier_acceptance_inputs, ...harnessInput } = input;
   const verifier_acceptances = verifier_acceptance_inputs.map(createVerifierAcceptanceReceipt);
   return createCodingHarnessReceipt({ ...harnessInput, verifier_acceptances });
