@@ -70,6 +70,21 @@ test("model advisory PASS never gains terminal acceptance authority", () => {
   assert.equal(resolveObligationAcceptance([receipt], HEAD, "proof-validity").state, "OPEN");
 });
 
+test("stale model advisory evidence stays non-terminal beside a valid verifier", () => {
+  const model = createVerifierAcceptanceReceipt(acceptance({
+    acceptance_id: "acc-stale-model-001",
+    verifier_id: "model-reviewer-stale",
+    verifier_authority_class: "MODEL_ADVISORY",
+    verifier_freshness_state: "STALE",
+    result: "PASS",
+  }));
+  const kernel = createVerifierAcceptanceReceipt(acceptance({ acceptance_id: "acc-current-kernel-001" }));
+  assert.equal(model.terminal_acceptance_effect, "NO_TERMINAL_EFFECT");
+  const resolution = resolveObligationAcceptance([model, kernel], HEAD, "proof-validity");
+  assert.equal(resolution.state, "ACCEPTED");
+  assert.deepEqual(resolution.advisory_acceptance_ids, ["acc-stale-model-001"]);
+});
+
 test("strong verifier FAIL beats model confidence", () => {
   const kernel = createVerifierAcceptanceReceipt(acceptance({ result: "FAIL" }));
   const model = createVerifierAcceptanceReceipt(acceptance({
@@ -81,7 +96,7 @@ test("strong verifier FAIL beats model confidence", () => {
   assert.equal(resolveObligationAcceptance([model, kernel], HEAD, "proof-validity").state, "REJECTED");
 });
 
-test("stale verifier fails closed instead of inheriting PASS", () => {
+test("stale authoritative verifier fails closed instead of inheriting PASS", () => {
   const stale = createVerifierAcceptanceReceipt(acceptance({ verifier_freshness_state: "STALE" }));
   assert.equal(stale.terminal_acceptance_effect, "ESCALATE");
   assert.equal(resolveObligationAcceptance([stale], HEAD, "proof-validity").state, "BLOCKED");

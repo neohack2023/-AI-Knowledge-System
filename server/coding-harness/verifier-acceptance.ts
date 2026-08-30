@@ -143,8 +143,8 @@ export const validateVerifierAcceptanceInput = (input: unknown): string[] => {
 };
 
 const deriveTerminalEffect = (input: VerifierAcceptanceInput): TerminalAcceptanceEffect => {
-  if (input.verifier_freshness_state !== "CURRENT") return "ESCALATE";
   if (input.verifier_authority_class === "MODEL_ADVISORY") return "NO_TERMINAL_EFFECT";
+  if (input.verifier_freshness_state !== "CURRENT") return "ESCALATE";
 
   switch (input.result) {
     case "FAIL":

@@ -17,8 +17,8 @@ A passing verifier receipt is deliberately local. It does not imply that lint, s
 
 ## Fail-closed behavior
 
-- `MODEL_ADVISORY` never has terminal mechanical authority by itself.
-- stale or unknown verifier freshness escalates instead of inheriting PASS.
+- `MODEL_ADVISORY` never has terminal mechanical authority by itself, regardless of freshness or confidence.
+- stale or unknown freshness on an acceptance-owning verifier escalates instead of inheriting PASS.
 - artifact/head mismatch blocks receipt construction.
 - incomplete coverage cannot become terminal ACCEPT.
 - conflicting terminal verifiers block unless an explicit higher-priority verifier declaration resolves the conflict.
@@ -31,9 +31,9 @@ For required obligations:
 - any `REJECTED` obligation -> `FAIL`
 - otherwise any `BLOCKED` obligation -> `BLOCKED`
 - otherwise any `OPEN` or `PARTIAL` obligation -> `PARTIAL`
-- all required obligations `ACCEPTED` -> `PASS` (or `FLAKY` when the execution explicitly carries a flaky signal)
+- all required obligations `ACCEPTED` -> `PASS` (or `FLAKY` when recorded check evidence explicitly has `status: FLAKY`)
 
-The caller does not supply the terminal status or receipt digest. Both are derived by the runtime.
+The caller does not supply the terminal status or receipt digest. Both are derived by the runtime from recorded evidence.
 
 ## Command surface
 
