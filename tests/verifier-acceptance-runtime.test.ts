@@ -280,3 +280,32 @@ test("malformed obligation entries fail with a controlled validation error befor
     },
   );
 });
+
+test("undeclared obligation input fields are rejected before schema-bound emission", async () => {
+  const malformedObligations = [{
+    obligation_id: "proof-validity",
+    description: "Proof validity",
+    required: true,
+    note: "undeclared",
+  }] as unknown as typeof DEFAULT_OBLIGATIONS;
+
+  await assert.rejects(
+    () => harness([acceptance()], malformedObligations),
+    (error) => {
+      assert.ok(error instanceof CodingHarnessReceiptValidationError);
+      assert.ok(error.issues.includes("obligations[0] contains unknown field note"));
+      return true;
+    },
+  );
+});
+
+test("undeclared top-level receipt fields are rejected during verification", async () => {
+  const receipt = await harness([acceptance()]);
+  const malformed = {
+    ...receipt,
+    undeclared_receipt_note: "schema-closed",
+  } as typeof receipt & { undeclared_receipt_note: string };
+
+  const issues = await verifyCodingHarnessReceipt(malformed);
+  assert.ok(issues.includes("receipt contains unknown field undeclared_receipt_note"));
+});
