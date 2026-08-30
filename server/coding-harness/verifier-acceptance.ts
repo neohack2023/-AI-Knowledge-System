@@ -72,10 +72,50 @@ export class VerifierAcceptanceValidationError extends Error {
   }
 }
 
+const verifierAcceptanceInputFields = [
+  "acceptance_id",
+  "scope_key",
+  "task_id",
+  "artifact_or_object_id",
+  "artifact_version_or_head",
+  "artifact_digest",
+  "obligation_id",
+  "obligation_description",
+  "verifier_id",
+  "verifier_version",
+  "verifier_authority_class",
+  "verifier_input_digest",
+  "verifier_freshness_state",
+  "coverage_state",
+  "result",
+  "higher_priority_verifier_ids",
+  "lower_priority_evidence_ids",
+  "retry_allowed",
+  "repair_feedback_pointer",
+  "receipt_pointer",
+] as const;
+
+const verifierAcceptanceReceiptFields = [
+  ...verifierAcceptanceInputFields,
+  "schema",
+  "terminal_acceptance_effect",
+] as const;
+
 const asNonEmptyString = (value: unknown) => typeof value === "string" && value.trim().length > 0;
 const oneOf = <T extends readonly string[]>(value: unknown, allowed: T): value is T[number] => (
   typeof value === "string" && (allowed as readonly string[]).includes(value)
 );
+
+const validateKnownFields = (
+  record: Record<string, unknown>,
+  allowedFields: readonly string[],
+  issues: string[],
+) => {
+  const allowed = new Set(allowedFields);
+  for (const field of Object.keys(record)) {
+    if (!allowed.has(field)) issues.push(`unknown field ${field}`);
+  }
+};
 
 const validateStringList = (value: unknown, field: string, issues: string[]) => {
   if (!Array.isArray(value)) {
@@ -100,6 +140,7 @@ export const validateVerifierAcceptanceInput = (input: unknown): string[] => {
     return ["input must be an object"];
   }
   const record = input as Record<string, unknown>;
+  validateKnownFields(record, verifierAcceptanceInputFields, issues);
   for (const field of [
     "acceptance_id",
     "scope_key",
@@ -175,9 +216,13 @@ export const createVerifierAcceptanceReceipt = (input: VerifierAcceptanceInput):
 };
 
 export const validateVerifierAcceptanceReceipt = (receipt: unknown): string[] => {
-  const issues = validateVerifierAcceptanceInput(receipt);
-  if (receipt === null || typeof receipt !== "object" || Array.isArray(receipt)) return issues;
+  if (receipt === null || typeof receipt !== "object" || Array.isArray(receipt)) return ["input must be an object"];
   const record = receipt as Record<string, unknown>;
+  const projectedInput = Object.fromEntries(
+    verifierAcceptanceInputFields.map((field) => [field, record[field]]),
+  );
+  const issues = validateVerifierAcceptanceInput(projectedInput);
+  validateKnownFields(record, verifierAcceptanceReceiptFields, issues);
   if (record.schema !== "aios_verifier_acceptance_v0_1") {
     issues.push("schema must equal aios_verifier_acceptance_v0_1");
   }
@@ -185,12 +230,41 @@ export const validateVerifierAcceptanceReceipt = (receipt: unknown): string[] =>
     issues.push(`terminal_acceptance_effect must be one of ${terminalAcceptanceEffects.join(" | ")}`);
   }
   if (issues.length === 0) {
-    const expected = deriveTerminalEffect(record as unknown as VerifierAcceptanceInput);
+    const expected = deriveTerminalEffect(projectedInput as unknown as VerifierAcceptanceInput);
     if (record.terminal_acceptance_effect !== expected) {
       issues.push(`terminal_acceptance_effect must be mechanically derived as ${expected}`);
     }
   }
   return issues;
+};
+
+const hasVerifierPriorityCycle = (candidates: readonly VerifierAcceptanceReceipt[]): boolean => {
+  const verifierIds = new Set(candidates.map((candidate) => candidate.verifier_id));
+  const graph = new Map<string, Set<string>>();
+
+  for (const candidate of candidates) {
+    const edges = graph.get(candidate.verifier_id) ?? new Set<string>();
+    for (const higherVerifierId of candidate.higher_priority_verifier_ids) {
+      if (verifierIds.has(higherVerifierId)) edges.add(higherVerifierId);
+    }
+    graph.set(candidate.verifier_id, edges);
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (verifierId: string): boolean => {
+    if (visiting.has(verifierId)) return true;
+    if (visited.has(verifierId)) return false;
+    visiting.add(verifierId);
+    for (const higherVerifierId of graph.get(verifierId) ?? []) {
+      if (visit(higherVerifierId)) return true;
+    }
+    visiting.delete(verifierId);
+    visited.add(verifierId);
+    return false;
+  };
+
+  return [...verifierIds].some((verifierId) => visit(verifierId));
 };
 
 export const resolveObligationAcceptance = (
@@ -205,12 +279,24 @@ export const resolveObligationAcceptance = (
 
   const advisory = matching.filter((receipt) => receipt.terminal_acceptance_effect === "NO_TERMINAL_EFFECT");
   const terminalCandidates = matching.filter((receipt) => receipt.terminal_acceptance_effect !== "NO_TERMINAL_EFFECT");
+  const advisoryIds = advisory.map((receipt) => receipt.acceptance_id);
+
+  if (hasVerifierPriorityCycle(terminalCandidates)) {
+    return {
+      obligation_id: obligationId,
+      artifact_version_or_head: artifactVersionOrHead,
+      state: "BLOCKED",
+      decisive_acceptance_ids: terminalCandidates.map((receipt) => receipt.acceptance_id),
+      advisory_acceptance_ids: advisoryIds,
+      reason_codes: ["VERIFIER_PRIORITY_CYCLE_OR_NO_MAXIMAL_OWNER"],
+    };
+  }
+
   const terminal = terminalCandidates.filter((receipt) => !receipt.higher_priority_verifier_ids.some((higherVerifierId) => (
     terminalCandidates.some((candidate) => candidate.verifier_id === higherVerifierId)
   )));
 
   const decisiveIds = terminal.map((receipt) => receipt.acceptance_id);
-  const advisoryIds = advisory.map((receipt) => receipt.acceptance_id);
 
   if (terminalCandidates.length > 0 && terminal.length === 0) {
     return {
