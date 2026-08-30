@@ -117,6 +117,16 @@ const validateKnownFields = (
   }
 };
 
+const validateRequiredFields = (
+  record: Record<string, unknown>,
+  requiredFields: readonly string[],
+  issues: string[],
+) => {
+  for (const field of requiredFields) {
+    if (!Object.prototype.hasOwnProperty.call(record, field)) issues.push(`missing required field ${field}`);
+  }
+};
+
 const validateStringList = (value: unknown, field: string, issues: string[]) => {
   if (!Array.isArray(value)) {
     issues.push(`${field} must be an array`);
@@ -218,11 +228,13 @@ export const createVerifierAcceptanceReceipt = (input: VerifierAcceptanceInput):
 export const validateVerifierAcceptanceReceipt = (receipt: unknown): string[] => {
   if (receipt === null || typeof receipt !== "object" || Array.isArray(receipt)) return ["input must be an object"];
   const record = receipt as Record<string, unknown>;
+  const issues: string[] = [];
+  validateKnownFields(record, verifierAcceptanceReceiptFields, issues);
+  validateRequiredFields(record, verifierAcceptanceReceiptFields, issues);
   const projectedInput = Object.fromEntries(
     verifierAcceptanceInputFields.map((field) => [field, record[field]]),
   );
-  const issues = validateVerifierAcceptanceInput(projectedInput);
-  validateKnownFields(record, verifierAcceptanceReceiptFields, issues);
+  issues.push(...validateVerifierAcceptanceInput(projectedInput));
   if (record.schema !== "aios_verifier_acceptance_v0_1") {
     issues.push("schema must equal aios_verifier_acceptance_v0_1");
   }
