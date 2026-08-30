@@ -38,6 +38,14 @@
     "obligations": {
       "type": "array",
       "minItems": 1,
+      "contains": {
+        "type": "object",
+        "required": ["required"],
+        "properties": {
+          "required": { "const": true }
+        }
+      },
+      "minContains": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
