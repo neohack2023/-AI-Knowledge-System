@@ -15,6 +15,7 @@ import {
 
 const HEAD = "38917a9028ef64161adf3d9a4d2212a3917e1b31";
 const BASE = "4088c690ab8e0fbee761ff8e503bbe4273e4ed58";
+const OBLIGATION_DESCRIPTION = "Proof validity";
 
 const acceptance = (overrides: Partial<VerifierAcceptanceInput> = {}): VerifierAcceptanceInput => ({
   acceptance_id: "acc-proof-001",
@@ -24,7 +25,7 @@ const acceptance = (overrides: Partial<VerifierAcceptanceInput> = {}): VerifierA
   artifact_version_or_head: HEAD,
   artifact_digest: `git-sha:${HEAD}`,
   obligation_id: "proof-validity",
-  obligation_description: "The declared proof obligation is mechanically valid.",
+  obligation_description: OBLIGATION_DESCRIPTION,
   verifier_id: "kernel-01",
   verifier_version: "1.0.0",
   verifier_authority_class: "HARD_KERNEL",
@@ -51,7 +52,7 @@ const executionInput = (overrides: Partial<CodingHarnessExecutionInput> = {}): C
   artifacts: [],
   known_regressions_loaded: ["VOA-01"],
   failed_reason_codes: [],
-  obligations: [{ obligation_id: "proof-validity", description: "Proof validity", required: true }],
+  obligations: [{ obligation_id: "proof-validity", description: OBLIGATION_DESCRIPTION, required: true }],
   verifier_acceptance_inputs: [acceptance()],
   ...overrides,
 });
@@ -59,11 +60,26 @@ const executionInput = (overrides: Partial<CodingHarnessExecutionInput> = {}): C
 test("whitespace-padded obligation identifiers fail closed before matching or emission", async () => {
   await assert.rejects(
     () => createCodingHarnessExecutionReceipt(executionInput({
-      obligations: [{ obligation_id: " proof-validity ", description: "Proof validity", required: true }],
+      obligations: [{ obligation_id: " proof-validity ", description: OBLIGATION_DESCRIPTION, required: true }],
     })),
     (error) => {
       assert.ok(error instanceof CodingHarnessReceiptValidationError);
       assert.ok(error.issues.includes("obligation_id must not have leading or trailing whitespace"));
+      return true;
+    },
+  );
+});
+
+test("acceptance descriptions must match the declared harness obligation before terminal closure", async () => {
+  await assert.rejects(
+    () => createCodingHarnessExecutionReceipt(executionInput({
+      verifier_acceptance_inputs: [acceptance({ obligation_description: "Different proof meaning" })],
+    })),
+    (error) => {
+      assert.ok(error instanceof CodingHarnessReceiptValidationError);
+      assert.ok(error.issues.includes(
+        "acceptance acc-proof-001: obligation_description must equal harness obligation description for proof-validity",
+      ));
       return true;
     },
   );
@@ -85,7 +101,7 @@ test("non-object execution inputs produce controlled validation errors before de
 test("published receipt schema and runtime both require at least one mandatory obligation", async () => {
   await assert.rejects(
     () => createCodingHarnessExecutionReceipt(executionInput({
-      obligations: [{ obligation_id: "proof-validity", description: "Proof validity", required: false }],
+      obligations: [{ obligation_id: "proof-validity", description: OBLIGATION_DESCRIPTION, required: false }],
       verifier_acceptance_inputs: [],
     })),
     (error) => {
@@ -139,7 +155,7 @@ test("published harness receipt schema mirrors runtime canonical obligation iden
   for (const candidate of [" proof-validity ", "proof-validity ", " proof-validity", "\tproof-validity", "proof-validity\n"]) {
     assert.equal(canonicalIdentifierPattern.test(candidate), false);
   }
-  for (const candidate of ["proof-validity", "proof validity", "π-proof"] ) {
+  for (const candidate of ["proof-validity", "proof validity", "π-proof"]) {
     assert.equal(canonicalIdentifierPattern.test(candidate), true);
   }
 });
@@ -189,6 +205,34 @@ test("published verifier schema mirrors runtime canonical identifier boundaries"
   for (const candidate of ["kernel-01", "kernel high", "κernel-01"]) {
     assert.equal(canonicalIdentifierPattern.test(candidate), true);
   }
+});
+
+test("nullable verifier pointers remain non-empty when present in both runtime and schema", async () => {
+  for (const field of ["repair_feedback_pointer", "receipt_pointer"] as const) {
+    assert.throws(
+      () => createVerifierAcceptanceReceipt(acceptance({ [field]: "" })),
+      (error) => {
+        assert.ok(error instanceof VerifierAcceptanceValidationError);
+        assert.ok(error.issues.includes(`${field} must be null or a non-empty string`));
+        return true;
+      },
+    );
+  }
+
+  const schema = JSON.parse(await readFile(
+    new URL("../schemas/aios-verifier-acceptance-v0.1.schema.json", import.meta.url),
+    "utf8",
+  )) as {
+    properties?: {
+      repair_feedback_pointer?: { minLength?: number; type?: string[] };
+      receipt_pointer?: { minLength?: number; type?: string[] };
+    };
+  };
+
+  assert.equal(schema.properties?.repair_feedback_pointer?.minLength, 1);
+  assert.deepEqual(schema.properties?.repair_feedback_pointer?.type, ["string", "null"]);
+  assert.equal(schema.properties?.receipt_pointer?.minLength, 1);
+  assert.deepEqual(schema.properties?.receipt_pointer?.type, ["string", "null"]);
 });
 
 test("direct CodingHarness receipt construction guards null and array roots", async () => {
