@@ -102,6 +102,9 @@ const verifierAcceptanceReceiptFields = [
 ] as const;
 
 const asNonEmptyString = (value: unknown) => typeof value === "string" && value.trim().length > 0;
+const asCanonicalIdentifier = (value: unknown) => (
+  asNonEmptyString(value) && (value as string) === (value as string).trim()
+);
 const oneOf = <T extends readonly string[]>(value: unknown, allowed: T): value is T[number] => (
   typeof value === "string" && (allowed as readonly string[]).includes(value)
 );
@@ -138,7 +141,9 @@ const validateStringList = (value: unknown, field: string, issues: string[]) => 
       issues.push(`${field} must contain non-empty string identifiers`);
       continue;
     }
-    const key = (entry as string).trim();
+    const raw = entry as string;
+    const key = raw.trim();
+    if (raw !== key) issues.push(`${field} must not contain identifiers with leading or trailing whitespace`);
     if (normalized.has(key)) issues.push(`${field} contains duplicate identifier ${key}`);
     normalized.add(key);
   }
@@ -165,6 +170,9 @@ export const validateVerifierAcceptanceInput = (input: unknown): string[] => {
     "verifier_input_digest",
   ]) {
     if (!asNonEmptyString(record[field])) issues.push(`${field} must be a non-empty string`);
+  }
+  if (asNonEmptyString(record.verifier_id) && !asCanonicalIdentifier(record.verifier_id)) {
+    issues.push("verifier_id must not have leading or trailing whitespace");
   }
   if (!oneOf(record.verifier_authority_class, verifierAuthorityClasses)) {
     issues.push(`verifier_authority_class must be one of ${verifierAuthorityClasses.join(" | ")}`);
