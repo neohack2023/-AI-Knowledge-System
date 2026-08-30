@@ -112,6 +112,17 @@ const validateAllowedFields = (
   }
 };
 
+const validateRequiredFields = (
+  record: Record<string, unknown>,
+  required: ReadonlySet<string>,
+  field: string,
+  issues: string[],
+) => {
+  for (const key of required) {
+    if (!Object.prototype.hasOwnProperty.call(record, key)) issues.push(`${field} missing required field ${key}`);
+  }
+};
+
 const validateStringList = (value: unknown, field: string, issues: string[]) => {
   if (!Array.isArray(value)) {
     issues.push(`${field} must be an array`);
@@ -314,6 +325,24 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
   const issues: string[] = [];
   if (!isJsonObject(receipt)) return ["receipt must be an object"];
   validateAllowedFields(receipt, codingHarnessReceiptFields, "receipt", issues);
+  validateRequiredFields(receipt, codingHarnessReceiptFields, "receipt", issues);
+
+  const projectedObligations: CodingHarnessObligationInput[] = [];
+  if (!Array.isArray(receipt.obligations)) {
+    issues.push("receipt obligations must be an array");
+  } else {
+    receipt.obligations.forEach((obligation, index) => {
+      if (!isJsonObject(obligation)) {
+        issues.push(`receipt obligations[${index}] must be an object`);
+        return;
+      }
+      projectedObligations.push({
+        obligation_id: obligation.obligation_id as string,
+        description: obligation.description as string,
+        required: obligation.required as boolean,
+      });
+    });
+  }
 
   issues.push(...validateInput({
     repository: receipt.repository,
@@ -326,7 +355,7 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
     artifacts: receipt.artifacts,
     known_regressions_loaded: receipt.known_regressions_loaded,
     failed_reason_codes: receipt.failed_reason_codes,
-    obligations: receipt.obligations.map(({ obligation_id, description, required }) => ({ obligation_id, description, required })),
+    obligations: projectedObligations,
     verifier_acceptances: receipt.verifier_acceptances,
   }));
 
@@ -341,7 +370,7 @@ export const verifyCodingHarnessReceipt = async (receipt: CodingHarnessReceipt):
     artifacts: receipt.artifacts,
     known_regressions_loaded: receipt.known_regressions_loaded,
     failed_reason_codes: receipt.failed_reason_codes,
-    obligations: receipt.obligations.map(({ obligation_id, description, required }) => ({ obligation_id, description, required })),
+    obligations: projectedObligations,
     verifier_acceptances: receipt.verifier_acceptances,
   }).catch(() => null);
 
