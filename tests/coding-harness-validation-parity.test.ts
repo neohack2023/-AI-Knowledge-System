@@ -116,6 +116,34 @@ test("published receipt schema and runtime both require at least one mandatory o
   assert.equal(obligations?.contains?.properties?.required?.const, true);
 });
 
+test("published harness receipt schema mirrors runtime canonical obligation identifiers", async () => {
+  const schema = JSON.parse(await readFile(
+    new URL("../schemas/aios-coding-harness-receipt-v0.1.schema.json", import.meta.url),
+    "utf8",
+  )) as {
+    properties?: {
+      obligations?: {
+        items?: {
+          properties?: {
+            obligation_id?: { pattern?: string };
+          };
+        };
+      };
+    };
+  };
+
+  const canonicalIdentifierPattern = /^(?:\S|\S[\s\S]*\S)$/;
+  const obligationPattern = schema.properties?.obligations?.items?.properties?.obligation_id?.pattern;
+  assert.equal(obligationPattern, canonicalIdentifierPattern.source);
+
+  for (const candidate of [" proof-validity ", "proof-validity ", " proof-validity", "\tproof-validity", "proof-validity\n"]) {
+    assert.equal(canonicalIdentifierPattern.test(candidate), false);
+  }
+  for (const candidate of ["proof-validity", "proof validity", "π-proof"] ) {
+    assert.equal(canonicalIdentifierPattern.test(candidate), true);
+  }
+});
+
 test("verifier node IDs and priority references reject surrounding whitespace before graph matching", () => {
   assert.throws(
     () => createVerifierAcceptanceReceipt(acceptance({ verifier_id: " kernel-01 " })),
