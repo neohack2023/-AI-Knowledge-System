@@ -14,8 +14,11 @@ jobs:
       PUBLIC_RELEASE_PRIVATE_TERMS: aios-ci-private-term-${{ github.run_id }}
       PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
-      - name: Checkout
+      - name: Checkout exact PR head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -41,7 +44,86 @@ jobs:
         run: npm ci
 
       - name: Build and test
+        id: build_test
         run: npm test
+
+      - name: Emit verifier-owned CodingHarness receipt
+        if: always()
+        env:
+          BUILD_TEST_OUTCOME: ${{ steps.build_test.outcome }}
+          AIOS_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AIOS_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          AIOS_REPOSITORY: ${{ github.repository }}
+          AIOS_RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p outputs
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { writeFile } from 'node:fs/promises';
+          const outcome = process.env.BUILD_TEST_OUTCOME || 'skipped';
+          const result = outcome === 'success' ? 'PASS' : outcome === 'failure' ? 'FAIL' : 'BLOCKED';
+          const coverage = result === 'BLOCKED' ? 'UNKNOWN' : 'COMPLETE_FOR_OBLIGATION';
+          const head = process.env.AIOS_HEAD_SHA;
+          const base = process.env.AIOS_BASE_SHA;
+          const repository = process.env.AIOS_REPOSITORY;
+          const runId = process.env.AIOS_RUN_ID;
+          const changedPaths = execFileSync('git', ['diff', '--name-only', '-z', `${base}...${head}`])
+            .toString('utf8')
+            .split('\0')
+            .filter(Boolean)
+            .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+          const input = {
+            repository,
+            head_sha: head,
+            base_sha: base,
+            profile: 'PR',
+            environment: { github_actions_run_id: runId, runner: 'ubuntu-latest', node: '22' },
+            changed_paths: changedPaths,
+            checks: [{ id: 'build-and-test', outcome }],
+            artifacts: [],
+            known_regressions_loaded: ['VERIFIER_OWNED_ACCEPTANCE_01'],
+            failed_reason_codes: result === 'PASS' ? [] : [`BUILD_AND_TEST_${result}`],
+            obligations: [{
+              obligation_id: 'repository-build-and-test',
+              description: 'The repository build-and-test job completes successfully for this exact head.',
+              required: true
+            }],
+            verifier_acceptance_inputs: [{
+              acceptance_id: `gha-build-test-${runId}`,
+              scope_key: 'global-working-memory',
+              task_id: `github-actions-run-${runId}`,
+              artifact_or_object_id: repository,
+              artifact_version_or_head: head,
+              artifact_digest: `git-sha:${head}`,
+              obligation_id: 'repository-build-and-test',
+              obligation_description: 'The repository build-and-test job completes successfully for this exact head.',
+              verifier_id: 'github-actions/build-and-test',
+              verifier_version: `ci.yml@${head}`,
+              verifier_authority_class: 'EXECUTABLE_SCOPED',
+              verifier_input_digest: `git-sha:${head}`,
+              verifier_freshness_state: 'CURRENT',
+              coverage_state: coverage,
+              result,
+              higher_priority_verifier_ids: [],
+              lower_priority_evidence_ids: [],
+              retry_allowed: true,
+              repair_feedback_pointer: null,
+              receipt_pointer: `github-actions:${repository}:${runId}`
+            }]
+          };
+          await writeFile('outputs/coding-harness-input.json', JSON.stringify(input, null, 2));
+          NODE
+          node --experimental-transform-types scripts/coding-harness/emit-receipt.ts outputs/coding-harness-input.json > outputs/coding-harness-receipt.json
+
+      - name: Upload CodingHarness receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coding-harness-receipt-${{ github.run_id }}
+          path: |
+            outputs/coding-harness-input.json
+            outputs/coding-harness-receipt.json
+          if-no-files-found: warn
 
   public-release-boundary:
     runs-on: ubuntu-latest
