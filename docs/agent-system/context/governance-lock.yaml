@@ -1,12 +1,17 @@
 bundle_id: REPOSITORY_GOVERNANCE_BUNDLE_01
-bundle_version: 0.3
+bundle_version: 0.4
 state: STAGING_ACTIVE
 materialized_on: 2026-09-04
+valid_through: 2026-10-04
 normal_repo_work_external_fetch_required: false
 upstream_authority_cutover: false
-repository_autonomy_phase: 3
+repository_autonomy_phase: 4
 native_adapter_state: ACTIVE
 native_skill_state: ACTIVE
+organization_audit_state: ACTIVE
+organization_audit_command: npm run check:agent-system
+organization_audit_workflow: .github/workflows/agent-system-audit.yml
+audit_fail_closed: true
 installed_skill_root: .github/skills
 installed_skills:
   - plan-feature
@@ -25,6 +30,7 @@ external_fetch_triggers:
   - unresolved_authority_conflict
   - owner_requests_upstream_sync
   - bundle_declared_stale_or_incomplete_for_task
+  - governance_lock_expired
 sync_role: KNOWLEDGE_STEWARD
 sync_method_default: reviewed_repository_change
 direct_main_staging_exception:
@@ -37,6 +43,11 @@ phase_3_direct_main_exception:
   scope: REPOSITORY_NATIVE_SKILLS_PHASE_3
   authorized_on: 2026-09-04
   reusable_without_new_owner_direction: false
+phase_4_direct_main_exception:
+  authorized: true
+  scope: REPOSITORY_ORGANIZATION_AUDIT_PHASE_4
+  authorized_on: 2026-09-04
+  reusable_without_new_owner_direction: false
 skill_authority_widening_allowed: false
 skill_shell_preapproval_default: false
 private_workspace_urls_allowed: false
@@ -45,3 +56,4 @@ semantic_handoff_source: docs/agent-system/context/REPOSITORY_HANDOFF.md
 knowledge_router: docs/agent-system/knowledge/KNOWLEDGE_INDEX.md
 adapter_router: docs/agent-system/adapters/README.md
 skill_router: docs/agent-system/skills/README.md
+audit_router: docs/agent-system/audit/README.md
