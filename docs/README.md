@@ -24,6 +24,12 @@ Always inspect `../public-release-manifest.yaml` before adding a new tracked pat
 
 - `CAPABILITY_DISCOVERY_MATERIALIZATION.md` — capability discovery and materialization behavior.
 
+## Repository agent operating system
+
+- `agent-system/README.md` — repository-local agent roles, commands, review-rule routing, anti-pattern learning, feature dossiers, and authority boundaries.
+- Load this surface for feature planning, repository-aware review, verification handoff, lesson harvesting, or changes to the repository's agent organization.
+- `agent-system/` is derived repository execution knowledge. It does not replace external cross-repository governance or grant authority by itself.
+
 ## Plans
 
 - `plans/` contains bounded task plans. Plans are task-specific execution context, not automatically permanent architecture or canon.
