@@ -132,8 +132,10 @@ jobs:
       PUBLIC_RELEASE_PRIVATE_TERMS: aios-ci-private-term-${{ github.run_id }}
       PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
     steps:
-      - name: Checkout
+      - name: Checkout exact PR head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4

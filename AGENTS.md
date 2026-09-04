@@ -35,7 +35,7 @@ Do not collapse trust-bearing evidence into loose booleans when identity or fres
 - Bind repair/scope classification to the exact base-to-head transition it describes.
 - Bind risk classification to the candidate that was assessed, or preserve a monotonic effective risk tier so stale state cannot silently lower review requirements.
 - Bind owner authorization to the exact candidate head authorized.
-- After a code-changing head update, assume prior head-bound gate, review, classification, and authorization evidence is stale unless the contract explicitly proves otherwise.
+- After any candidate-head change, assume prior head-bound gate, review, classification, and authorization evidence is stale unless the contract mechanically proves transferability.
 - `MODEL_ADVISORY` review can identify defects and propose repairs, but it never becomes terminal mechanical acceptance by repetition or confidence.
 - A verifier PASS closes only the obligation that verifier is authorized to close.
 
