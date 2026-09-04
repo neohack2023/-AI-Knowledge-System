@@ -12,6 +12,7 @@ The canonical installed skill surface is `.github/skills/<skill-name>/SKILL.md`:
 | `review-pr` | `.github/skills/review-pr/SKILL.md` | Reviewer |
 | `verify-head` | `.github/skills/verify-head/SKILL.md` | Verifier |
 | `harvest-lesson` | `.github/skills/harvest-lesson/SKILL.md` | Knowledge Steward |
+| `sync-governance` | `.github/skills/sync-governance/SKILL.md` | Knowledge Steward |
 | `prepare-release` | `.github/skills/prepare-release/SKILL.md` | Release Steward |
 
 This file remains the vendor-neutral lifecycle contract. `SKILL.md` packages the repeatable procedure for tools supporting the Agent Skills format. Semantic changes should keep the two surfaces aligned.
@@ -70,6 +71,23 @@ Output: acceptance evidence for declared obligations only.
 7. Stop for required adjudication before promotion.
 
 Output: candidate record plus optional promotion proposal.
+
+## `sync-governance`
+
+**Primary role:** Knowledge Steward  
+**Mutation:** bounded repository governance/context/evidence write only when synchronization is triggered and authorized.
+
+1. Read the governance lock and confirm an external-fetch trigger or explicit owner synchronization request.
+2. Resolve the exact repository base identity live.
+3. Fetch only the pinned stable upstream governance source set.
+4. Record opaque source IDs plus observed last-edited/version identities; do not copy private workspace URLs into Git.
+5. Compare semantic delta only; do not vendor the upstream corpus.
+6. Classify `NO_MATERIAL_DELTA`, `MATERIAL_DELTA_RECONCILED`, or `MATERIAL_DELTA_PENDING`.
+7. If material drift is pending, stop and do not renew freshness.
+8. If no material drift remains, write the immutable sync receipt and bind its SHA-256, sync ID, date, and derived freshness window in the governance lock.
+9. Run governance-sync validation plus the organization audit against the resulting exact repository identity.
+
+Output: bounded upstream reconciliation receipt and refreshed local governance lock, or a fail-closed pending-delta handoff.
 
 ## `prepare-release`
 
