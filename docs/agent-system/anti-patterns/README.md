@@ -2,15 +2,24 @@
 
 This surface stores detailed negative knowledge discovered through repository work. It is deliberately separate from always-loaded PR rules.
 
-## Lifecycle
+## Two-axis lifecycle
+
+Evidence maturity and rule promotion are independent facts. Never replace one with the other.
 
 ```text
+EVIDENCE STATE
 CANDIDATE
 → CONFIRMED
 → VALIDATED_LOCAL
-→ PROMOTED_AREA or PROMOTED_COMMON
-→ SUPERSEDED / DEPRECATED when later evidence replaces it
+→ SUPERSEDED / DEPRECATED when later evidence replaces the lesson
+
+PROMOTION STATE
+NONE
+→ PROMOTED_AREA
+→ PROMOTED_COMMON when broader adjudication is justified
 ```
+
+A candidate can therefore be `VALIDATED_LOCAL + NONE`, `VALIDATED_LOCAL + PROMOTED_AREA`, or `VALIDATED_LOCAL + PROMOTED_COMMON`. Promotion does not erase how strong the evidence is, and stronger evidence does not automatically promote a rule.
 
 ## Capture law
 
@@ -22,7 +31,12 @@ A useful anti-pattern records:
 - how it was detected;
 - the smallest repair pattern;
 - the regression/process guard;
-- evidence and promotion state.
+- immutable source evidence;
+- evidence state and promotion state separately.
+
+## Source-binding law
+
+Every confirmed or promoted candidate must carry at least one immutable source edge sufficient to re-audit the lesson. Prefer exact candidate head plus the most specific available review/thread/comment, CI run, regression, or process observation. A bare PR number or branch label is navigation, not provenance.
 
 ## Promotion law
 
