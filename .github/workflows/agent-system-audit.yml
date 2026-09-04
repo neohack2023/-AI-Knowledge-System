@@ -13,6 +13,7 @@ on:
       - 'docs/agent-system/**'
       - 'scripts/agent-system/**'
       - 'tests/agent-system-audit.test.mjs'
+      - 'tests/governance-sync.test.mjs'
       - 'package.json'
   push:
     branches: [main]
@@ -27,6 +28,7 @@ on:
       - 'docs/agent-system/**'
       - 'scripts/agent-system/**'
       - 'tests/agent-system-audit.test.mjs'
+      - 'tests/governance-sync.test.mjs'
       - 'package.json'
   workflow_dispatch:
 
@@ -48,18 +50,30 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Test the auditor
-        run: node --test tests/agent-system-audit.test.mjs
+      - name: Test the organization auditor
+        run: npm run test:agent-system
+
+      - name: Test governance synchronization
+        run: npm run test:governance-sync
 
       - name: Audit repository organization
         env:
           AIOS_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run check:agent-system
 
-      - name: Upload organization audit receipt
+      - name: Validate governance synchronization
+        run: npm run check:governance-sync
+
+      - name: Validate public release boundary
+        run: npm run check:public-release
+
+      - name: Upload organization audit receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agent-system-audit-${{ github.run_id }}
-          path: outputs/agent-system-audit.json
+          path: |
+            outputs/agent-system-audit.json
+            outputs/governance-sync-validation.json
+            outputs/public-release-report.json
           if-no-files-found: warn
