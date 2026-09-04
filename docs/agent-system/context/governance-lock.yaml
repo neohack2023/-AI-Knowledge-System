@@ -1,9 +1,11 @@
 bundle_id: REPOSITORY_GOVERNANCE_BUNDLE_01
-bundle_version: 0.1
-state: CANDIDATE
+bundle_version: 0.2
+state: STAGING_ACTIVE
 materialized_on: 2026-09-04
 normal_repo_work_external_fetch_required: false
 upstream_authority_cutover: false
+repository_autonomy_phase: 2
+native_adapter_state: ACTIVE
 upstream_sources:
   - AIOS_GITHUB_GOVERNED_EXECUTION_CONTRACT_v0.1
   - VERIFIER_OWNED_ACCEPTANCE_01
@@ -16,7 +18,14 @@ external_fetch_triggers:
   - owner_requests_upstream_sync
   - bundle_declared_stale_or_incomplete_for_task
 sync_role: KNOWLEDGE_STEWARD
-sync_method: reviewed_pull_request
+sync_method_default: reviewed_repository_change
+direct_main_staging_exception:
+  authorized: true
+  scope: REPOSITORY_SELF_SUFFICIENCY_PHASE_1_AND_2
+  authorized_on: 2026-09-04
+  reusable_without_new_owner_direction: false
 private_workspace_urls_allowed: false
 live_repository_facts_source: github
 semantic_handoff_source: docs/agent-system/context/REPOSITORY_HANDOFF.md
+knowledge_router: docs/agent-system/knowledge/KNOWLEDGE_INDEX.md
+adapter_router: docs/agent-system/adapters/README.md
