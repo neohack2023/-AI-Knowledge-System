@@ -1,0 +1,65 @@
+name: Agent System Audit
+
+on:
+  pull_request:
+    paths:
+      - '.github/agents/**'
+      - '.github/skills/**'
+      - '.github/instructions/**'
+      - '.github/copilot-instructions.md'
+      - '.github/workflows/agent-system-audit.yml'
+      - 'AGENTS.md'
+      - 'config/agent-system-audit.json'
+      - 'docs/agent-system/**'
+      - 'scripts/agent-system/**'
+      - 'tests/agent-system-audit.test.mjs'
+      - 'package.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/agents/**'
+      - '.github/skills/**'
+      - '.github/instructions/**'
+      - '.github/copilot-instructions.md'
+      - '.github/workflows/agent-system-audit.yml'
+      - 'AGENTS.md'
+      - 'config/agent-system-audit.json'
+      - 'docs/agent-system/**'
+      - 'scripts/agent-system/**'
+      - 'tests/agent-system-audit.test.mjs'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout immutable audit target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test the auditor
+        run: node --test tests/agent-system-audit.test.mjs
+
+      - name: Audit repository organization
+        env:
+          AIOS_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npm run check:agent-system
+
+      - name: Upload organization audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-system-audit-${{ github.run_id }}
+          path: outputs/agent-system-audit.json
+          if-no-files-found: warn

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "required_skills": [
+    {"name": "plan-feature", "role": "Planner", "agent": ".github/agents/planner.agent.md"},
+    {"name": "review-pr", "role": "Reviewer", "agent": ".github/agents/reviewer.agent.md"},
+    {"name": "verify-head", "role": "Verifier", "agent": ".github/agents/verifier.agent.md"},
+    {"name": "harvest-lesson", "role": "Knowledge Steward", "agent": ".github/agents/knowledge-steward.agent.md"},
+    {"name": "prepare-release", "role": "Release Steward", "agent": ".github/agents/release-steward.agent.md"}
+  ],
+  "governance_lock": "docs/agent-system/context/governance-lock.yaml",
+  "handoff": "docs/agent-system/context/REPOSITORY_HANDOFF.md",
+  "knowledge_index": "docs/agent-system/knowledge/KNOWLEDGE_INDEX.md",
+  "audit_markdown_roots": [
+    "docs/agent-system",
+    ".github/skills",
+    ".github/agents",
+    ".github/instructions"
+  ],
+  "audit_markdown_files": [
+    "AGENTS.md",
+    ".github/copilot-instructions.md"
+  ],
+  "governance_valid_through_key": "valid_through",
+  "minimum_repository_autonomy_phase": 4
+}
