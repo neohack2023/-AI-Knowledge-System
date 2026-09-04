@@ -1,30 +1,37 @@
 bundle_id: REPOSITORY_GOVERNANCE_BUNDLE_01
-bundle_version: 0.4
-state: STAGING_ACTIVE
+bundle_version: 0.5
+state: ACTIVE
 materialized_on: 2026-09-04
 valid_through: 2026-10-04
 normal_repo_work_external_fetch_required: false
 upstream_authority_cutover: false
-repository_autonomy_phase: 4
+repository_autonomy_phase: 5
 native_adapter_state: ACTIVE
 native_skill_state: ACTIVE
 organization_audit_state: ACTIVE
 organization_audit_command: npm run check:agent-system
 organization_audit_workflow: .github/workflows/agent-system-audit.yml
 audit_fail_closed: true
+upstream_sync_state: ACTIVE
+sync_skill: sync-governance
+sync_receipt_root: docs/agent-system/governance-sync/receipts
+last_sync_id: GSYNC-20260904-001
+last_sync_receipt: docs/agent-system/governance-sync/receipts/GSYNC-20260904-001.json
+last_sync_receipt_sha256: sha256:c41754790ca6dd0f249cbe6a56ea3d2b797077592fdd8bb40a99aa856235a769
+last_upstream_sync: 2026-09-04
+sync_freshness_days: 30
 installed_skill_root: .github/skills
 installed_skills:
   - plan-feature
   - review-pr
   - verify-head
   - harvest-lesson
+  - sync-governance
   - prepare-release
 upstream_sources:
   - AIOS_GITHUB_GOVERNED_EXECUTION_CONTRACT_v0.1
   - VERIFIER_OWNED_ACCEPTANCE_01
   - CODING-HARNESS-01
-  - REPOSITORY_ORGANIZATIONAL_OS_01
-  - REPOSITORY_SELF_SUFFICIENCY_01
 external_fetch_triggers:
   - cross_repository_or_global_governance_change
   - unresolved_authority_conflict
@@ -48,6 +55,11 @@ phase_4_direct_main_exception:
   scope: REPOSITORY_ORGANIZATION_AUDIT_PHASE_4
   authorized_on: 2026-09-04
   reusable_without_new_owner_direction: false
+phase_5_direct_main_exception:
+  authorized: true
+  scope: REPOSITORY_GOVERNANCE_SYNC_PHASE_5
+  authorized_on: 2026-09-04
+  reusable_without_new_owner_direction: false
 skill_authority_widening_allowed: false
 skill_shell_preapproval_default: false
 private_workspace_urls_allowed: false
@@ -57,3 +69,4 @@ knowledge_router: docs/agent-system/knowledge/KNOWLEDGE_INDEX.md
 adapter_router: docs/agent-system/adapters/README.md
 skill_router: docs/agent-system/skills/README.md
 audit_router: docs/agent-system/audit/README.md
+sync_router: docs/agent-system/governance-sync/README.md
