@@ -1,6 +1,6 @@
 # Repository Agent Operating System
 
-This directory is the repository-local operating map for agents working in AI Knowledge System. It organizes **who does the work, when a workflow is invoked, which review rules apply, how failures become lessons, how material features remain traceable, and which checked-in context lets normal work proceed without external memory retrieval**.
+This directory is the repository-local operating map for agents working in AI Knowledge System. It organizes **who does the work, when a workflow is invoked, which review rules apply, how failures become lessons, how material features remain traceable, which context normal work loads, and how supported agent products enter that system**.
 
 GitHub remains authoritative for repository files, branches, commits, pull requests, reviews, and CI. These files are the public, local execution projection agents need while working here.
 
@@ -25,6 +25,7 @@ This is operational self-sufficiency, **not** a silent global AIOS authority cut
 - **Feature dossier = navigable provenance map** for a material feature; Git history and live PR/CI state remain repository truth.
 - **Context bundle = public-safe semantic orientation** for normal repository work.
 - **Governance lock = vendored upstream-policy snapshot boundary**, not mutable GitHub-state evidence.
+- **Adapter = vendor-specific entry/routing layer** into the same canonical repository knowledge.
 
 No label grants authority by itself.
 
@@ -34,8 +35,8 @@ For material repository work:
 
 1. Read root `AGENTS.md`.
 2. Read `context/README.md` and the smallest required context bundle.
-3. Read the most specific nested `AGENTS.md` for touched paths.
-4. Read only the relevant role file under `agents/`.
+3. Read the most specific nested `AGENTS.md` and applicable tool path-specific instructions for touched paths.
+4. Resolve the relevant bounded role. Tool-native agent profiles may project that role but do not replace its authority limits.
 5. Read the matching lifecycle command in `commands/README.md`.
 6. Load `pr-rules/common.md` plus the smallest touched-area rule file.
 7. Load the active feature dossier / execution plan when one exists.
@@ -48,7 +49,10 @@ Do **not** preload every candidate lesson or external memory source by default.
 
 - `context/` — project charter, semantic handoff, authority map, vendored governance, and governance lock.
 - `knowledge/` — repository knowledge routing/index.
-- `agents/` — bounded professional job contracts.
+- `agents/` — vendor-neutral bounded professional job contracts.
+- `adapters/` — supported product routing and adapter law.
+- `.github/agents/` — GitHub Copilot-native projections of selected role contracts.
+- `.github/instructions/` — GitHub path-specific instruction adapters.
 - `commands/` — repeatable lifecycle entry points.
 - `pr-rules/` — compact human-promoted rules for repeated review use.
 - `anti-patterns/` — candidate negative knowledge and promotion lifecycle.
@@ -58,6 +62,16 @@ Do **not** preload every candidate lesson or external memory source by default.
 - `skills/` — repository-local skill projection boundary.
 - `guardrails/` — authority and separation-of-duty constraints.
 - `SCHEMAS.md` — canonical local record shapes.
+
+## Tool adapters
+
+### OpenAI Codex
+
+Codex uses hierarchical `AGENTS.md`. Root instructions route inward; deeper `AGENTS.md` files specialize subtrees. See `adapters/CODEX.md`.
+
+### GitHub Copilot
+
+Copilot uses `.github/copilot-instructions.md`, path-specific `.github/instructions/**/*.instructions.md`, and bounded custom agents under `.github/agents/`. See `adapters/GITHUB_COPILOT.md`.
 
 ## Compounding loop
 
@@ -80,11 +94,11 @@ For a material feature, the navigable repository chain is:
 ```text
 intent
 → local plan / feature dossier
-→ branch + PR
+→ branch/PR or explicitly owner-authorized direct-main staging
 → implementation commits
 → review findings
 → repair rounds
-→ exact-head CI/verifier evidence
+→ exact bound verifier/CI evidence where required
 → anti-pattern candidates
 → decisions / handoff updates
 → terminal disposition
@@ -92,7 +106,7 @@ intent
 
 Public-safe opaque upstream reference IDs may be carried when a feature originated in global AIOS governance, but normal repository execution does not require an external round-trip.
 
-A tracked dossier must not attempt to self-bind to the commit SHA that contains itself. Current candidate head is read live from GitHub; historical reviewed/verified heads may be recorded as evidence rows.
+A tracked dossier must not attempt to self-bind to the commit SHA that contains itself. Resolve current candidate/main identity live from GitHub; historical reviewed/verified heads may be recorded as evidence rows.
 
 ## Seed set
 
