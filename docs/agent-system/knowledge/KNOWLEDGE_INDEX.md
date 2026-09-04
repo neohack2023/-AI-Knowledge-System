@@ -8,18 +8,29 @@ Use this index instead of searching external memory first.
 - `../context/REPOSITORY_HANDOFF.md` — semantic current phase and next actions.
 - `../context/AUTHORITY_MAP.md` — source-of-truth routing.
 - `../context/GOVERNANCE_BUNDLE.md` — vendored local execution laws.
-- `../context/governance-lock.yaml` — external-fetch/synchronization triggers.
 
 ## Agent organization
 
 - `../README.md` — operating-system map and load order.
 - `../agents/` — vendor-neutral bounded job contracts.
-- `../adapters/` — product-specific routing for Codex/GitHub Copilot.
-- `../../../.github/agents/` — GitHub Copilot custom-agent projections.
-- `../../../.github/instructions/` — GitHub path-specific instruction adapters.
-- `../commands/README.md` — lifecycle entry points.
+- `../../../.github/agents/` — installed GitHub custom-agent projections.
+- `../commands/README.md` — vendor-neutral lifecycle entry points.
+- `../skills/README.md` — repository-native skill law and command-to-skill mapping.
+- `../../../.github/skills/` — installed task-specific Agent Skills.
 - `../guardrails/` — separation-of-duty and authority constraints.
 - `../SCHEMAS.md` — local record schemas.
+
+## Installed lifecycle skills
+
+Load only the skill relevant to the task:
+
+- `.github/skills/plan-feature/SKILL.md`
+- `.github/skills/review-pr/SKILL.md`
+- `.github/skills/verify-head/SKILL.md`
+- `.github/skills/harvest-lesson/SKILL.md`
+- `.github/skills/prepare-release/SKILL.md`
+
+Skills define repeatable procedure. They do not grant authority.
 
 ## Planning and decisions
 
@@ -39,14 +50,12 @@ Use this index instead of searching external memory first.
 
 - `../../VERIFIER_OWNED_ACCEPTANCE_RUNTIME.md` — verifier-owned acceptance contract.
 - `../../../server/coding-harness/AGENTS.md` — coding-harness path law when touching that subtree.
-- `../../../.github/instructions/coding-harness.instructions.md` — Copilot-native path adapter for the trust-bearing harness surface.
 
 ## Public-release safety
 
 - `../../PUBLIC_RELEASE_BOUNDARY.md`
 - `../../../public-release-manifest.yaml`
-- `../../../.github/instructions/public-release.instructions.md`
 
 ## External escalation
 
-Do not fetch Notion/Drive by default. Escalate only when `../context/governance-lock.yaml` triggers an upstream read/synchronization or when the owner explicitly requests one. Repository adapters and custom agents must route through this same boundary rather than inventing their own external-memory policy.
+Do not fetch Notion/Drive by default. Escalate only when `../context/governance-lock.yaml` triggers an upstream read or when the owner explicitly requests one.

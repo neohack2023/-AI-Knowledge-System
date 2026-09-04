@@ -8,6 +8,8 @@ Before proposing, editing, or reviewing:
 - Read `docs/agent-system/context/README.md`, then use `docs/agent-system/knowledge/KNOWLEDGE_INDEX.md` to load only the smallest relevant local context.
 - Honor applicable `.github/instructions/**/*.instructions.md` path-specific rules. Do not duplicate those rules into unrelated prompts.
 - Use `.github/agents/*.agent.md` specialists for bounded jobs when they materially improve the task. `ROLE PROFILE ≠ AUTHORITY`; tool access never grants merge, verifier, release, or owner authority.
+- Use the single relevant `.github/skills/<skill-name>/SKILL.md` for task-specific lifecycle procedures. Do not preload every skill. Skills define **how**, not authority.
+- Canonical mappings: Planner → `plan-feature`; Reviewer → `review-pr`; Verifier → `verify-head`; Knowledge Steward → `harvest-lesson`; Release Steward → `prepare-release`.
 - For `server/coding-harness/**`, read the nested `AGENTS.md`, verifier contract, and coding-harness PR rules before reviewing/changing trust logic.
 - Keep one coherent concern and explicit non-goals unless the owner has expressly authorized a direct-main staging operation.
 - Treat identity, freshness, review class, risk, transition classification, and owner authorization as separate trust-bearing facts when required.
@@ -18,10 +20,16 @@ Before proposing, editing, or reviewing:
 - Never copy private workspace links, personal memory, live provider bindings, secrets, or private receipts into this public repository.
 - Never merge, deploy, release, or change authority boundaries solely because an automated review or test is green.
 
+## Skill boundary
+
+GitHub may select project skills based on their descriptions. A selected skill does not override stronger repository authority/safety contracts and does not widen the selected custom agent's role. Explicit user/task instructions may choose a different procedural path when compatible with those stronger boundaries.
+
+The Phase 3 skills intentionally do not pre-approve shell/bash execution in `allowed-tools` frontmatter.
+
 ## External-memory boundary
 
 Do not fetch Notion/Drive merely to reconstruct repository identity, semantic phase, operating rules, plans, decisions, or known lessons. Escalate externally only when `docs/agent-system/context/governance-lock.yaml` triggers synchronization/conflict handling or the owner explicitly requests it.
 
 ## Review behavior
 
-Prioritize concrete correctness, trust-binding, security, data-loss, contract, and liveness defects. Load common plus touched-area PR rules. Retrieve detailed anti-pattern candidates only when relevant. Avoid re-raising already repaired prior-head findings unless the current candidate still reproduces the defect. You may suggest a lesson candidate; you may not self-promote it.
+Prioritize concrete correctness, trust-binding, security, data-loss, contract, and liveness defects. Load common plus touched-area PR rules and use `review-pr` when performing the repeatable review workflow. Retrieve detailed anti-pattern candidates only when relevant. Avoid re-raising already repaired prior-head findings unless the current candidate still reproduces the defect. You may suggest a lesson candidate; you may not self-promote it.

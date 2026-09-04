@@ -1,6 +1,6 @@
 # AI Knowledge System Repository Instructions
 
-This file is the canonical repository-local instruction map for coding agents. Keep it compact. Put detailed path-specific rules in nested `AGENTS.md`, `.github/instructions/**`, or repository docs and route to them from here.
+This file is the canonical repository-local instruction map for coding agents. Keep it compact. Put detailed path-specific rules in nested `AGENTS.md`, `.github/instructions/**`, repository-native skills, or repository docs and route to them from here.
 
 ## Repository role
 
@@ -17,18 +17,33 @@ This file is the canonical repository-local instruction map for coding agents. K
 3. Use `docs/agent-system/knowledge/KNOWLEDGE_INDEX.md` and `docs/README.md` to load only the smallest relevant documentation. Do not scan all docs by default.
 4. Read `package.json` before inventing build, test, lint, or release commands.
 5. Before editing a subtree, check for a more specific nested `AGENTS.md` and applicable `.github/instructions/**/*.instructions.md`.
-6. Before editing `server/coding-harness/**`, read `server/coding-harness/AGENTS.md`, `docs/VERIFIER_OWNED_ACCEPTANCE_RUNTIME.md`, and the coding-harness PR rules.
-7. Before adding a tracked path or public artifact, read `docs/PUBLIC_RELEASE_BOUNDARY.md` and `public-release-manifest.yaml`.
+6. When the task matches a repeatable lifecycle procedure, load the single relevant `.github/skills/<skill-name>/SKILL.md`. Skills are task procedures, not authority grants.
+7. Before editing `server/coding-harness/**`, read `server/coding-harness/AGENTS.md`, `docs/VERIFIER_OWNED_ACCEPTANCE_RUNTIME.md`, and the coding-harness PR rules.
+8. Before adding a tracked path or public artifact, read `docs/PUBLIC_RELEASE_BOUNDARY.md` and `public-release-manifest.yaml`.
 
 ## Repository organization
 
 - `docs/agent-system/agents/` contains vendor-neutral bounded job contracts.
 - `.github/agents/` projects those jobs into GitHub Copilot custom agents.
-- `docs/agent-system/commands/` defines lifecycle entry contracts.
+- `.github/skills/` contains installed task-specific Agent Skills for repeatable lifecycle procedures.
+- `docs/agent-system/skills/` documents the skill boundary, routing, and maintenance law.
+- `docs/agent-system/commands/` defines vendor-neutral lifecycle entry contracts that the installed skills project.
 - `docs/agent-system/pr-rules/` contains compact promoted review law.
 - `docs/agent-system/anti-patterns/` contains deeper negative knowledge and immutable source evidence.
 - `docs/agent-system/features/`, `decisions/`, and `exec-plans/` hold feature provenance, durable repository decisions, and execution plans.
 - `docs/agent-system/adapters/` explains product-specific routing without creating a second policy authority.
+
+## Skill routing
+
+Canonical Phase 3 procedures:
+
+- Planner → `plan-feature`
+- Reviewer → `review-pr`
+- Verifier → `verify-head`
+- Knowledge Steward → `harvest-lesson`
+- Release Steward → `prepare-release`
+
+Load only the relevant skill. Do not preload every skill into every task. Explicit user/task instructions may choose a different procedural path when compatible with stronger repository authority and safety boundaries.
 
 ## Work-unit discipline
 
