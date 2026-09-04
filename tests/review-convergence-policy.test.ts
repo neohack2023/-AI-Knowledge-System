@@ -4,6 +4,7 @@ import { evaluateReviewConvergence, type ReviewConvergenceInput } from "../serve
 
 const H1 = "1111111111111111111111111111111111111111";
 const H2 = "2222222222222222222222222222222222222222";
+const H3 = "3333333333333333333333333333333333333333";
 
 function base(overrides: Partial<ReviewConvergenceInput> = {}): ReviewConvergenceInput {
   return {
@@ -14,6 +15,8 @@ function base(overrides: Partial<ReviewConvergenceInput> = {}): ReviewConvergenc
     fullReviewHeadSha: H1,
     reviewedHeadSha: H1,
     latestReviewKind: "FULL",
+    deltaClassificationBaseSha: H1,
+    deltaClassificationHeadSha: H1,
     repairOnlyDelta: false,
     scopeExpanded: false,
     repairRounds: 0,
@@ -34,7 +37,7 @@ test("stale hard-gate PASS is rejected when evidence head differs from candidate
 });
 
 test("standard-risk change gets one initial broad review", () => {
-  const result = evaluateReviewConvergence(base({ fullReviewHeadSha: null, reviewedHeadSha: null, latestReviewKind: "NONE", ownerAuthorizedHeadSha: null }));
+  const result = evaluateReviewConvergence(base({ fullReviewHeadSha: null, reviewedHeadSha: null, latestReviewKind: "NONE", deltaClassificationBaseSha: null, deltaClassificationHeadSha: null, ownerAuthorizedHeadSha: null }));
   assert.equal(result.decision, "REQUIRE_FULL_REVIEW");
   assert.equal(result.reviewScope, "FULL");
 });
@@ -45,30 +48,41 @@ test("confirmed in-scope P2 requires repair within budget", () => {
 });
 
 test("repaired STANDARD head is reviewed before inherited findings drive another repair", () => {
-  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H1, ownerAuthorizedHeadSha: null, repairOnlyDelta: true, repairRounds: 1, findings: [{ id: "F-1", severity: "P2", scope: "IN_SCOPE", findingClass: "CORRECTNESS", confirmed: true, resolved: false }] }));
+  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H1, deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, ownerAuthorizedHeadSha: null, repairOnlyDelta: true, repairRounds: 1, findings: [{ id: "F-1", severity: "P2", scope: "IN_SCOPE", findingClass: "CORRECTNESS", confirmed: true, resolved: false }] }));
   assert.equal(result.decision, "REQUIRE_SCOPED_REREVIEW");
 });
 
 test("breaker is evaluated only after the current repaired head has been reviewed", () => {
-  const stale = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H1, ownerAuthorizedHeadSha: null, repairOnlyDelta: true, repairRounds: 2, findings: [{ id: "F-4", severity: "P2", scope: "IN_SCOPE", findingClass: "CORRECTNESS", confirmed: true, resolved: false }] }));
+  const stale = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H1, deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, ownerAuthorizedHeadSha: null, repairOnlyDelta: true, repairRounds: 2, findings: [{ id: "F-4", severity: "P2", scope: "IN_SCOPE", findingClass: "CORRECTNESS", confirmed: true, resolved: false }] }));
   assert.equal(stale.decision, "REQUIRE_SCOPED_REREVIEW");
-  const current = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", ownerAuthorizedHeadSha: null, repairOnlyDelta: true, repairRounds: 2, findings: [{ id: "F-4", severity: "P2", scope: "IN_SCOPE", findingClass: "CORRECTNESS", confirmed: true, resolved: false }] }));
+  const current = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, ownerAuthorizedHeadSha: null, repairOnlyDelta: true, repairRounds: 2, findings: [{ id: "F-4", severity: "P2", scope: "IN_SCOPE", findingClass: "CORRECTNESS", confirmed: true, resolved: false }] }));
   assert.equal(current.decision, "ADJUDICATE_STOP");
 });
 
 test("clean scoped repair review preserves earlier broad review evidence", () => {
-  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", repairOnlyDelta: true, repairRounds: 1, ownerAuthorizedHeadSha: H2 }));
+  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: true, repairRounds: 1, ownerAuthorizedHeadSha: H2 }));
   assert.equal(result.decision, "MERGE_ELIGIBLE");
 });
 
 test("STANDARD non-repair head rejects scoped review and requires current full review", () => {
-  const scoped = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", repairOnlyDelta: false, ownerAuthorizedHeadSha: H2 }));
+  const scoped = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: false, ownerAuthorizedHeadSha: H2 }));
   assert.equal(scoped.decision, "REQUIRE_FULL_REVIEW");
   assert.equal(scoped.reviewScope, "FULL");
   assert.ok(scoped.reasonCodes.includes("HEAD_CHANGED_OUTSIDE_REPAIR_DELTA"));
 
-  const full = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "FULL", repairOnlyDelta: false, ownerAuthorizedHeadSha: H2 }));
+  const full = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, fullReviewHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "FULL", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: false, ownerAuthorizedHeadSha: H2 }));
   assert.equal(full.decision, "MERGE_ELIGIBLE");
+});
+
+test("delta classification is bound to the exact retained full-review base and candidate head", () => {
+  const result = evaluateReviewConvergence(base({ candidateHeadSha: H3, hardGateEvidenceHeadSha: H3, reviewedHeadSha: H3, latestReviewKind: "SCOPED_REPAIR", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: true, ownerAuthorizedHeadSha: H3 }));
+  assert.equal(result.decision, "REQUIRE_FULL_REVIEW");
+  assert.ok(result.reasonCodes.includes("DELTA_CLASSIFICATION_STALE"));
+});
+
+test("current full review remains valid after a later scoped review on the same immutable head", () => {
+  const result = evaluateReviewConvergence(base({ riskTier: "SENSITIVE", candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, fullReviewHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: true, ownerAuthorizedHeadSha: H2 }));
+  assert.equal(result.decision, "MERGE_ELIGIBLE");
 });
 
 test("out-of-scope advisory is deferred instead of widening the PR", () => {
@@ -83,7 +97,7 @@ test("critical authority finding stays blocking even when labeled out-of-scope",
 });
 
 test("resolved critical finding elevates STANDARD repair to SENSITIVE full-review obligation", () => {
-  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", repairOnlyDelta: true, ownerAuthorizedHeadSha: H2, findings: [{ id: "F-C", severity: "P1", scope: "IN_SCOPE", findingClass: "AUTHORITY", confirmed: true, resolved: true }] }));
+  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: true, ownerAuthorizedHeadSha: H2, findings: [{ id: "F-C", severity: "P1", scope: "IN_SCOPE", findingClass: "AUTHORITY", confirmed: true, resolved: true }] }));
   assert.equal(result.effectiveRiskTier, "SENSITIVE");
   assert.equal(result.decision, "REQUIRE_FULL_REVIEW");
   assert.equal(result.repairRoundLimit, 3);
@@ -95,18 +109,19 @@ test("current full review discharges scope expansion", () => {
 });
 
 test("scope expansion without current full review requires one", () => {
-  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, scopeExpanded: true, reviewedHeadSha: H1, ownerAuthorizedHeadSha: H2 }));
+  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, scopeExpanded: true, deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, reviewedHeadSha: H1, ownerAuthorizedHeadSha: H2 }));
   assert.equal(result.decision, "REQUIRE_FULL_REVIEW");
+  assert.ok(result.reasonCodes.includes("SCOPE_EXPANDED_FULL_REVIEW_REQUIRED"));
 });
 
 test("owner merge authorization is bound to candidate head", () => {
-  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "FULL", ownerAuthorizedHeadSha: H1 }));
+  const result = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, fullReviewHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "FULL", deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, ownerAuthorizedHeadSha: H1 }));
   assert.equal(result.decision, "OWNER_AUTHORIZATION_REQUIRED");
   assert.ok(result.reasonCodes.includes("OWNER_AUTHORIZATION_STALE"));
 });
 
 test("sensitive head changes retain full-review strictness", () => {
-  const result = evaluateReviewConvergence(base({ riskTier: "SENSITIVE", candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H1, repairOnlyDelta: true, ownerAuthorizedHeadSha: null, repairRounds: 1 }));
+  const result = evaluateReviewConvergence(base({ riskTier: "SENSITIVE", candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H1, deltaClassificationBaseSha: H1, deltaClassificationHeadSha: H2, repairOnlyDelta: true, ownerAuthorizedHeadSha: null, repairRounds: 1 }));
   assert.equal(result.decision, "REQUIRE_FULL_REVIEW");
   assert.equal(result.repairRoundLimit, 3);
 });

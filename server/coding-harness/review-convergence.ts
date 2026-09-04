@@ -29,6 +29,8 @@ export interface ReviewConvergenceInput {
   fullReviewHeadSha: string | null;
   reviewedHeadSha: string | null;
   latestReviewKind: ReviewKind;
+  deltaClassificationBaseSha: string | null;
+  deltaClassificationHeadSha: string | null;
   repairOnlyDelta: boolean;
   scopeExpanded: boolean;
   repairRounds: number;
@@ -104,6 +106,8 @@ export function evaluateReviewConvergence(input: ReviewConvergenceInput): Review
   requireSha(input.hardGateEvidenceHeadSha, "hardGateEvidenceHeadSha", true);
   requireSha(input.fullReviewHeadSha, "fullReviewHeadSha", true);
   requireSha(input.reviewedHeadSha, "reviewedHeadSha", true);
+  requireSha(input.deltaClassificationBaseSha, "deltaClassificationBaseSha", true);
+  requireSha(input.deltaClassificationHeadSha, "deltaClassificationHeadSha", true);
   requireSha(input.ownerAuthorizedHeadSha, "ownerAuthorizedHeadSha", true);
 
   if (!Number.isInteger(input.repairRounds) || input.repairRounds < 0) {
@@ -120,9 +124,14 @@ export function evaluateReviewConvergence(input: ReviewConvergenceInput): Review
   const deferredFindingIds = input.findings.filter(isDeferredFinding).map((finding) => finding.id);
   const reasonCodes: string[] = [];
   const currentHeadReviewed = input.reviewedHeadSha === input.candidateHeadSha;
-  const currentFullReview = currentHeadReviewed && input.latestReviewKind === "FULL";
+  const currentFullReview = input.fullReviewHeadSha === input.candidateHeadSha;
   const currentScopedReview = currentHeadReviewed && input.latestReviewKind === "SCOPED_REPAIR";
   const hasHistoricalFullReview = input.fullReviewHeadSha !== null;
+  const currentHeadHasReviewEvidence = currentFullReview || currentHeadReviewed;
+  const deltaClassificationCurrent =
+    hasHistoricalFullReview &&
+    input.deltaClassificationBaseSha === input.fullReviewHeadSha &&
+    input.deltaClassificationHeadSha === input.candidateHeadSha;
 
   if (input.hardGateState !== "PASS") {
     reasonCodes.push(`HARD_GATE_${input.hardGateState}`);
@@ -133,18 +142,29 @@ export function evaluateReviewConvergence(input: ReviewConvergenceInput): Review
     return { decision: "BLOCKED_HARD_GATE", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
-  // Scope expansion and sensitive boundaries require a full review of the exact current head.
-  if (input.scopeExpanded && !currentFullReview) {
-    reasonCodes.push("SCOPE_EXPANDED_FULL_REVIEW_REQUIRED");
-    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
-  }
   if (!hasHistoricalFullReview && effectiveTier !== "LOW") {
     reasonCodes.push("INITIAL_FULL_REVIEW_REQUIRED");
     return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
+  // A STANDARD candidate may use delta classification to reduce review scope only when the
+  // classification is bound to the retained broad-review baseline and the exact candidate head.
+  if (effectiveTier === "STANDARD" && hasHistoricalFullReview && !currentFullReview && !deltaClassificationCurrent) {
+    const unbound = input.deltaClassificationBaseSha === null || input.deltaClassificationHeadSha === null;
+    reasonCodes.push(unbound ? "DELTA_CLASSIFICATION_UNBOUND" : "DELTA_CLASSIFICATION_STALE");
+    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+
+  // Scope expansion and sensitive boundaries require a full review of the exact current head.
+  // fullReviewHeadSha is cumulative evidence for that immutable head and cannot be erased by a
+  // later narrower review on the same commit.
+  if (input.scopeExpanded && !currentFullReview) {
+    reasonCodes.push("SCOPE_EXPANDED_FULL_REVIEW_REQUIRED");
+    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+
   // Review the repaired/current head before acting again on findings inherited from an older head.
-  if (!currentHeadReviewed && effectiveTier !== "LOW") {
+  if (!currentHeadHasReviewEvidence && effectiveTier !== "LOW") {
     if (effectiveTier === "SENSITIVE") {
       reasonCodes.push("SENSITIVE_CURRENT_HEAD_FULL_REVIEW_REQUIRED");
       return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
@@ -170,7 +190,7 @@ export function evaluateReviewConvergence(input: ReviewConvergenceInput): Review
   }
 
   // A STANDARD repair-only current head may proceed from a scoped review if a broad review exists in lineage.
-  if (effectiveTier === "STANDARD" && input.repairOnlyDelta && currentHeadReviewed && !currentFullReview && !currentScopedReview) {
+  if (effectiveTier === "STANDARD" && input.repairOnlyDelta && !currentFullReview && !currentScopedReview) {
     reasonCodes.push("REPAIR_DELTA_REVIEW_REQUIRED");
     return { decision: "REQUIRE_SCOPED_REREVIEW", reviewScope: "SCOPED_REPAIR", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
