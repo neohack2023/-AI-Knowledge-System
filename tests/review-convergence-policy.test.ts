@@ -61,6 +61,16 @@ test("clean scoped repair review preserves earlier broad review evidence", () =>
   assert.equal(result.decision, "MERGE_ELIGIBLE");
 });
 
+test("STANDARD non-repair head rejects scoped review and requires current full review", () => {
+  const scoped = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "SCOPED_REPAIR", repairOnlyDelta: false, ownerAuthorizedHeadSha: H2 }));
+  assert.equal(scoped.decision, "REQUIRE_FULL_REVIEW");
+  assert.equal(scoped.reviewScope, "FULL");
+  assert.ok(scoped.reasonCodes.includes("HEAD_CHANGED_OUTSIDE_REPAIR_DELTA"));
+
+  const full = evaluateReviewConvergence(base({ candidateHeadSha: H2, hardGateEvidenceHeadSha: H2, reviewedHeadSha: H2, latestReviewKind: "FULL", repairOnlyDelta: false, ownerAuthorizedHeadSha: H2 }));
+  assert.equal(full.decision, "MERGE_ELIGIBLE");
+});
+
 test("out-of-scope advisory is deferred instead of widening the PR", () => {
   const result = evaluateReviewConvergence(base({ findings: [{ id: "F-2", severity: "P2", scope: "OUT_OF_SCOPE", findingClass: "MAINTAINABILITY", confirmed: true, resolved: false }] }));
   assert.equal(result.decision, "MERGE_ELIGIBLE");

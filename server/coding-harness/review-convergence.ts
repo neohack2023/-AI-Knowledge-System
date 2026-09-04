@@ -163,6 +163,12 @@ export function evaluateReviewConvergence(input: ReviewConvergenceInput): Review
     return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
+  // A STANDARD candidate changed outside a repair-only delta can only proceed from a current full review.
+  if (effectiveTier === "STANDARD" && !input.repairOnlyDelta && !currentFullReview) {
+    reasonCodes.push("HEAD_CHANGED_OUTSIDE_REPAIR_DELTA");
+    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+
   // A STANDARD repair-only current head may proceed from a scoped review if a broad review exists in lineage.
   if (effectiveTier === "STANDARD" && input.repairOnlyDelta && currentHeadReviewed && !currentFullReview && !currentScopedReview) {
     reasonCodes.push("REPAIR_DELTA_REVIEW_REQUIRED");

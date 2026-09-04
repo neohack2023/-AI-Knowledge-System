@@ -98,6 +98,8 @@ This prevents a stale finding from automatically triggering another repair, or e
 - a current-head `FULL` review discharges a prior scope-expansion review requirement;
 - an unchanged reviewed head does not require duplicate review merely to produce another disposition.
 
+A current-head review is not sufficient by identity alone: its `latestReviewKind` must also satisfy the required review class. In particular, a STANDARD candidate changed outside a repair-only delta cannot proceed from `SCOPED_REPAIR` even when `reviewedHeadSha == candidateHeadSha`.
+
 ## Repair breaker
 
 When current-head review is complete and unresolved blocking findings remain at the configured repair-round limit:
@@ -130,7 +132,8 @@ candidate exact head
      -> any confirmed critical-class finding => SENSITIVE
   -> derive review currency from reviewedHeadSha == candidateHeadSha
   -> scope-expanded/SENSITIVE current head without FULL review => REQUIRE_FULL_REVIEW
-  -> STANDARD repair-only current head without scoped review => REQUIRE_SCOPED_REREVIEW
+  -> STANDARD non-repair current head without FULL review => REQUIRE_FULL_REVIEW
+  -> STANDARD repair-only current head without scoped/full review => REQUIRE_SCOPED_REREVIEW
   -> current-head review complete
      -> confirmed blocking finding => REPAIR_REQUIRED
         -> breaker reached => ADJUDICATE_STOP
@@ -157,6 +160,7 @@ The focused policy suite now covers:
 - repaired-head review before inherited findings;
 - breaker only after current-head review;
 - clean scoped repair convergence;
+- STANDARD non-repair current head rejecting scoped review and requiring FULL review;
 - out-of-scope advisory deferral;
 - critical findings remaining blocking;
 - repaired critical finding elevating STANDARD to SENSITIVE;
@@ -177,6 +181,7 @@ The focused policy suite now covers:
 - Google engineering practices: small self-contained changes are easier to review thoroughly and merge safely.
 - OpenAI Codex issue #42130 (2026-09-01): independently reports an unbounded managed review -> repair -> new-commit review loop.
 - PR #67 Codex review passes on `3a4640d...`: five confirmed defects, three trust-binding and two convergence/liveness.
+- PR #67 current-head FULL review on `887d132b...` (review `5115462974`): confirmed a sixth policy defect where a non-repair STANDARD candidate could incorrectly proceed from a current-head `SCOPED_REPAIR` review.
 
 ## Non-goals
 
