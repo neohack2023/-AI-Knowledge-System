@@ -5,6 +5,7 @@
     {"name": "review-pr", "role": "Reviewer", "agent": ".github/agents/reviewer.agent.md"},
     {"name": "verify-head", "role": "Verifier", "agent": ".github/agents/verifier.agent.md"},
     {"name": "harvest-lesson", "role": "Knowledge Steward", "agent": ".github/agents/knowledge-steward.agent.md"},
+    {"name": "sync-governance", "role": "Knowledge Steward", "agent": ".github/agents/knowledge-steward.agent.md"},
     {"name": "prepare-release", "role": "Release Steward", "agent": ".github/agents/release-steward.agent.md"}
   ],
   "governance_lock": "docs/agent-system/context/governance-lock.yaml",
@@ -21,5 +22,5 @@
     ".github/copilot-instructions.md"
   ],
   "governance_valid_through_key": "valid_through",
-  "minimum_repository_autonomy_phase": 4
+  "minimum_repository_autonomy_phase": 5
 }
