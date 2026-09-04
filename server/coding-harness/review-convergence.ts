@@ -23,17 +23,18 @@ export interface AdvisoryFinding {
 
 export interface ReviewConvergenceInput {
   riskTier: ReviewRiskTier;
+  candidateHeadSha: string;
   hardGateState: HardGateState;
-  fullReviewCompleted: boolean;
-  currentHeadReviewed: boolean;
+  hardGateEvidenceHeadSha: string | null;
+  fullReviewHeadSha: string | null;
+  reviewedHeadSha: string | null;
   latestReviewKind: ReviewKind;
-  headChangedSinceFullReview: boolean;
   repairOnlyDelta: boolean;
   scopeExpanded: boolean;
   repairRounds: number;
   maxRepairRounds?: number;
   findings: AdvisoryFinding[];
-  ownerMergeAuthorized: boolean;
+  ownerAuthorizedHeadSha: string | null;
 }
 
 export type ReviewConvergenceDecision =
@@ -48,6 +49,7 @@ export type ReviewConvergenceDecision =
 export interface ReviewConvergenceResult {
   decision: ReviewConvergenceDecision;
   reviewScope: ReviewKind;
+  effectiveRiskTier: ReviewRiskTier;
   blockingFindingIds: string[];
   deferredFindingIds: string[];
   reasonCodes: string[];
@@ -67,6 +69,15 @@ const CRITICAL_CLASSES = new Set<FindingClass>([
   "CONTRACT",
 ]);
 
+const gitSha = /^[0-9a-f]{40}$/i;
+
+function requireSha(value: string | null, field: string, allowNull: boolean): void {
+  if (value === null && allowNull) return;
+  if (typeof value !== "string" || !gitSha.test(value)) {
+    throw new TypeError(`${field} must be ${allowNull ? "null or " : ""}an exact 40-character Git SHA`);
+  }
+}
+
 function isBlockingFinding(finding: AdvisoryFinding): boolean {
   if (!finding.confirmed || finding.resolved) return false;
   if (CRITICAL_CLASSES.has(finding.findingClass)) return true;
@@ -80,12 +91,27 @@ function isDeferredFinding(finding: AdvisoryFinding): boolean {
   return finding.scope === "OUT_OF_SCOPE" || finding.severity === "P3";
 }
 
+function effectiveRiskTier(input: ReviewConvergenceInput): ReviewRiskTier {
+  if (input.riskTier === "SENSITIVE") return "SENSITIVE";
+  if (input.findings.some((finding) => finding.confirmed && CRITICAL_CLASSES.has(finding.findingClass))) {
+    return "SENSITIVE";
+  }
+  return input.riskTier;
+}
+
 export function evaluateReviewConvergence(input: ReviewConvergenceInput): ReviewConvergenceResult {
+  requireSha(input.candidateHeadSha, "candidateHeadSha", false);
+  requireSha(input.hardGateEvidenceHeadSha, "hardGateEvidenceHeadSha", true);
+  requireSha(input.fullReviewHeadSha, "fullReviewHeadSha", true);
+  requireSha(input.reviewedHeadSha, "reviewedHeadSha", true);
+  requireSha(input.ownerAuthorizedHeadSha, "ownerAuthorizedHeadSha", true);
+
   if (!Number.isInteger(input.repairRounds) || input.repairRounds < 0) {
     throw new TypeError("repairRounds must be a non-negative integer");
   }
 
-  const repairRoundLimit = input.maxRepairRounds ?? DEFAULT_REPAIR_LIMIT[input.riskTier];
+  const effectiveTier = effectiveRiskTier(input);
+  const repairRoundLimit = input.maxRepairRounds ?? DEFAULT_REPAIR_LIMIT[effectiveTier];
   if (!Number.isInteger(repairRoundLimit) || repairRoundLimit < 1) {
     throw new TypeError("maxRepairRounds must be a positive integer");
   }
@@ -93,55 +119,71 @@ export function evaluateReviewConvergence(input: ReviewConvergenceInput): Review
   const blockingFindingIds = input.findings.filter(isBlockingFinding).map((finding) => finding.id);
   const deferredFindingIds = input.findings.filter(isDeferredFinding).map((finding) => finding.id);
   const reasonCodes: string[] = [];
+  const currentHeadReviewed = input.reviewedHeadSha === input.candidateHeadSha;
+  const currentFullReview = currentHeadReviewed && input.latestReviewKind === "FULL";
+  const currentScopedReview = currentHeadReviewed && input.latestReviewKind === "SCOPED_REPAIR";
+  const hasHistoricalFullReview = input.fullReviewHeadSha !== null;
 
   if (input.hardGateState !== "PASS") {
     reasonCodes.push(`HARD_GATE_${input.hardGateState}`);
-    return { decision: "BLOCKED_HARD_GATE", reviewScope: "NONE", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+    return { decision: "BLOCKED_HARD_GATE", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+  if (input.hardGateEvidenceHeadSha !== input.candidateHeadSha) {
+    reasonCodes.push("HARD_GATE_EVIDENCE_STALE");
+    return { decision: "BLOCKED_HARD_GATE", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
-  if (input.scopeExpanded) {
+  // Scope expansion and sensitive boundaries require a full review of the exact current head.
+  if (input.scopeExpanded && !currentFullReview) {
     reasonCodes.push("SCOPE_EXPANDED_FULL_REVIEW_REQUIRED");
-    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+  if (!hasHistoricalFullReview && effectiveTier !== "LOW") {
+    reasonCodes.push("INITIAL_FULL_REVIEW_REQUIRED");
+    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
-  if (!input.fullReviewCompleted && input.riskTier !== "LOW") {
-    reasonCodes.push("INITIAL_FULL_REVIEW_REQUIRED");
-    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  // Review the repaired/current head before acting again on findings inherited from an older head.
+  if (!currentHeadReviewed && effectiveTier !== "LOW") {
+    if (effectiveTier === "SENSITIVE") {
+      reasonCodes.push("SENSITIVE_CURRENT_HEAD_FULL_REVIEW_REQUIRED");
+      return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+    }
+    if (!input.repairOnlyDelta) {
+      reasonCodes.push("HEAD_CHANGED_OUTSIDE_REPAIR_DELTA");
+      return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+    }
+    reasonCodes.push("REPAIR_DELTA_REVIEW_REQUIRED");
+    return { decision: "REQUIRE_SCOPED_REREVIEW", reviewScope: "SCOPED_REPAIR", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+
+  // A sensitive candidate can only proceed from a current full review, never a scoped repair review.
+  if (effectiveTier === "SENSITIVE" && !currentFullReview) {
+    reasonCodes.push("SENSITIVE_CURRENT_HEAD_FULL_REVIEW_REQUIRED");
+    return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  }
+
+  // A STANDARD repair-only current head may proceed from a scoped review if a broad review exists in lineage.
+  if (effectiveTier === "STANDARD" && input.repairOnlyDelta && currentHeadReviewed && !currentFullReview && !currentScopedReview) {
+    reasonCodes.push("REPAIR_DELTA_REVIEW_REQUIRED");
+    return { decision: "REQUIRE_SCOPED_REREVIEW", reviewScope: "SCOPED_REPAIR", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
   if (blockingFindingIds.length > 0) {
     if (input.repairRounds >= repairRoundLimit) {
       reasonCodes.push("REPAIR_ROUND_LIMIT_REACHED");
-      return { decision: "ADJUDICATE_STOP", reviewScope: "NONE", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+      return { decision: "ADJUDICATE_STOP", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
     }
     reasonCodes.push("CONFIRMED_BLOCKING_FINDINGS");
-    return { decision: "REPAIR_REQUIRED", reviewScope: "NONE", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+    return { decision: "REPAIR_REQUIRED", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
-  if (input.headChangedSinceFullReview && input.riskTier !== "LOW") {
-    if (input.riskTier === "SENSITIVE") {
-      if (!(input.latestReviewKind === "FULL" && input.currentHeadReviewed)) {
-        reasonCodes.push("SENSITIVE_HEAD_CHANGE_FULL_REVIEW_REQUIRED");
-        return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
-      }
-    } else {
-      if (!input.repairOnlyDelta) {
-        reasonCodes.push("HEAD_CHANGED_OUTSIDE_REPAIR_DELTA");
-        return { decision: "REQUIRE_FULL_REVIEW", reviewScope: "FULL", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
-      }
-      if (!(input.latestReviewKind === "SCOPED_REPAIR" && input.currentHeadReviewed)) {
-        reasonCodes.push("REPAIR_DELTA_REVIEW_REQUIRED");
-        return { decision: "REQUIRE_SCOPED_REREVIEW", reviewScope: "SCOPED_REPAIR", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
-      }
-    }
-  }
-
-  if (!input.ownerMergeAuthorized) {
-    reasonCodes.push("OWNER_MERGE_AUTHORIZATION_REQUIRED");
-    return { decision: "OWNER_AUTHORIZATION_REQUIRED", reviewScope: "NONE", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  if (input.ownerAuthorizedHeadSha !== input.candidateHeadSha) {
+    reasonCodes.push(input.ownerAuthorizedHeadSha === null ? "OWNER_MERGE_AUTHORIZATION_REQUIRED" : "OWNER_AUTHORIZATION_STALE");
+    return { decision: "OWNER_AUTHORIZATION_REQUIRED", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
   }
 
   if (deferredFindingIds.length > 0) reasonCodes.push("NONBLOCKING_FINDINGS_DEFERRED");
   reasonCodes.push("CONVERGED");
-  return { decision: "MERGE_ELIGIBLE", reviewScope: "NONE", blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
+  return { decision: "MERGE_ELIGIBLE", reviewScope: "NONE", effectiveRiskTier: effectiveTier, blockingFindingIds, deferredFindingIds, reasonCodes, repairRoundLimit };
 }
