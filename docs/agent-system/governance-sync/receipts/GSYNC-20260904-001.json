@@ -1,0 +1,57 @@
+{
+  "schema_name": "GovernanceSyncReceipt",
+  "schema_version": "1.0",
+  "sync_id": "GSYNC-20260904-001",
+  "performed_on": "2026-09-04",
+  "repository_base_sha": "bd0e1d19243fa03088d80d555e944fa2fdef4601",
+  "sync_role": "KNOWLEDGE_STEWARD",
+  "trigger": "owner_requests_upstream_sync",
+  "upstream_snapshot_identity_kind": "NOTION_PAGE_ID_PLUS_LAST_EDITED_AT",
+  "upstream_sources": [
+    {
+      "source_id": "AIOS_GITHUB_GOVERNED_EXECUTION_CONTRACT_v0.1",
+      "page_id": "3aa43bd4-ae4a-8125-a453-d4ecd5fad910",
+      "observed_last_edited_at": "2026-07-27T04:20:37.420Z"
+    },
+    {
+      "source_id": "VERIFIER_OWNED_ACCEPTANCE_01",
+      "page_id": "3cc43bd4-ae4a-811f-a48f-ebed755e58cc",
+      "observed_last_edited_at": "2026-08-30T02:35:15.344Z"
+    },
+    {
+      "source_id": "CODING-HARNESS-01",
+      "page_id": "3bf43bd4-ae4a-8100-80a4-deb6de8d5316",
+      "observed_last_edited_at": "2026-09-03T12:12:00.000Z"
+    }
+  ],
+  "comparison": {
+    "delta_state": "MATERIAL_DELTA_RECONCILED",
+    "material_deltas": [
+      {
+        "delta_id": "DIRECT_MAIN_STAGING_EXCEPTION",
+        "upstream_position": "Default repository delivery is branch/PR based and the older governed execution contract excludes direct default-branch edits by agents.",
+        "repository_position": "Phases 1-5 used explicit owner-authorized, phase-specific, non-reusable direct-main staging exceptions.",
+        "reconciliation": "Keep branch/PR delivery as the default after Phase 5. Preserve each direct-main staging authorization as an exceptional historical receipt; do not infer reusable direct-main authority."
+      },
+      {
+        "delta_id": "UPSTREAM_SOURCE_SET_NORMALIZED",
+        "upstream_position": "Recurring synchronization should compare repository-local governance against durable global/cross-repository governance sources.",
+        "repository_position": "The Phase 4 lock also listed repository organizational/self-sufficiency MASON plans, including the mutable plan used to record this sync episode.",
+        "reconciliation": "The recurring Phase 5 supply set is narrowed to the three stable global repository/verification governance contracts. Repository organizational and self-sufficiency plans remain historical implementation evidence, not recurring upstream dependencies."
+      }
+    ]
+  },
+  "refresh": {
+    "prior_valid_through": "2026-10-04",
+    "freshness_policy_days": 30,
+    "refreshed_on": "2026-09-04",
+    "valid_through_after": "2026-10-04",
+    "applied": true
+  },
+  "authority_boundary": {
+    "normal_repo_work_external_fetch_required": false,
+    "global_authority_cutover": false,
+    "merge_release_deploy_authority_granted": false,
+    "private_workspace_urls_in_repository": false
+  }
+}
