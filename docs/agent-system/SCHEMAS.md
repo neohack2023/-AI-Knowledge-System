@@ -63,8 +63,14 @@ Only compact adjudicated rules belong in `pr-rules/**`.
 anti_pattern_id:
 domain:
 source_pr:
-source_review_or_thread:
-source_head:
+source_evidence:
+  - kind: REVIEW_FINDING | CI_RUN | REGRESSION | PROCESS_OBSERVATION | COMMIT
+    head_sha:
+    review_id:
+    thread_id:
+    comment_id:
+    run_id:
+    artifact_ref:
 observed_behavior:
 why_it_looked_reasonable:
 actual_failure:
@@ -77,6 +83,10 @@ rule_targets: []
 recurrence_count:
 supersedes: []
 ```
+
+`source_evidence` is an evidence-edge list, not a prose summary. Populate only fields that exist for that edge. Every `CONFIRMED` or `VALIDATED_LOCAL` record requires at least one immutable edge that identifies the exact head/artifact plus the most specific available review, thread, comment, CI run, regression, or process observation.
+
+`evidence_state` and `promotion_state` are orthogonal. Promotion never overwrites evidence maturity, and evidence maturity never grants promotion automatically.
 
 A candidate can guide investigation before promotion, but it is not automatically always-loaded law.
 
