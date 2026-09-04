@@ -18,14 +18,53 @@ function extractJob(workflow, jobName) {
   return nextJob === -1 ? tail : tail.slice(0, nextJob);
 }
 
-const exactHeadRef = /uses:\s+actions\/checkout@v4[\s\S]{0,220}ref:\s+\$\{\{\s*github\.event\.pull_request\.head\.sha\s*\}\}/;
+function extractStep(job, stepName) {
+  const marker = `      - name: ${stepName}\n`;
+  const start = job.indexOf(marker);
+  assert.notEqual(start, -1, `missing step ${stepName}`);
+
+  const tail = job.slice(start + marker.length);
+  const nextStep = tail.search(/\n      - name: /);
+  return nextStep === -1 ? tail : tail.slice(0, nextStep);
+}
+
+function checkoutRef(job) {
+  const step = extractStep(job, 'Checkout exact PR head');
+  const lines = step.split('\n');
+
+  assert.ok(
+    lines.some((line) => line.trim() === 'uses: actions/checkout@v4'),
+    'checkout step must use actions/checkout@v4',
+  );
+
+  const withIndex = lines.findIndex((line) => line.trim() === 'with:');
+  assert.notEqual(withIndex, -1, 'checkout step must have a with mapping');
+  const withIndent = lines[withIndex].match(/^\s*/u)[0].length;
+
+  for (let index = withIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) continue;
+
+    const indent = line.match(/^\s*/u)[0].length;
+    if (indent <= withIndent) break;
+
+    const refMatch = line.match(/^\s*ref:\s*(.+?)\s*$/u);
+    if (refMatch) return refMatch[1];
+  }
+
+  assert.fail('checkout step with mapping must contain ref');
+}
 
 test('all acceptance-relevant CI jobs checkout the exact immutable PR head', async () => {
   const workflow = await read('.github/workflows/ci.yml');
 
   for (const jobName of ['build-and-test', 'public-release-boundary']) {
     const job = extractJob(workflow, jobName);
-    assert.match(job, exactHeadRef, `${jobName} must checkout github.event.pull_request.head.sha`);
+    assert.equal(
+      checkoutRef(job),
+      '${{ github.event.pull_request.head.sha }}',
+      `${jobName} must bind actions/checkout with.ref to github.event.pull_request.head.sha`,
+    );
   }
 });
 
@@ -35,6 +74,16 @@ test('agent guidance invalidates head-bound evidence after any candidate-head ch
 
   assert.doesNotMatch(rootInstructions, /code-changing head/i);
   assert.doesNotMatch(harnessInstructions, /code-changing head/i);
-  assert.match(rootInstructions, /After any candidate-head change, assume prior head-bound/);
-  assert.match(harnessInstructions, /If the candidate head changes, prior head-bound evidence is stale/);
+  assert.ok(
+    rootInstructions.includes(
+      'After any candidate-head change, assume prior head-bound gate, review, classification, and authorization evidence is stale unless the contract mechanically proves transferability.',
+    ),
+    'root instructions must require mechanical proof before evidence transfer',
+  );
+  assert.ok(
+    harnessInstructions.includes(
+      'If the candidate head changes, prior head-bound evidence is stale unless the contract mechanically proves transferability.',
+    ),
+    'coding-harness instructions must require mechanical proof before evidence transfer',
+  );
 });
