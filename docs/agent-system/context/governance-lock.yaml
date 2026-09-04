@@ -1,11 +1,19 @@
 bundle_id: REPOSITORY_GOVERNANCE_BUNDLE_01
-bundle_version: 0.2
+bundle_version: 0.3
 state: STAGING_ACTIVE
 materialized_on: 2026-09-04
 normal_repo_work_external_fetch_required: false
 upstream_authority_cutover: false
-repository_autonomy_phase: 2
+repository_autonomy_phase: 3
 native_adapter_state: ACTIVE
+native_skill_state: ACTIVE
+installed_skill_root: .github/skills
+installed_skills:
+  - plan-feature
+  - review-pr
+  - verify-head
+  - harvest-lesson
+  - prepare-release
 upstream_sources:
   - AIOS_GITHUB_GOVERNED_EXECUTION_CONTRACT_v0.1
   - VERIFIER_OWNED_ACCEPTANCE_01
@@ -24,8 +32,16 @@ direct_main_staging_exception:
   scope: REPOSITORY_SELF_SUFFICIENCY_PHASE_1_AND_2
   authorized_on: 2026-09-04
   reusable_without_new_owner_direction: false
+phase_3_direct_main_exception:
+  authorized: true
+  scope: REPOSITORY_NATIVE_SKILLS_PHASE_3
+  authorized_on: 2026-09-04
+  reusable_without_new_owner_direction: false
+skill_authority_widening_allowed: false
+skill_shell_preapproval_default: false
 private_workspace_urls_allowed: false
 live_repository_facts_source: github
 semantic_handoff_source: docs/agent-system/context/REPOSITORY_HANDOFF.md
 knowledge_router: docs/agent-system/knowledge/KNOWLEDGE_INDEX.md
 adapter_router: docs/agent-system/adapters/README.md
+skill_router: docs/agent-system/skills/README.md
