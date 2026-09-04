@@ -1,0 +1,22 @@
+bundle_id: REPOSITORY_GOVERNANCE_BUNDLE_01
+bundle_version: 0.1
+state: CANDIDATE
+materialized_on: 2026-09-04
+normal_repo_work_external_fetch_required: false
+upstream_authority_cutover: false
+upstream_sources:
+  - AIOS_GITHUB_GOVERNED_EXECUTION_CONTRACT_v0.1
+  - VERIFIER_OWNED_ACCEPTANCE_01
+  - CODING-HARNESS-01
+  - REPOSITORY_ORGANIZATIONAL_OS_01
+  - REPOSITORY_SELF_SUFFICIENCY_01
+external_fetch_triggers:
+  - cross_repository_or_global_governance_change
+  - unresolved_authority_conflict
+  - owner_requests_upstream_sync
+  - bundle_declared_stale_or_incomplete_for_task
+sync_role: KNOWLEDGE_STEWARD
+sync_method: reviewed_pull_request
+private_workspace_urls_allowed: false
+live_repository_facts_source: github
+semantic_handoff_source: docs/agent-system/context/REPOSITORY_HANDOFF.md
