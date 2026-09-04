@@ -8,7 +8,7 @@ Use this index instead of searching external memory first.
 - `../context/REPOSITORY_HANDOFF.md` — semantic current phase and next actions.
 - `../context/AUTHORITY_MAP.md` — source-of-truth routing.
 - `../context/GOVERNANCE_BUNDLE.md` — vendored local execution laws.
-- `../context/governance-lock.yaml` — repository autonomy phase, external-fetch triggers, and governance freshness window.
+- `../context/governance-lock.yaml` — repository autonomy phase, external-fetch triggers, governance freshness, and latest sync receipt binding.
 
 ## Agent organization
 
@@ -18,7 +18,8 @@ Use this index instead of searching external memory first.
 - `../commands/README.md` — vendor-neutral lifecycle entry points.
 - `../skills/README.md` — repository-native skill law and command-to-skill mapping.
 - `../../../.github/skills/` — installed task-specific Agent Skills.
-- `../audit/README.md` — deterministic Phase 4 organization audit, failure classes, and evidence boundary.
+- `../audit/README.md` — deterministic organization audit, failure classes, and evidence boundary.
+- `../governance-sync/README.md` — bounded Knowledge Steward upstream supply path, delta states, freshness law, and receipt contract.
 - `../../../config/agent-system-audit.json` — machine-owned audit registry.
 - `../guardrails/` — separation-of-duty and authority constraints.
 - `../SCHEMAS.md` — local record schemas.
@@ -31,17 +32,28 @@ Load only the skill relevant to the task:
 - `.github/skills/review-pr/SKILL.md`
 - `.github/skills/verify-head/SKILL.md`
 - `.github/skills/harvest-lesson/SKILL.md`
+- `.github/skills/sync-governance/SKILL.md`
 - `.github/skills/prepare-release/SKILL.md`
 
 Skills define repeatable procedure. They do not grant authority.
 
 ## Organization verification
 
-- `npm run test:agent-system` — unit tests for the audit logic.
-- `npm run check:agent-system` — deterministic repository audit and JSON receipt.
-- `.github/workflows/agent-system-audit.yml` — PR, `main` push, and manual CI lane for organization integrity.
+- `npm run test:agent-system` — unit tests for the organization-audit logic.
+- `npm run check:agent-system` — deterministic repository organization audit and JSON receipt.
+- `npm run test:governance-sync` — unit tests for governance synchronization semantics.
+- `npm run check:governance-sync` — validates the active sync receipt, digest binding, source set, delta disposition, and freshness derivation.
+- `.github/workflows/agent-system-audit.yml` — PR, `main` push, and manual CI lane for organization and governance-sync integrity.
 
-The audit covers skill discovery/frontmatter, role bindings, local documentation links, governance freshness, anti-pattern provenance, feature/decision/plan indexing, and semantic handoff phase drift.
+## Governance synchronization
+
+Normal repository work remains local-first. Use upstream synchronization only when `../context/governance-lock.yaml` or explicit owner direction triggers it.
+
+- `../governance-sync/README.md` — synchronization contract.
+- `../governance-sync/receipts/` — immutable public-safe synchronization receipts.
+- `.github/skills/sync-governance/SKILL.md` — Knowledge Steward procedure.
+
+The recurring upstream source set contains stable global/cross-repository governance contracts, not mutable repository implementation plans.
 
 ## Planning and decisions
 
@@ -69,4 +81,4 @@ The audit covers skill discovery/frontmatter, role bindings, local documentation
 
 ## External escalation
 
-Do not fetch Notion/Drive by default. Escalate only when `../context/governance-lock.yaml` triggers an upstream read, including governance-lock expiry, or when the owner explicitly requests one.
+Do not fetch Notion/Drive by default. Escalate only when `../context/governance-lock.yaml` triggers an upstream read, including governance-lock expiry, or when the owner explicitly requests synchronization. Use the `sync-governance` skill rather than ad hoc external-memory reconstruction.
