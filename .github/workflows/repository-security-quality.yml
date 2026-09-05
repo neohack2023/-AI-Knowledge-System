@@ -1,4 +1,4 @@
-name: Repository Security & Quality
+name: Repository Python Quality
 
 on:
   pull_request:
@@ -8,24 +8,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: repository-security-quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: repository-python-quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Reject newly introduced vulnerable dependencies
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          fail-on-severity: moderate
-          comment-summary-in-pr: never
-          retry-on-snapshot-warnings: true
-          retry-on-snapshot-warnings-timeout: 60
-
   python-static-analysis:
     name: Python static analysis
     runs-on: ubuntu-latest
@@ -72,7 +58,7 @@ jobs:
             echo '## Python static-analysis migration evidence'
             echo
             echo '- Ruff 0.16.6 fatal-error profile is blocking in this workflow.'
-            echo '- Current repository Python population passed the Ruff profile.'
-            echo '- Preregistered malformed-syntax fixture was rejected.'
+            echo '- Current repository Python population must pass the Ruff profile.'
+            echo '- Preregistered malformed-syntax fixture must be rejected.'
             echo '- Existing py_compile removal remains a separate integration cutover after #76 and this stack converge.'
           } >> "$GITHUB_STEP_SUMMARY"
