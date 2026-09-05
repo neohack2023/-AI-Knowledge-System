@@ -39,7 +39,7 @@ At minimum preserve these distinctions when applicable:
 - risk-classification candidate identity or monotonic effective-risk history;
 - owner-authorization head identity.
 
-If a code-changing head changes, prior head-bound evidence is stale unless the contract mechanically proves otherwise.
+If the candidate head changes, prior head-bound evidence is stale unless the contract mechanically proves transferability.
 
 ## Review-class and transition rules
 
