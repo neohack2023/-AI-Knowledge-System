@@ -1,0 +1,65 @@
+name: Repository Security & Quality
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-security-quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reject newly introduced vulnerable dependencies
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: never
+          retry-on-snapshot-warnings: true
+          retry-on-snapshot-warnings-timeout: 60
+
+  python-static-analysis:
+    name: Python static analysis (shadow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact audit target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Run Ruff fatal-error baseline
+        id: ruff
+        continue-on-error: true
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
+        with:
+          version: '0.16.6'
+          download-from-astral-mirror: false
+          args: 'check --select E9,F63,F7,F82'
+          src: >-
+            worker/gog-sam3d-body/server.py
+            worker/aios-chatgpt-app/*.py
+            reusable-code/tools/*.py
+
+      - name: Record Python migration baseline
+        if: always()
+        shell: bash
+        env:
+          RUFF_OUTCOME: ${{ steps.ruff.outcome }}
+        run: |
+          {
+            echo '## Python static-analysis migration baseline'
+            echo
+            echo "- Ruff 0.16.6 fatal-error profile: ${RUFF_OUTCOME}"
+            echo '- existing py_compile CI remains authoritative until Ruff parity is proven'
+          } >> "$GITHUB_STEP_SUMMARY"
