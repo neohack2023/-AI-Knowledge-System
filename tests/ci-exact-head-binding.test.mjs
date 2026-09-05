@@ -29,10 +29,20 @@ function extractStep(job, stepName) {
   return nextStep === -1 ? tail : tail.slice(0, nextStep);
 }
 
+function indentation(line) {
+  return line.match(/^\s*/u)[0].length;
+}
+
 function checkoutBinding(job) {
   const step = extractStep(job, 'Checkout exact PR head');
   const lines = step.split('\n');
-  const usesLine = lines.find((line) => line.trim().startsWith('uses: '));
+  const directStepIndent = Math.min(
+    ...lines.filter((line) => line.trim()).map((line) => indentation(line)),
+  );
+
+  const usesLine = lines.find(
+    (line) => indentation(line) === directStepIndent && line.trim().startsWith('uses: '),
+  );
   const usesMatch = usesLine?.trim().match(/^uses:\s+actions\/checkout@([0-9a-f]{40})(?:\s+#.*)?$/u);
   assert.ok(usesMatch, 'checkout step must use actions/checkout pinned to an immutable commit');
   assert.equal(
@@ -41,18 +51,19 @@ function checkoutBinding(job) {
     'checkout step must use the reviewed immutable checkout commit',
   );
 
-  const withIndex = lines.findIndex((line) => line.trim() === 'with:');
-  assert.notEqual(withIndex, -1, 'checkout step must have a with mapping');
-  const withIndent = lines[withIndex].match(/^\s*/u)[0].length;
-  const directChildIndent = withIndent + 2;
+  const withIndex = lines.findIndex(
+    (line) => indentation(line) === directStepIndent && line.trim() === 'with:',
+  );
+  assert.notEqual(withIndex, -1, 'checkout step must have a direct-child with mapping');
+  const directInputIndent = directStepIndent + 2;
 
   for (let index = withIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (!line.trim()) continue;
 
-    const indent = line.match(/^\s*/u)[0].length;
-    if (indent <= withIndent) break;
-    if (indent !== directChildIndent) continue;
+    const indent = indentation(line);
+    if (indent <= directStepIndent) break;
+    if (indent !== directInputIndent) continue;
 
     const refMatch = line.match(/^\s*ref:\s*(.+?)\s*$/u);
     if (refMatch) return refMatch[1];
