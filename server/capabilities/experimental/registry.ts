@@ -1,4 +1,8 @@
 import {
+  habitusAdaptiveRetrievalInputSchema,
+  habitusAdaptiveRetrievalOutputSchema,
+} from "./habitus-adaptive-retrieval.ts";
+import {
   securityReportEvidenceHygieneInputSchema,
   securityReportEvidenceHygieneOutputSchema,
 } from "./security-report-evidence-hygiene.ts";
@@ -62,9 +66,51 @@ export const securityReportEvidenceHygieneExperimentalEntry: ExperimentalReadOnl
   source_authority: "GITHUB_EXECUTION_TRUTH",
 };
 
+export const habitusAdaptiveRetrievalExperimentalEntry: ExperimentalReadOnlyRegistryEntry = {
+  schema_name: "ExperimentalReadOnlyRegistryEntry",
+  schema_version: "1.0",
+  capability_id: "cap:habitus-adaptive-retrieval-benchmark",
+  candidate_id: "EXP-HABITUS-001A",
+  name: "Habitus Adaptive Retrieval Benchmark",
+  description: "Runs the frozen five-arm EXP-HABITUS-001A retrieval benchmark behind exact-scope, graph-non-authority, and authority-admission gates with no network access or external effects.",
+  lifecycle_status: "EXPERIMENTAL",
+  read_write_mode: "READ_ONLY",
+  execution_modes: ["SIMULATION"],
+  scope_allowlist: ["global-working-memory"],
+  media_types: ["application/json"],
+  handler_ref: "module:server/capabilities/experimental/habitus-adaptive-retrieval-fixture#runExpHabitus001aSimulation",
+  input_schema_ref: "aios://capabilities/habitus-adaptive-retrieval/input/1.0.0",
+  output_schema_ref: "aios://capabilities/habitus-adaptive-retrieval/output/1.0.0",
+  input_schema: habitusAdaptiveRetrievalInputSchema,
+  output_schema: habitusAdaptiveRetrievalOutputSchema,
+  autonomy_band: "A0",
+  reversibility: "FULLY_REVERSIBLE",
+  blast_radius: "PROCESS_LOCAL",
+  network_access: "NONE",
+  external_effects: "NONE",
+  runtime_binding_status: "BOUND_SIMULATION_ONLY",
+  validation_refs: [
+    "STONE-20260829-GLOBAL-HABITUS-001",
+    "EXP-HABITUS-001A-FIXTURE-V1",
+    "MASON-EPISODE-20260829-GLOBAL-070",
+  ],
+  source_authority: "GITHUB_EXECUTION_TRUTH",
+};
+
 export const experimentalReadOnlyCapabilityRegistry = [
   securityReportEvidenceHygieneExperimentalEntry,
 ] as const;
 
+// Keep benchmark-only experiments out of the ordinary experimental capability
+// list until promotion. They remain discoverable through the combined catalog.
+export const experimentalReadOnlyBenchmarkRegistry = [
+  habitusAdaptiveRetrievalExperimentalEntry,
+] as const;
+
+export const experimentalReadOnlyCapabilityCatalog = [
+  ...experimentalReadOnlyCapabilityRegistry,
+  ...experimentalReadOnlyBenchmarkRegistry,
+] as const;
+
 export const getExperimentalReadOnlyCapability = (capabilityId: string) =>
-  experimentalReadOnlyCapabilityRegistry.find((entry) => entry.capability_id === capabilityId) ?? null;
+  experimentalReadOnlyCapabilityCatalog.find((entry) => entry.capability_id === capabilityId) ?? null;
