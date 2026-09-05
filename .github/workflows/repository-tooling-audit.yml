@@ -59,6 +59,19 @@ jobs:
           advanced-security: false
           annotations: true
 
+      - name: Build explicit Markdown parity file list
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs
+          {
+            find docs/agent-system .github/skills .github/agents .github/instructions \
+              -type f -name '*.md' -print
+            printf '%s\n' AGENTS.md .github/copilot-instructions.md
+          } | sort -u > outputs/mature-tooling-markdown-files.txt
+          test -s outputs/mature-tooling-markdown-files.txt
+          echo "Markdown parity files: $(wc -l < outputs/mature-tooling-markdown-files.txt)"
+
       - name: Shadow existing Markdown-link audit with lychee
         id: lychee
         continue-on-error: true
@@ -67,12 +80,7 @@ jobs:
           args: >-
             --no-progress
             --offline
-            './docs/agent-system/**/*.md'
-            './.github/skills/**/*.md'
-            './.github/agents/**/*.md'
-            './.github/instructions/**/*.md'
-            './AGENTS.md'
-            './.github/copilot-instructions.md'
+            --files-from outputs/mature-tooling-markdown-files.txt
           fail: false
           failIfEmpty: false
           jobSummary: true
