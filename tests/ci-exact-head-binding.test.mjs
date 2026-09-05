@@ -33,9 +33,11 @@ function checkoutBinding(job) {
   const step = extractStep(job, 'Checkout exact PR head');
   const lines = step.split('\n');
   const usesLine = lines.find((line) => line.trim().startsWith('uses: '));
+  const usesMatch = usesLine?.trim().match(/^uses:\s+actions\/checkout@([0-9a-f]{40})(?:\s+#.*)?$/u);
+  assert.ok(usesMatch, 'checkout step must use actions/checkout pinned to an immutable commit');
   assert.equal(
-    usesLine?.trim(),
-    `uses: actions/checkout@${CHECKOUT_SHA} # v7.0.1`,
+    usesMatch[1],
+    CHECKOUT_SHA,
     'checkout step must use the reviewed immutable checkout commit',
   );
 
