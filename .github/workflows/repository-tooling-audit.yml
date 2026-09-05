@@ -1,0 +1,95 @@
+name: Repository Tooling Audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-tooling-audit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mature-tooling:
+    name: Mature tooling audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact audit target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install actionlint 1.7.12 with release digest verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint_1.7.12_linux_amd64.tar.gz"
+          install_dir="$RUNNER_TEMP/actionlint"
+          curl --fail --silent --show-error --location \
+            --output "$archive" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum --check --strict
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" -C "$install_dir"
+          "$install_dir/actionlint" -version
+          echo "$install_dir" >> "$GITHUB_PATH"
+
+      - name: Validate GitHub Actions with actionlint
+        run: actionlint -color
+
+      - name: Audit workflow security with zizmor
+        id: zizmor
+        continue-on-error: true
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          inputs: .
+          collect: all
+          version: 1.29.0
+          online-audits: false
+          persona: regular
+          min-severity: medium
+          min-confidence: medium
+          advanced-security: false
+          annotations: true
+
+      - name: Shadow existing Markdown-link audit with lychee
+        id: lychee
+        continue-on-error: true
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0 / lychee v0.24.2
+        with:
+          args: >-
+            --no-progress
+            --offline
+            './docs/agent-system/**/*.md'
+            './.github/skills/**/*.md'
+            './.github/agents/**/*.md'
+            './.github/instructions/**/*.md'
+            './AGENTS.md'
+            './.github/copilot-instructions.md'
+          fail: false
+          failIfEmpty: false
+          jobSummary: true
+
+      - name: Record migration baseline
+        if: always()
+        shell: bash
+        env:
+          ZIZMOR_OUTCOME: ${{ steps.zizmor.outcome }}
+          LYCHEE_OUTCOME: ${{ steps.lychee.outcome }}
+          LYCHEE_EXIT_CODE: ${{ steps.lychee.outputs.exit_code }}
+        run: |
+          {
+            echo '## Mature tooling migration baseline'
+            echo
+            echo "- actionlint: blocking gate completed before this step"
+            echo "- zizmor: ${ZIZMOR_OUTCOME} (shadow during baseline)"
+            echo "- lychee: ${LYCHEE_OUTCOME}, exit=${LYCHEE_EXIT_CODE:-unknown} (shadow during parity phase)"
+            echo '- legacy AIOS semantic checks remain authoritative until paired parity is proven'
+          } >> "$GITHUB_STEP_SUMMARY"
