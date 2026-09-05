@@ -44,6 +44,7 @@ function checkoutBinding(job) {
   const withIndex = lines.findIndex((line) => line.trim() === 'with:');
   assert.notEqual(withIndex, -1, 'checkout step must have a with mapping');
   const withIndent = lines[withIndex].match(/^\s*/u)[0].length;
+  const directChildIndent = withIndent + 2;
 
   for (let index = withIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
@@ -51,12 +52,13 @@ function checkoutBinding(job) {
 
     const indent = line.match(/^\s*/u)[0].length;
     if (indent <= withIndent) break;
+    if (indent !== directChildIndent) continue;
 
     const refMatch = line.match(/^\s*ref:\s*(.+?)\s*$/u);
     if (refMatch) return refMatch[1];
   }
 
-  assert.fail('checkout step with mapping must contain ref');
+  assert.fail('checkout step with mapping must contain a direct-child ref');
 }
 
 test('all acceptance-relevant CI jobs checkout the exact immutable PR head', async () => {
