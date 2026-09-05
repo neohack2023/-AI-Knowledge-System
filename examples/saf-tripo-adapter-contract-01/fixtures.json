@@ -1,0 +1,141 @@
+{
+  "positive": {
+    "request": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "IMAGE_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "provider_model_version": "fixture-model",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_REQUIRED",
+      "authorization": "NONE",
+      "source_refs": ["fixture:image:front"],
+      "parameters": {"face_limit": 5000, "quad": true, "pbr": true, "smart_low_poly": true},
+      "secret_ref": "secret://TRIPO_API_KEY"
+    },
+    "running": {
+      "contract": "TripoTaskObservation/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-001",
+      "task_type": "image_to_model",
+      "status": "RUNNING",
+      "progress": 42,
+      "observed_at": "2026-08-13T01:00:00Z",
+      "transport": "v2",
+      "output_refs": {},
+      "error": null,
+      "raw_provider_body_logged": false
+    },
+    "artifact": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-001",
+      "artifact_kind": "PBR_MODEL",
+      "source_url": "https://example.invalid/model.glb",
+      "digest_state": "VERIFIED",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "importProposal": {
+      "contract": "TripoImportProposal/0.1",
+      "artifact_ref": "artifact:fixture-task-001:pbr",
+      "target_executor": "blender",
+      "requested_effect": "IMPORT_GLB",
+      "authorization": "NONE",
+      "arbitrary_code": false
+    }
+  },
+  "negative": {
+    "tlsDisabled": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "IMAGE_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_DISABLED",
+      "authorization": "NONE",
+      "parameters": {}
+    },
+    "secretSerialized": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "TEXT_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_REQUIRED",
+      "authorization": "NONE",
+      "parameters": {},
+      "api_key": "tsk_should-never-be-here"
+    },
+    "nestedSecretSerialized": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "TEXT_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_REQUIRED",
+      "authorization": "NONE",
+      "parameters": {"transport": {"api_key": "tsk_nested-should-never-be-here"}}
+    },
+    "deepNestedTokenSerialized": {
+      "contract": "TripoProviderRequest/0.1",
+      "provider": "tripo",
+      "operation": "IMAGE_TO_MODEL",
+      "scope_key": "global-working-memory",
+      "api_route_family": "v2",
+      "tls_policy": "VERIFY_REQUIRED",
+      "authorization": "NONE",
+      "parameters": {"provider": {"auth": [{"token": "nested-token"}]}}
+    },
+    "arbitraryBlenderCode": {
+      "contract": "TripoImportProposal/0.1",
+      "artifact_ref": "artifact:x",
+      "target_executor": "blender",
+      "requested_effect": "EXECUTE_CODE",
+      "authorization": "NONE",
+      "arbitrary_code": true
+    },
+    "verifiedWithoutDigest": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-002",
+      "artifact_kind": "MODEL",
+      "source_url": "https://example.invalid/model.glb",
+      "digest_state": "VERIFIED",
+      "sha256": null,
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "signedUrlPersisted": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-003",
+      "artifact_kind": "MODEL",
+      "source_url": "https://example.invalid/model.glb?signature=ephemeral-secret",
+      "digest_state": "PENDING",
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "fragmentUrlPersisted": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-004",
+      "artifact_kind": "MODEL",
+      "source_url": "https://example.invalid/model.glb#transport-fragment",
+      "digest_state": "PENDING",
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    },
+    "insecureArtifactUrl": {
+      "contract": "TripoArtifactCandidate/0.1",
+      "provider": "tripo",
+      "task_id": "fixture-task-005",
+      "artifact_kind": "MODEL",
+      "source_url": "http://example.invalid/model.glb",
+      "digest_state": "PENDING",
+      "validation_state": "UNVALIDATED",
+      "authorization": "NONE"
+    }
+  }
+}
