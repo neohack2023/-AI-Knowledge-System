@@ -20,6 +20,7 @@ type BridgeBody = {
   query?: string;
   id?: string;
   limit?: number;
+  include_text?: boolean;
   scope_key?: string;
   workflow_id?: string;
   execution_id?: string;
@@ -108,7 +109,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!authorized(request)) return rejectUnauthorized();
-  const durableRuntime = await getDurableWorkflowRuntime();
 
   try {
     const body = await request.json() as BridgeBody;
@@ -121,6 +121,12 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "search") {
+      if (body.include_text !== undefined && typeof body.include_text !== "boolean") {
+        return NextResponse.json(
+          { error: { code: "INVALID_INCLUDE_TEXT", message: "include_text must be a boolean." } },
+          { status: 400 },
+        );
+      }
       const query = body.query?.trim();
       if (!query) {
         return NextResponse.json(
@@ -138,6 +144,12 @@ export async function POST(request: Request) {
           title: record.title,
           url: record.url,
           metadata: record.metadata,
+          ...(body.include_text === true ? {
+            text: record.text,
+            scope_key: record.scope_key,
+            coverage: "REPOSITORY_EXECUTION_TRUTH_ONLY",
+            write_authorization: "NONE",
+          } : {}),
         })),
       });
     }
@@ -179,6 +191,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      const durableRuntime = await getDurableWorkflowRuntime();
       const snapshot = await durableRuntime.getExecution(executionId);
       if (snapshot.execution.scope_key !== SCOPE) {
         return NextResponse.json(
@@ -205,6 +218,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      const durableRuntime = await getDurableWorkflowRuntime();
       const provenance = await durableRuntime.getProvenanceEnvelope(executionId, envelopeId, SCOPE);
       return NextResponse.json({
         contract: CONTRACT,
@@ -232,6 +246,7 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
+      const durableRuntime = await getDurableWorkflowRuntime();
       const created = await durableRuntime.createExecution({
         workflow_id: workflowId,
         scope_key: SCOPE,

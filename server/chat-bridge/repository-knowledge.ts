@@ -1,5 +1,6 @@
 import { capabilityDiscoveryRuntime } from "../capabilities/index.ts";
 import { workflowExecutionKernel } from "../workflows/kernel.ts";
+import { listChatBridgeExecutableWorkflows } from "./execution-policy.ts";
 
 export type RepositoryKnowledgeRecord = {
   id: string;
@@ -26,12 +27,16 @@ const supplementalApiRecords = (): RepositoryKnowledgeRecord[] => [
     scope_key: "global-working-memory",
     title: "Workflow execution API",
     url: `${MAIN_BLOB}/app/api/workflow-executions/route.ts`,
-    text: "The workflow execution API exposes the registered server workflow kernel. It supports creation, execution, lifecycle transitions, and registry-backed next-action operations. The ChatGPT bridge restricts its own execution tool to SIMULATION mode and does not grant external destination-write authority.",
+    text: [
+      "The workflow execution API exposes the registered server workflow kernel, lifecycle transitions, and registry-backed next actions.",
+      `Bridge-eligible LIVE workflows from the current policy and handler registry: ${listChatBridgeExecutableWorkflows().map((workflow) => workflow.workflow_id).join(", ") || "none"}.`,
+      "Eligibility is checked again for each request; governed_write_probe is blocked and no external destination-write authority is granted.",
+    ].join(" "),
     metadata: {
       authority: "GITHUB_EXECUTION_TRUTH",
       source_ref: "app/api/workflow-executions/route.ts",
       kind: "API",
-      tags: ["api", "workflow", "kernel", "simulation", "next-action"],
+      tags: ["api", "workflow", "kernel", "live", "next-action"],
     },
   },
   {

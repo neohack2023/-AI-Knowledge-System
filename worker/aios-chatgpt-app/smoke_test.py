@@ -84,7 +84,10 @@ async def exercise_registered_surface(module) -> None:
     assert "read_execution_provenance" in html
     assert "Execution trace" in html
 
+    requests = []
+
     def fake_request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        requests.append(payload)
         assert path == "/api/aios-bridge"
         if payload is None:
             return {
@@ -106,6 +109,13 @@ async def exercise_registered_surface(module) -> None:
                         "id": "repo:workflow:internal-runtime-diagnostic",
                         "title": "LIVE workflow: internal-runtime-diagnostic",
                         "url": "https://github.com/example/repo/blob/main/server/workflows/kernel.ts",
+                        **({
+                            "text": "Process-local diagnostic workflow fixture.",
+                            "metadata": {"authority": "GITHUB_EXECUTION_TRUTH"},
+                            "scope_key": "global-working-memory",
+                            "coverage": "REPOSITORY_EXECUTION_TRUTH_ONLY",
+                            "write_authorization": "NONE",
+                        } if payload.get("include_text") else {}),
                     }
                 ]
             }
@@ -182,6 +192,18 @@ async def exercise_registered_surface(module) -> None:
     search_result = await module.mcp.call_tool("search", {"query": "workflow"})
     search_payload = json.loads(text_from_tool_result(search_result))
     assert search_payload["results"][0]["id"] == "repo:workflow:internal-runtime-diagnostic"
+    assert set(search_payload["results"][0]) == {"id", "title", "url"}
+
+    request_count = len(requests)
+    context_result = await module.mcp.call_tool("search", {"query": "workflow", "include_text": True})
+    context_payload = json.loads(text_from_tool_result(context_result))
+    assert len(requests) == request_count + 1
+    assert requests[-1]["include_text"] is True
+    item = context_payload["results"][0]
+    assert item["text"] == "Process-local diagnostic workflow fixture."
+    assert item["metadata"]["authority"] == "GITHUB_EXECUTION_TRUTH"
+    assert item["scope_key"] == "global-working-memory"
+    assert item["write_authorization"] == "NONE"
 
     fetch_result = await module.mcp.call_tool(
         "fetch", {"id": "repo:workflow:internal-runtime-diagnostic"}

@@ -172,17 +172,26 @@ def workbench_resource() -> str:
     title="Search AIOS repository knowledge",
     description=(
         "Use this when the user needs read-only AI Knowledge System repository execution truth. "
-        "Returns the standard company-knowledge search shape."
+        "Returns the standard company-knowledge search shape by default. "
+        "Set include_text=true for bounded full records with authority metadata in one call; "
+        "do not fetch those same records again unless freshness or missing evidence requires it."
     ),
     annotations=READ_ONLY,
 )
-def search(query: str) -> str:
+def search(query: str, include_text: bool = False) -> str:
     """Search live repository-projected AIOS knowledge."""
-    payload = _request("/api/aios-bridge", {"action": "search", "query": query})
+    payload = _request("/api/aios-bridge", {
+        "action": "search", "query": query, "include_text": include_text,
+    })
     results = payload.get("results", [])
     standard = {
         "results": [
-            {"id": item["id"], "title": item["title"], "url": item["url"]}
+            {
+                "id": item["id"], "title": item["title"], "url": item["url"],
+                **({key: item[key] for key in (
+                    "text", "metadata", "scope_key", "coverage", "write_authorization",
+                )} if include_text else {}),
+            }
             for item in results
             if all(key in item for key in ("id", "title", "url"))
         ]

@@ -33,7 +33,18 @@ test("AIOS chat bridge search and fetch preserve exact record identity", () => {
 
 test("AIOS chat bridge does not fabricate unknown records", () => {
   assert.equal(fetchRepositoryKnowledge("repo:missing:fixture"), null);
-  assert.deepEqual(searchRepositoryKnowledge("zzzz-no-match-fixture"), []);
+  assert.deepEqual(searchRepositoryKnowledge("zzzznomatchfixture"), []);
+});
+
+test("bridge API knowledge reflects eligible LIVE handlers instead of stale simulation guidance", () => {
+  const record = fetchRepositoryKnowledge("repo:api:workflow-executions");
+  assert.ok(record);
+  assert.doesNotMatch(record.text, /SIMULATION/);
+  for (const workflow of listChatBridgeExecutableWorkflows()) {
+    assert.ok(record.text.includes(workflow.workflow_id));
+  }
+  assert.match(record.text, /checked again for each request/);
+  assert.match(record.text, /governed_write_probe is blocked/);
 });
 
 test("ChatGPT bridge admits the internal A0 process-local diagnostic", () => {

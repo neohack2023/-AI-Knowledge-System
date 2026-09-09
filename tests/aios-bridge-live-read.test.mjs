@@ -18,6 +18,54 @@ const post = async (payload) => {
   return { response, body: await response.json() };
 };
 
+test("context search returns fetch-equivalent text in one bounded read while default search stays compact", async () => {
+  const compact = await post({ action: "search", query: "workflow", limit: 2 });
+  const context = await post({ action: "search", query: "workflow", limit: 2, include_text: true });
+  assert.equal(context.response.status, 200);
+  assert.equal(compact.response.status, 200);
+  assert.ok(context.body.results.length > 0);
+  assert.ok(context.body.results.length <= 2);
+  assert.deepEqual(context.body.results.map(({ id }) => id), compact.body.results.map(({ id }) => id));
+  for (const item of compact.body.results) assert.equal(Object.hasOwn(item, "text"), false);
+  for (const item of context.body.results) {
+    const fetched = await post({ action: "fetch", id: item.id });
+    assert.equal(item.text, fetched.body.text);
+    assert.equal(item.url, fetched.body.url);
+    assert.equal(item.metadata.authority, fetched.body.metadata.authority);
+    assert.equal(item.scope_key, fetched.body.metadata.scope_key);
+    assert.equal(item.coverage, fetched.body.metadata.coverage);
+    assert.equal(item.write_authorization, "NONE");
+  }
+});
+
+test("context search preserves scope rejection, no-match behavior and strict opt-in", async () => {
+  const wrongScope = await post({ action: "search", query: "workflow", include_text: true, scope_key: "unregistered-fixture" });
+  assert.equal(wrongScope.response.status, 409);
+  const missing = await post({ action: "search", query: "zzzznomatchfixture", include_text: true });
+  assert.deepEqual(missing.body.results, []);
+  const malformed = await post({ action: "search", query: "workflow", include_text: "true" });
+  assert.equal(malformed.response.status, 400);
+  assert.equal(malformed.body.error.code, "INVALID_INCLUDE_TEXT");
+});
+
+test("repository search and fetch do not consult the durable execution runtime", async () => {
+  const key = "__aiKnowledgeDurableWorkflowRuntimePromise";
+  const previous = Object.getOwnPropertyDescriptor(globalThis, key);
+  Object.defineProperty(globalThis, key, {
+    configurable: true,
+    get() { throw new Error("Execution storage must not gate repository reads"); },
+  });
+  try {
+    const result = await post({ action: "search", query: "workflow", include_text: true, limit: 1 });
+    assert.equal(result.response.status, 200);
+    const fetched = await post({ action: "fetch", id: result.body.results[0].id });
+    assert.equal(fetched.response.status, 200);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, key, previous);
+    else delete globalThis[key];
+  }
+});
+
 test("bridge exposes exact execution and execution-bound provenance as read-only projections", async () => {
   const executed = await post({
     action: "execute_safe_workflow",
