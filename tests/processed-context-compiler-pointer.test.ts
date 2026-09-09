@@ -13,6 +13,15 @@ import {
 import { selectProcessedContextForEnvelope } from "../server/processed-context/context-envelope-consumer.ts";
 import { InMemoryProcessedContextCurrentPointerStore } from "../server/processed-context/current-pointer-store.ts";
 
+const throwsCode = (fn: () => unknown, code: string) => {
+  assert.throws(fn, (error: unknown) => (
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error as { code?: unknown }).code === code
+  ));
+};
+
 const workingItem = (
   itemId: string,
   summary: string,
@@ -90,16 +99,16 @@ test("PCW-COMP-01 selects only requested task-relevant entries and preserves DER
 
 test("PCW-COMP-02 exact scope and continuity boundary are mandatory", () => {
   const window = fresh();
-  assert.throws(() => selectProcessedContextForEnvelope({
+  throwsCode(() => selectProcessedContextForEnvelope({
     window,
     scope_key: "udio-algorithms",
     continuity_id: window.identity.continuity_id,
-  }), /SCOPE_MISMATCH/);
-  assert.throws(() => selectProcessedContextForEnvelope({
+  }), "PROCESSED_CONTEXT_ENVELOPE_SCOPE_MISMATCH");
+  throwsCode(() => selectProcessedContextForEnvelope({
     window,
     scope_key: window.identity.scope_key,
     continuity_id: "continuity:other",
-  }), /CONTINUITY_MISMATCH/);
+  }), "PROCESSED_CONTEXT_ENVELOPE_CONTINUITY_MISMATCH");
 });
 
 test("PCW-COMP-03 revalidation state is carried forward but never treated as authoritative freshness", () => {
@@ -118,19 +127,19 @@ test("PCW-COMP-03 revalidation state is carried forward but never treated as aut
 test("PCW-COMP-04 invalid or non-current PCW versions cannot feed the envelope compiler", () => {
   const invalid = fresh();
   invalid.freshness.validity = "INVALID";
-  assert.throws(() => selectProcessedContextForEnvelope({
+  throwsCode(() => selectProcessedContextForEnvelope({
     window: invalid,
     scope_key: invalid.identity.scope_key,
     continuity_id: invalid.identity.continuity_id,
-  }), /WINDOW_INVALID/);
+  }), "PROCESSED_CONTEXT_ENVELOPE_WINDOW_INVALID");
 
   const superseded = fresh();
   superseded.identity.lifecycle_state = "SUPERSEDED";
-  assert.throws(() => selectProcessedContextForEnvelope({
+  throwsCode(() => selectProcessedContextForEnvelope({
     window: superseded,
     scope_key: superseded.identity.scope_key,
     continuity_id: superseded.identity.continuity_id,
-  }), /WINDOW_NOT_CURRENT/);
+  }), "PROCESSED_CONTEXT_ENVELOPE_WINDOW_NOT_CURRENT");
 });
 
 test("PCW-PTR-01 current pointer is keyed by exact scope_key plus continuity_id", () => {
@@ -169,7 +178,10 @@ test("PCW-PTR-04 stale predecessor detects a current-pointer race", () => {
   const second = fold(first, "event:3");
   store.putCurrent(second, first.identity.object_id);
   const competitor = fold(first, "event:4");
-  assert.throws(() => store.putCurrent(competitor, first.identity.object_id), /CURRENT_POINTER_RACE/);
+  throwsCode(
+    () => store.putCurrent(competitor, first.identity.object_id),
+    "PROCESSED_CONTEXT_CURRENT_POINTER_RACE",
+  );
 });
 
 test("PCW-PTR-05 first insert cannot smuggle an advanced version or predecessor", () => {
@@ -177,5 +189,8 @@ test("PCW-PTR-05 first insert cannot smuggle an advanced version or predecessor"
   const first = fresh();
   first.identity.window_version = 2;
   first.lineage.previous_window_id = "window:invented";
-  assert.throws(() => store.putCurrent(first, null), /INITIAL_VERSION_INVALID/);
+  throwsCode(
+    () => store.putCurrent(first, null),
+    "PROCESSED_CONTEXT_POINTER_INITIAL_VERSION_INVALID",
+  );
 });
