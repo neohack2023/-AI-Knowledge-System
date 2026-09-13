@@ -1,6 +1,6 @@
 # AIOS_DEVOS_GENERALIZATION_01 — Post-Merge Repair
 
-State: `ACTIVE`
+State: `CANDIDATE_REPAIR`
 
 ## Trigger
 
@@ -12,7 +12,7 @@ Post-merge review of PR #86 identified three confirmed bootstrap safety defects 
 
 ## Authority boundary
 
-These findings are evidence-backed negative knowledge, not global law. The repair is bounded to the DevOS compiler and its regression tests. No authority, release, deployment, or external-memory boundary changes are included.
+These findings are evidence-backed negative knowledge, not global law. The repair is bounded to the DevOS compiler, its bootstrap skill contract, and regression tests. No authority, release, deployment, or external-memory boundary changes are included.
 
 ## Repair obligations
 
@@ -24,3 +24,19 @@ These findings are evidence-backed negative knowledge, not global law. The repai
 - keep unrelated existing `devos/` / `.devos/` paths fail-closed rather than silently claiming them;
 - add regression tests for each failure mode;
 - run exact-head CI and Agent System Audit before merge.
+
+## Candidate implementation
+
+Branch: `aios/devos-bootstrap-safety-01`
+
+Implemented states:
+
+- `DEVOS_PRESENT`
+- `BOOTSTRAP_REPAIR`
+- `DEVOS_PATH_CONFLICT`
+- `EQUIVALENT_REPO_OS_PRESENT`
+- `BOOTSTRAP_REQUIRED`
+
+The repair makes repository existence and containment explicit preconditions, adds semantic coherence checks instead of directory-presence detection, and keeps repair non-destructive.
+
+Local isolated regression evidence before PR: `10/10 PASS`.
