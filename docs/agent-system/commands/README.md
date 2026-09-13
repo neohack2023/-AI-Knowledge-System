@@ -12,6 +12,7 @@ The canonical installed skill surface is `.github/skills/<skill-name>/SKILL.md`:
 | `review-pr` | `.github/skills/review-pr/SKILL.md` | Reviewer |
 | `verify-head` | `.github/skills/verify-head/SKILL.md` | Verifier |
 | `harvest-lesson` | `.github/skills/harvest-lesson/SKILL.md` | Knowledge Steward |
+| `bootstrap-devos` | `.github/skills/bootstrap-devos/SKILL.md` | Knowledge Steward |
 | `sync-governance` | `.github/skills/sync-governance/SKILL.md` | Knowledge Steward |
 | `prepare-release` | `.github/skills/prepare-release/SKILL.md` | Release Steward |
 
@@ -71,6 +72,23 @@ Output: acceptance evidence for declared obligations only.
 7. Stop for required adjudication before promotion.
 
 Output: candidate record plus optional promotion proposal.
+
+## `bootstrap-devos`
+
+**Primary role:** Knowledge Steward  
+**Mutation:** plan-only by default; missing-file repository scaffold writes only when explicitly authorized for the target repository.
+
+1. Resolve the exact target repository/root and current base identity when available.
+2. Inventory existing instructions, DevOS/repository-OS surfaces, languages, package/runtime markers, tests, CI, and verification commands.
+3. Run `scripts/agent-system/devos-compiler.mjs` in plan-only mode.
+4. If `DEVOS_PRESENT` or `EQUIVALENT_REPO_OS_PRESENT`, reuse/adapt the existing operating layer and stop before duplicate installation.
+5. If `BOOTSTRAP_REQUIRED`, install only the minimal non-destructive scaffold. Never overwrite an existing file.
+6. Keep normal repository work local-first and external-fetch-free by default.
+7. Install bounded research-preflight and negative-knowledge semantics without granting either promotion authority.
+8. Defer SQLite, specialist agents, extra skills, and heavier evaluation machinery until measured repository need justifies them.
+9. Run compiler tests plus the target repository's applicable existing verification commands.
+
+Output: `DevOSRepositoryInventory`, `DevOSAdaptationProfile`, created/skipped file receipt, and explicit deferred components.
 
 ## `sync-governance`
 

@@ -1,6 +1,6 @@
 # Repository Agent-System Schemas
 
-These schemas define repository-local records. Fields may be represented as Markdown front matter, YAML blocks, or equivalent structured sections, but the semantics must remain stable.
+These schemas define repository-local records. Fields may be represented as Markdown front matter, YAML blocks, JSON, or equivalent structured sections, but the semantics must remain stable.
 
 ## Agent role contract
 
@@ -40,6 +40,110 @@ failure_stop: []
 ```
 
 Commands do not inherit authority from their names.
+
+## DevOS repository inventory
+
+```yaml
+schema_name: DevOSRepositoryInventory
+schema_version:
+root:
+top_level_entries: []
+languages: []
+package_manager:
+architecture: SINGLE_ROOT | MONOREPO
+maturity: GREENFIELD | EMERGING | ESTABLISHED
+instruction_surfaces: []
+devos_roots: []
+repository_os_surface:
+workflow_files: []
+test_surfaces: []
+verification_commands: {}
+```
+
+The inventory is descriptive evidence used by the compiler. It does not grant repository or external-memory authority.
+
+## DevOS adaptation profile
+
+```yaml
+schema_name: DevOSAdaptationProfile
+schema_version:
+mode: BOOTSTRAP_REQUIRED | DEVOS_PRESENT | EQUIVALENT_REPO_OS_PRESENT
+target_root:
+repository_shape: {}
+authority:
+  live_repository_execution: GIT_REPOSITORY
+  devos_role: REPOSITORY_LOCAL_COGNITION_AND_ROUTING_PROJECTION
+  external_memory_role: UPSTREAM_DURABLE_MEMORY_OR_GOVERNANCE_WHEN_DECLARED
+  research_authority_effect: NONE
+retrieval_order: []
+components:
+  local_context_bundle:
+  agent_router:
+  research_preflight:
+  negative_knowledge:
+  applied_learning:
+  runtime_database:
+  repository_native_skills:
+  upstream_sync:
+research_triggers: []
+learning_states: []
+bootstrap_policy:
+  overwrite_existing_files: false
+  copy_external_memory_corpus: false
+  research_auto_promotes: false
+  negative_knowledge_auto_promotes: false
+  normal_repo_work_external_fetch_required: false
+```
+
+The compiler must return reuse/no-op when a coherent repository operating layer already owns the function. The adaptation profile is a plan, not authority to mutate the target repository.
+
+## DevOS research receipt
+
+```yaml
+research_id:
+trigger_task_ids: []
+trigger_signals: []
+questions: []
+queries: []
+sources:
+  - source_ref:
+    source_class:
+    published_or_updated:
+    retrieved_on:
+claims:
+  - statement:
+    source_refs: []
+    confidence:
+    fact_or_inference:
+uncertainties: []
+inspirations:
+  - idea:
+    source_refs: []
+    analogy_boundary:
+validation_refs: []
+no_op_reason:
+authority_effect: NONE
+promotion_state: CANDIDATE_ONLY
+```
+
+Research can expand the candidate space. It cannot promote itself into repository law or external-memory canon.
+
+## DevOS learning object
+
+```yaml
+learning_id:
+representation: EPISODIC | SEMANTIC | PROCEDURAL | NEGATIVE
+maturity: OBSERVED | RESEARCH_SUPPORTED | LOCALLY_VALIDATED | REPEATED | REUSABLE_CANDIDATE | DEPRECATED
+scope:
+statement:
+evidence_refs: []
+regression_refs: []
+holdout_or_transfer_refs: []
+known_failure_modes: []
+promotion_state: NONE | LOCAL_RULE | BROADER_CANDIDATE
+```
+
+Learning maturity and authority/promotion are independent dimensions.
 
 ## PR rule record
 

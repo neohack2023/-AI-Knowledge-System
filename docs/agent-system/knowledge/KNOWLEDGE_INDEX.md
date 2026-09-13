@@ -18,6 +18,9 @@ Use this index instead of searching external memory first.
 - `../commands/README.md` — vendor-neutral lifecycle entry points.
 - `../skills/README.md` — repository-native skill law and command-to-skill mapping.
 - `../../../.github/skills/` — installed task-specific Agent Skills.
+- `../devos/README.md` — portable adaptive DevOS compiler, research-preflight, learning, and negative-knowledge contract.
+- `../../../scripts/agent-system/devos-compiler.mjs` — deterministic target-repository inventory/profile/bootstrap compiler.
+- `../../../tests/devos-compiler.test.mjs` — synthetic compiler regression suite.
 - `../audit/README.md` — deterministic organization audit, failure classes, and evidence boundary.
 - `../governance-sync/README.md` — bounded Knowledge Steward upstream supply path, delta states, freshness law, and receipt contract.
 - `../../../config/agent-system-audit.json` — machine-owned audit registry.
@@ -32,13 +35,33 @@ Load only the skill relevant to the task:
 - `.github/skills/review-pr/SKILL.md`
 - `.github/skills/verify-head/SKILL.md`
 - `.github/skills/harvest-lesson/SKILL.md`
+- `.github/skills/bootstrap-devos/SKILL.md`
 - `.github/skills/sync-governance/SKILL.md`
 - `.github/skills/prepare-release/SKILL.md`
 
 Skills define repeatable procedure. They do not grant authority.
 
+## DevOS bootstrap / generalization
+
+Use `bootstrap-devos` only when a target repository needs repository-local cognition and lacks a usable DevOS/equivalent operating layer.
+
+Plan first:
+
+```bash
+node scripts/agent-system/devos-compiler.mjs --root <target-repository>
+```
+
+Apply only when target writes are authorized:
+
+```bash
+node scripts/agent-system/devos-compiler.mjs --root <target-repository> --apply --report <receipt-path>
+```
+
+The compiler is non-destructive, treats an existing `devos/`, `.devos/`, or coherent `docs/agent-system/` as reusable local infrastructure, installs bounded research-preflight and negative-knowledge semantics, and defers SQLite/specialist machinery until measured need exists.
+
 ## Organization verification
 
+- `node --test tests/devos-compiler.test.mjs` — focused DevOS compiler tests.
 - `npm run test:agent-system` — unit tests for the organization-audit logic.
 - `npm run check:agent-system` — deterministic repository organization audit and JSON receipt.
 - `npm run test:governance-sync` — unit tests for governance synchronization semantics.
@@ -61,6 +84,7 @@ The recurring upstream source set contains stable global/cross-repository govern
 - `../exec-plans/README.md` — execution-plan contract.
 - `../../plans/` — existing bounded repository plans.
 - `../features/` — feature dossiers and provenance maps.
+- `../features/AIOS_DEVOS_GENERALIZATION_01/manifest.md` — active portable DevOS generalization slice.
 
 ## Review and negative knowledge
 
@@ -82,3 +106,5 @@ The recurring upstream source set contains stable global/cross-repository govern
 ## External escalation
 
 Do not fetch Notion/Drive by default. Escalate only when `../context/governance-lock.yaml` triggers an upstream read, including governance-lock expiry, or when the owner explicitly requests synchronization. Use the `sync-governance` skill rather than ad hoc external-memory reconstruction.
+
+For task-specific factual gaps that are not governance synchronization, use the target repository's bounded research-preflight policy. Research is candidate evidence, not upstream memory authority and not automatic canon.
