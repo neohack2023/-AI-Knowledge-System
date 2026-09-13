@@ -15,7 +15,7 @@ repository: neohack2023/-AI-Knowledge-System
 base_ref: main
 base_sha: 99e7c38bd43b69c1b0e3de6fe6f071bf3f4d84b4
 branch: aios/devos-generalization-01
-pr_number:
+pr_number: 86
 ```
 
 ## Scope
