@@ -26,6 +26,7 @@ installed_skills:
   - review-pr
   - verify-head
   - harvest-lesson
+  - bootstrap-devos
   - sync-governance
   - prepare-release
 upstream_sources:
