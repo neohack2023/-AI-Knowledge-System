@@ -1,6 +1,6 @@
 # Repository Agent Operating System
 
-This directory is the repository-local operating map for agents working in AI Knowledge System. It organizes **who does the work, when a workflow is invoked, which review rules apply, how failures become lessons, how material features remain traceable, which context normal work loads, and how supported agent products enter that system**.
+This directory is the repository-local operating map for agents working in AI Knowledge System. It organizes **who does the work, when a workflow is invoked, which review rules apply, how failures become lessons, how material features remain traceable, which context normal work loads, how supported agent products enter that system, and how the pattern compiles down into smaller target repositories**.
 
 GitHub remains authoritative for repository files, branches, commits, pull requests, reviews, and CI. These files are the public, local execution projection agents need while working here.
 
@@ -11,6 +11,8 @@ GitHub remains authoritative for repository files, branches, commits, pull reque
 For normal repository-scoped work, use checked-in context plus live GitHub state. Do not fetch Notion/Drive merely to reconstruct project identity, operating rules, current semantic phase, decisions, plans, or known repository lessons.
 
 External workspace retrieval is an explicit escalation for cross-repository/global governance changes, unresolved authority conflicts, a stale/incomplete governance lock, or an owner-requested synchronization.
+
+Task-specific factual gaps may separately trigger bounded live research under a repository research-preflight policy. Research expands candidate evidence; it does not become authority or canon by retrieval.
 
 This is operational self-sufficiency, **not** a silent global AIOS authority cutover.
 
@@ -26,6 +28,9 @@ This is operational self-sufficiency, **not** a silent global AIOS authority cut
 - **Context bundle = public-safe semantic orientation** for normal repository work.
 - **Governance lock = vendored upstream-policy snapshot boundary**, not mutable GitHub-state evidence.
 - **Adapter = vendor-specific entry/routing layer** into the same canonical repository knowledge.
+- **DevOS compiler = adaptive repository-onboarding mechanism** that installs the smallest local cognition scaffold only when no equivalent operating layer exists.
+- **Research preflight = bounded candidate-evidence expansion**, never an authority grant.
+- **Learning object = evidence-bound episodic/semantic/procedural/negative knowledge** with maturity separate from promotion state.
 
 No label grants authority by itself.
 
@@ -45,6 +50,14 @@ For material repository work:
 
 Do **not** preload every candidate lesson or external memory source by default.
 
+## Portable DevOS compiler
+
+`devos/README.md` documents `AIOS_DEVOS_GENERALIZATION_01`. The deterministic compiler lives at `../../scripts/agent-system/devos-compiler.mjs`.
+
+Use plan-only first against a target repository. It inventories repository shape and emits a `DevOSAdaptationProfile`. If the target already has `devos/`, `.devos/`, or a coherent equivalent repo OS, the compiler returns reuse/no-op instead of creating a second tree. If bootstrap is required, `--apply` creates missing scaffold files only and never overwrites existing files.
+
+The minimal scaffold installs repository-first routing, bounded research-preflight, knowledge maturity states, negative-knowledge structure, and receipt boundaries. SQLite, specialist agents, extra skills, and heavier evaluation machinery are deferred until measured need warrants them.
+
 ## Organization
 
 - `context/` — project charter, semantic handoff, authority map, vendored governance, and governance lock.
@@ -56,6 +69,7 @@ Do **not** preload every candidate lesson or external memory source by default.
 - `commands/` — repeatable lifecycle entry points.
 - `pr-rules/` — compact human-promoted rules for repeated review use.
 - `anti-patterns/` — candidate negative knowledge and promotion lifecycle.
+- `devos/` — portable adaptive DevOS generalization contract.
 - `features/` — feature-dossier schema and future feature provenance maps.
 - `decisions/` — durable repository decision/ADR lane.
 - `exec-plans/` — execution-plan contract and template; active task plans may remain in existing `docs/plans/`.
@@ -86,6 +100,17 @@ confirmed incident/review finding
 ```
 
 Evidence maturity and promotion scope are independent axes. A reviewer may **suggest** a lesson candidate. A reviewer may not silently write or promote its own lesson into review law.
+
+For repository learning more generally:
+
+```text
+observation / bounded research
+→ candidate explanation or approach
+→ repository evaluation
+→ episodic | semantic | procedural | negative knowledge
+→ transfer/regression evidence when warranted
+→ governed promotion or no-op
+```
 
 ## Feature trace
 
