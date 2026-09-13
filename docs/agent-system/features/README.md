@@ -4,6 +4,10 @@ Feature dossiers are repository-local provenance maps for **material** features.
 
 Use a dossier when the work has meaningful architecture, risk, multiple repair/review rounds, special verifier obligations, durable lessons, or external governance anchors worth preserving.
 
+## Active / notable dossiers
+
+- `AIOS_DEVOS_GENERALIZATION_01/manifest.md` — adaptive repository-first DevOS bootstrap/compiler, bounded research fallback, and applied-learning generalization.
+
 ## What a dossier owns
 
 - stable feature ID and concern;
