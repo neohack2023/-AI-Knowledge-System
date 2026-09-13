@@ -28,6 +28,8 @@ This file is the canonical repository-local instruction map for coding agents. K
 - `.github/skills/` contains installed task-specific Agent Skills for repeatable lifecycle procedures.
 - `docs/agent-system/skills/` documents the skill boundary, routing, and maintenance law.
 - `docs/agent-system/commands/` defines vendor-neutral lifecycle entry contracts that the installed skills project.
+- `docs/agent-system/devos/` defines the portable adaptive DevOS compiler and repo-first research/learning boundary.
+- `scripts/agent-system/devos-compiler.mjs` inventories target repositories and compiles the smallest non-destructive DevOS scaffold when no equivalent operating layer exists.
 - `docs/agent-system/pr-rules/` contains compact promoted review law.
 - `docs/agent-system/anti-patterns/` contains deeper negative knowledge and immutable source evidence.
 - `docs/agent-system/features/`, `decisions/`, and `exec-plans/` hold feature provenance, durable repository decisions, and execution plans.
@@ -35,12 +37,14 @@ This file is the canonical repository-local instruction map for coding agents. K
 
 ## Skill routing
 
-Canonical Phase 3 procedures:
+Canonical procedures:
 
 - Planner → `plan-feature`
 - Reviewer → `review-pr`
 - Verifier → `verify-head`
 - Knowledge Steward → `harvest-lesson`
+- Knowledge Steward → `bootstrap-devos` when a target repository lacks DevOS/equivalent local operating context
+- Knowledge Steward → `sync-governance`
 - Release Steward → `prepare-release`
 
 Load only the relevant skill. Do not preload every skill into every task. Explicit user/task instructions may choose a different procedural path when compatible with stronger repository authority and safety boundaries.
