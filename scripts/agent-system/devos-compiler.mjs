@@ -4,7 +4,16 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DEVOS_ROOT = 'devos';
-const SCHEMA_VERSION = '1.0';
+const SCHEMA_VERSION = '1.1';
+const MINIMAL_BOOTSTRAP_FILES = [
+  'README.md',
+  'project.json',
+  'adaptation-profile.json',
+  'research-policy.json',
+  'knowledge/README.md',
+  'anti-patterns/README.md',
+  'receipts/README.md'
+];
 
 async function exists(target) {
   try {
@@ -23,12 +32,17 @@ async function readJson(file) {
   }
 }
 
-async function listTopLevel(root) {
+async function requireRepositoryRoot(root) {
+  const resolvedRoot = path.resolve(root);
+  let rootStat;
   try {
-    return await readdir(root, { withFileTypes: true });
-  } catch {
-    return [];
+    rootStat = await stat(resolvedRoot);
+  } catch (error) {
+    if (error?.code === 'ENOENT') throw new Error(`Repository root does not exist: ${resolvedRoot}`);
+    throw error;
   }
+  if (!rootStat.isDirectory()) throw new Error(`Repository root is not a directory: ${resolvedRoot}`);
+  return resolvedRoot;
 }
 
 async function listDirectoryNames(root, relative) {
@@ -46,9 +60,87 @@ function unique(values) {
   return [...new Set(values)].sort();
 }
 
-export async function inventoryRepository(root = process.cwd()) {
+function validateDevosRoot(devosRoot) {
+  if (typeof devosRoot !== 'string' || !devosRoot.trim()) throw new Error('DevOS root must be a non-empty repository-relative path.');
+  if (path.isAbsolute(devosRoot)) throw new Error(`DevOS root must be repository-relative: ${devosRoot}`);
+  const normalized = path.normalize(devosRoot);
+  if (normalized === '.' || normalized === '..' || normalized.startsWith(`..${path.sep}`)) {
+    throw new Error(`DevOS root escapes or collapses to the repository root: ${devosRoot}`);
+  }
+  return normalized;
+}
+
+function resolveInsideRoot(root, relative) {
   const resolvedRoot = path.resolve(root);
-  const top = await listTopLevel(resolvedRoot);
+  const target = path.resolve(resolvedRoot, relative);
+  const relation = path.relative(resolvedRoot, target);
+  if (relation === '..' || relation.startsWith(`..${path.sep}`) || path.isAbsolute(relation)) {
+    throw new Error(`Generated path escapes repository root: ${relative}`);
+  }
+  return target;
+}
+
+async function inspectDevosCandidate(root, candidate) {
+  const candidatePath = path.join(root, candidate);
+  let candidateStat;
+  try {
+    candidateStat = await stat(candidatePath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+  if (!candidateStat.isDirectory()) {
+    return { root: candidate, state: 'UNRECOGNIZED', missing: [...MINIMAL_BOOTSTRAP_FILES], reason: 'PATH_IS_NOT_DIRECTORY' };
+  }
+
+  const project = await readJson(path.join(candidatePath, 'project.json'));
+  const missing = [];
+  for (const relative of MINIMAL_BOOTSTRAP_FILES) {
+    if (!(await exists(path.join(candidatePath, relative)))) missing.push(relative);
+  }
+
+  if (project?.devos_profile === 'MINIMAL_BOOTSTRAP') {
+    return {
+      root: candidate,
+      state: missing.length ? 'INCOMPLETE_BOOTSTRAP' : 'COHERENT',
+      missing,
+      reason: missing.length ? 'KNOWN_BOOTSTRAP_INCOMPLETE' : 'KNOWN_BOOTSTRAP_COMPLETE'
+    };
+  }
+
+  const coherenceSignals = [
+    await exists(path.join(candidatePath, 'README.md')),
+    Boolean(project),
+    await exists(path.join(candidatePath, 'AGENTS.md')),
+    await exists(path.join(candidatePath, 'research-policy.json')),
+    await exists(path.join(candidatePath, 'knowledge')),
+    await exists(path.join(candidatePath, 'contracts'))
+  ].filter(Boolean).length;
+
+  return {
+    root: candidate,
+    state: coherenceSignals >= 3 ? 'COHERENT' : 'UNRECOGNIZED',
+    missing,
+    reason: coherenceSignals >= 3 ? 'COHERENT_EXISTING_DEVOS' : 'INSUFFICIENT_DEVOS_SIGNALS'
+  };
+}
+
+async function inspectRepositoryOs(root) {
+  const repoOs = path.join(root, 'docs', 'agent-system');
+  if (!(await exists(repoOs))) return null;
+  const signals = [
+    await exists(path.join(repoOs, 'README.md')),
+    await exists(path.join(repoOs, 'SCHEMAS.md')),
+    await exists(path.join(repoOs, 'context')),
+    await exists(path.join(repoOs, 'knowledge')),
+    await exists(path.join(repoOs, 'commands'))
+  ].filter(Boolean).length;
+  return signals >= 2 ? 'docs/agent-system' : null;
+}
+
+export async function inventoryRepository(root = process.cwd()) {
+  const resolvedRoot = await requireRepositoryRoot(root);
+  const top = await readdir(resolvedRoot, { withFileTypes: true });
   const names = new Set(top.map((entry) => entry.name));
   const topFiles = top.filter((entry) => entry.isFile()).map((entry) => entry.name);
 
@@ -70,9 +162,13 @@ export async function inventoryRepository(root = process.cwd()) {
     if (await exists(path.join(resolvedRoot, candidate))) instructionSurfaces.push(candidate);
   }
 
-  const devosRoots = [];
-  for (const candidate of ['devos', '.devos']) if (await exists(path.join(resolvedRoot, candidate))) devosRoots.push(candidate);
-  const hasRepoOs = await exists(path.join(resolvedRoot, 'docs/agent-system'));
+  const devosCandidates = [];
+  for (const candidate of ['devos', '.devos']) {
+    const inspection = await inspectDevosCandidate(resolvedRoot, candidate);
+    if (inspection) devosCandidates.push(inspection);
+  }
+  const devosRoots = devosCandidates.filter((item) => item.state === 'COHERENT').map((item) => item.root);
+  const repositoryOsSurface = devosRoots.length ? null : await inspectRepositoryOs(resolvedRoot);
 
   const workflows = await listDirectoryNames(resolvedRoot, '.github/workflows');
   const testSurfaces = [];
@@ -113,7 +209,8 @@ export async function inventoryRepository(root = process.cwd()) {
     maturity: maturitySignals >= 3 ? 'ESTABLISHED' : maturitySignals >= 1 ? 'EMERGING' : 'GREENFIELD',
     instruction_surfaces: unique(instructionSurfaces),
     devos_roots: devosRoots,
-    repository_os_surface: hasRepoOs ? 'docs/agent-system' : null,
+    devos_candidates: devosCandidates,
+    repository_os_surface: repositoryOsSurface,
     workflow_files: workflows,
     test_surfaces: testSurfaces,
     verification_commands: verification
@@ -121,11 +218,22 @@ export async function inventoryRepository(root = process.cwd()) {
 }
 
 export function compileDevosProfile(inventory, { devosRoot = DEFAULT_DEVOS_ROOT } = {}) {
-  const existingDevos = inventory.devos_roots?.[0] || null;
-  const equivalentRepoOs = !existingDevos && inventory.repository_os_surface ? inventory.repository_os_surface : null;
-  const mode = existingDevos ? 'DEVOS_PRESENT' : equivalentRepoOs ? 'EQUIVALENT_REPO_OS_PRESENT' : 'BOOTSTRAP_REQUIRED';
-  const targetRoot = existingDevos || equivalentRepoOs || devosRoot;
+  const requestedRoot = validateDevosRoot(devosRoot);
+  const coherent = inventory.devos_candidates?.find((item) => item.state === 'COHERENT') || null;
+  const incomplete = inventory.devos_candidates?.find((item) => item.state === 'INCOMPLETE_BOOTSTRAP') || null;
+  const conflict = inventory.devos_candidates?.find((item) => item.state === 'UNRECOGNIZED') || null;
+  const equivalentRepoOs = !coherent && !incomplete && !conflict && inventory.repository_os_surface ? inventory.repository_os_surface : null;
 
+  const mode = coherent
+    ? 'DEVOS_PRESENT'
+    : incomplete
+      ? 'BOOTSTRAP_REPAIR'
+      : conflict
+        ? 'DEVOS_PATH_CONFLICT'
+        : equivalentRepoOs
+          ? 'EQUIVALENT_REPO_OS_PRESENT'
+          : 'BOOTSTRAP_REQUIRED';
+  const targetRoot = coherent?.root || incomplete?.root || conflict?.root || equivalentRepoOs || requestedRoot;
   const runtimeDbDisposition = inventory.maturity === 'ESTABLISHED' ? 'OPTIONAL_AFTER_MEASURED_NEED' : 'DEFER';
 
   return {
@@ -133,6 +241,8 @@ export function compileDevosProfile(inventory, { devosRoot = DEFAULT_DEVOS_ROOT 
     schema_version: SCHEMA_VERSION,
     mode,
     target_root: targetRoot,
+    repair_missing_files: incomplete?.missing || [],
+    conflict_reason: conflict?.reason || null,
     repository_shape: {
       architecture: inventory.architecture,
       maturity: inventory.maturity,
@@ -153,8 +263,8 @@ export function compileDevosProfile(inventory, { devosRoot = DEFAULT_DEVOS_ROOT 
       'LIVE_PUBLIC_RESEARCH_WHEN_LOCAL_AND_UPSTREAM_KNOWLEDGE_ARE_INSUFFICIENT_OR_STALE'
     ],
     components: {
-      local_context_bundle: mode === 'BOOTSTRAP_REQUIRED' ? 'INSTALL_MINIMAL' : 'REUSE',
-      agent_router: inventory.instruction_surfaces.includes('AGENTS.md') ? 'REUSE' : mode === 'BOOTSTRAP_REQUIRED' ? 'INSTALL_MINIMAL' : 'ADAPT_IF_NEEDED',
+      local_context_bundle: mode === 'BOOTSTRAP_REQUIRED' ? 'INSTALL_MINIMAL' : mode === 'BOOTSTRAP_REPAIR' ? 'REPAIR_MISSING' : 'REUSE',
+      agent_router: inventory.instruction_surfaces.includes('AGENTS.md') ? 'REUSE' : ['BOOTSTRAP_REQUIRED', 'BOOTSTRAP_REPAIR'].includes(mode) ? 'INSTALL_MINIMAL' : 'ADAPT_IF_NEEDED',
       research_preflight: 'REQUIRED',
       negative_knowledge: 'REQUIRED',
       applied_learning: 'SCAFFOLD_GOVERNED',
@@ -163,29 +273,18 @@ export function compileDevosProfile(inventory, { devosRoot = DEFAULT_DEVOS_ROOT 
       upstream_sync: 'TRIGGERED_NOT_BOOTSTRAP'
     },
     research_triggers: [
-      'EXTERNAL_UNCERTAINTY',
-      'BLOCKER',
-      'CAPABILITY_GAP',
-      'STALE_EVIDENCE',
-      'WEAK_COMPARISON',
-      'DESIGN_DEAD_END',
-      'FEATURE_INCUBATION',
-      'OPPORTUNITY_WINDOW'
+      'EXTERNAL_UNCERTAINTY', 'BLOCKER', 'CAPABILITY_GAP', 'STALE_EVIDENCE', 'WEAK_COMPARISON', 'DESIGN_DEAD_END', 'FEATURE_INCUBATION', 'OPPORTUNITY_WINDOW'
     ],
-    learning_states: [
-      'OBSERVED',
-      'RESEARCH_SUPPORTED',
-      'LOCALLY_VALIDATED',
-      'REPEATED',
-      'REUSABLE_CANDIDATE',
-      'DEPRECATED'
-    ],
+    learning_states: ['OBSERVED', 'RESEARCH_SUPPORTED', 'LOCALLY_VALIDATED', 'REPEATED', 'REUSABLE_CANDIDATE', 'DEPRECATED'],
     bootstrap_policy: {
       overwrite_existing_files: false,
       copy_external_memory_corpus: false,
       research_auto_promotes: false,
       negative_knowledge_auto_promotes: false,
-      normal_repo_work_external_fetch_required: false
+      normal_repo_work_external_fetch_required: false,
+      repository_boundary_enforced: true,
+      missing_repository_root_fails_closed: true,
+      incomplete_bootstrap_resumable: true
     }
   };
 }
@@ -223,44 +322,18 @@ function researchPolicy(profile) {
     promotion_state: 'CANDIDATE_ONLY',
     trigger_policy: profile.research_triggers,
     source_policy: {
-      evidence_preference: [
-        'STANDARD_OR_SPECIFICATION',
-        'PRIMARY_DOCUMENTATION',
-        'SOURCE_REPOSITORY',
-        'RELEASE_NOTES',
-        'RESEARCH_PAPER',
-        'MAINTAINER_ENGINEERING_NOTE',
-        'REPRODUCIBLE_BENCHMARK'
-      ],
-      inspiration_allowed: [
-        'POSTMORTEM',
-        'CONFERENCE_TALK',
-        'DESIGN_ANALYSIS',
-        'OPEN_SOURCE_IMPLEMENTATION',
-        'COMMUNITY_DISCUSSION',
-        'DEVELOPER_ANECDOTE'
-      ],
-      primary_source_required_for: [
-        'CURRENT_API_BEHAVIOR',
-        'PLATFORM_OR_TOOL_VERSION_CAPABILITY',
-        'LICENSE_OR_POLICY',
-        'SECURITY_RELEVANT_BEHAVIOR'
-      ]
+      evidence_preference: ['STANDARD_OR_SPECIFICATION', 'PRIMARY_DOCUMENTATION', 'SOURCE_REPOSITORY', 'RELEASE_NOTES', 'RESEARCH_PAPER', 'MAINTAINER_ENGINEERING_NOTE', 'REPRODUCIBLE_BENCHMARK'],
+      inspiration_allowed: ['POSTMORTEM', 'CONFERENCE_TALK', 'DESIGN_ANALYSIS', 'OPEN_SOURCE_IMPLEMENTATION', 'COMMUNITY_DISCUSSION', 'DEVELOPER_ANECDOTE'],
+      primary_source_required_for: ['CURRENT_API_BEHAVIOR', 'PLATFORM_OR_TOOL_VERSION_CAPABILITY', 'LICENSE_OR_POLICY', 'SECURITY_RELEVANT_BEHAVIOR']
     },
     lanes: ['CURRENT_STATE', 'IMPLEMENTATIONS', 'FAILURE_MODES', 'ADJACENT_DESIGN', 'OPPORTUNITY'],
-    stop_conditions: [
-      'DECISIVE_PRIMARY_EVIDENCE_FOUND',
-      'ADDITIONAL_SOURCES_ARE_DERIVATIVE_DUPLICATES',
-      'PROJECT_FIT_FAILED',
-      'QUESTION_ANSWERED_WITH_SUFFICIENT_CONFIDENCE',
-      'CONTINUED_RESEARCH_UNLIKELY_TO_CHANGE_DISPOSITION'
-    ]
+    stop_conditions: ['DECISIVE_PRIMARY_EVIDENCE_FOUND', 'ADDITIONAL_SOURCES_ARE_DERIVATIVE_DUPLICATES', 'PROJECT_FIT_FAILED', 'QUESTION_ANSWERED_WITH_SUFFICIENT_CONFIDENCE', 'CONTINUED_RESEARCH_UNLIKELY_TO_CHANGE_DISPOSITION']
   };
 }
 
 export function renderBootstrapFiles(profile, { includeAgentRouter = true } = {}) {
-  if (profile.mode !== 'BOOTSTRAP_REQUIRED') return {};
-  const root = profile.target_root;
+  if (!['BOOTSTRAP_REQUIRED', 'BOOTSTRAP_REPAIR'].includes(profile.mode)) return {};
+  const root = validateDevosRoot(profile.target_root);
   const project = {
     schema_version: 1,
     devos_profile: 'MINIMAL_BOOTSTRAP',
@@ -284,15 +357,22 @@ export function renderBootstrapFiles(profile, { includeAgentRouter = true } = {}
 }
 
 export async function applyBootstrap(root, profile) {
-  const resolvedRoot = path.resolve(root);
-  if (profile.mode !== 'BOOTSTRAP_REQUIRED') {
+  const resolvedRoot = await requireRepositoryRoot(root);
+  if (['DEVOS_PRESENT', 'EQUIVALENT_REPO_OS_PRESENT'].includes(profile.mode)) {
     return { state: 'NOOP_EXISTING_OPERATING_LAYER', created: [], skipped: [], target_root: profile.target_root };
   }
+  if (profile.mode === 'DEVOS_PATH_CONFLICT') {
+    throw new Error(`Existing path ${profile.target_root} is not a coherent DevOS; refusing to claim or mutate it.`);
+  }
+  if (!['BOOTSTRAP_REQUIRED', 'BOOTSTRAP_REPAIR'].includes(profile.mode)) {
+    throw new Error(`Unsupported DevOS bootstrap mode: ${profile.mode}`);
+  }
+
   const files = renderBootstrapFiles(profile);
   const created = [];
   const skipped = [];
   for (const [relative, content] of Object.entries(files)) {
-    const target = path.join(resolvedRoot, relative);
+    const target = resolveInsideRoot(resolvedRoot, relative);
     await mkdir(path.dirname(target), { recursive: true });
     try {
       await writeFile(target, content, { encoding: 'utf8', flag: 'wx' });
@@ -302,8 +382,16 @@ export async function applyBootstrap(root, profile) {
       else throw error;
     }
   }
+
+  for (const relative of Object.keys(files)) {
+    const target = resolveInsideRoot(resolvedRoot, relative);
+    if (!(await exists(target))) throw new Error(`Bootstrap did not materialize expected file: ${relative}`);
+  }
+
   return {
-    state: created.length ? 'BOOTSTRAP_APPLIED' : 'BOOTSTRAP_ALREADY_PRESENT',
+    state: created.length
+      ? profile.mode === 'BOOTSTRAP_REPAIR' ? 'BOOTSTRAP_REPAIRED' : 'BOOTSTRAP_APPLIED'
+      : 'BOOTSTRAP_ALREADY_PRESENT',
     target_root: profile.target_root,
     created: created.sort(),
     skipped: skipped.sort()
@@ -325,7 +413,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  return `Usage: node scripts/agent-system/devos-compiler.mjs [--root PATH] [--devos-root PATH] [--apply] [--report FILE]\n\nPlan-only is the default. --apply creates missing scaffold files and never overwrites existing files.\n`;
+  return `Usage: node scripts/agent-system/devos-compiler.mjs [--root PATH] [--devos-root PATH] [--apply] [--report FILE]\n\nPlan-only is the default. --apply creates missing scaffold files and never overwrites existing files. Repository roots must already exist, and scaffold paths may not escape the target repository.\n`;
 }
 
 async function main() {
