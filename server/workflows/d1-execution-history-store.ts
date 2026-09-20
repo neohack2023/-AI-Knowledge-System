@@ -119,8 +119,21 @@ const executionHistoryReadinessQueries = executionHistoryRequiredTables.map(
   (table) => `SELECT 1 AS ready FROM ${table} LIMIT 0`,
 );
 
+const safeErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (
+    error !== null
+    && typeof error === "object"
+    && "message" in error
+    && typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+};
+
 export const sanitizeD1SchemaFailure = (error: unknown): D1SchemaFailureDetail => {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = safeErrorMessage(error);
   if (/syntax error|near\s+.+syntax/i.test(message)) return "SQLITE_SYNTAX_ERROR";
   if (/already exists|duplicate|constraint/i.test(message)) return "SQLITE_SCHEMA_OBJECT_CONFLICT";
   if (/permission|not authorized|unauthorized|forbidden/i.test(message)) return "SQLITE_PERMISSION_DENIED";
