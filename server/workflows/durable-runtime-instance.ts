@@ -5,12 +5,6 @@ import { UnavailableExecutionHistoryStore, type ExecutionHistoryStore } from "./
 import { workflowExecutionKernel } from "./kernel.ts";
 
 type RuntimeEnv = { DB?: D1DatabaseLike };
-type DurableRuntimeGlobal = typeof globalThis & {
-  __aiKnowledgeDurableExecutionHistoryStorePromise?: Promise<ExecutionHistoryStore>;
-  __aiKnowledgeDurableWorkflowRuntimePromise?: Promise<DurableWorkflowRuntime>;
-};
-
-const runtimeGlobal = globalThis as DurableRuntimeGlobal;
 
 const loadRuntimeEnv = async (): Promise<RuntimeEnv> => {
   try {
@@ -28,18 +22,13 @@ const createStore = async (): Promise<ExecutionHistoryStore> => {
   return new D1ExecutionHistoryStore(db).initialize();
 };
 
-const storePromise = runtimeGlobal.__aiKnowledgeDurableExecutionHistoryStorePromise ??=
-  createStore();
-
-export const getExecutionHistoryStore = () => storePromise;
+export const getExecutionHistoryStore = () => createStore();
 
 export const getDurableWorkflowRuntime = async () => {
-  runtimeGlobal.__aiKnowledgeDurableWorkflowRuntimePromise ??= storePromise.then((store) =>
-    new DurableWorkflowRuntime(
-      workflowExecutionKernel,
-      store,
-      capabilityResolverFromRegistry(capabilityDiscoveryRuntime.listCapabilities()),
-    )
+  const store = await createStore();
+  return new DurableWorkflowRuntime(
+    workflowExecutionKernel,
+    store,
+    capabilityResolverFromRegistry(capabilityDiscoveryRuntime.listCapabilities()),
   );
-  return runtimeGlobal.__aiKnowledgeDurableWorkflowRuntimePromise;
 };

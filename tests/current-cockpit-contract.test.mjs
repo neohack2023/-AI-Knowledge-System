@@ -41,8 +41,14 @@ test("live diagnostic is fail-closed behind positive D1 durability", () => {
   assert.ok(cockpit.includes("Fresh-runtime restoration must still be tested separately"));
 });
 
-test("durable history list endpoint fails visibly when D1 is unavailable", () => {
-  assert.match(runtimeInstance, /export const getExecutionHistoryStore = \(\) => storePromise/);
+test("durable history is request-scoped and fails visibly when D1 is unavailable", () => {
+  assert.match(runtimeInstance, /const createStore = async \(\): Promise<ExecutionHistoryStore> =>/);
+  assert.match(runtimeInstance, /export const getExecutionHistoryStore = \(\) => createStore\(\)/);
+  assert.match(runtimeInstance, /const store = await createStore\(\)/);
+  assert.doesNotMatch(runtimeInstance, /storePromise/);
+  assert.doesNotMatch(runtimeInstance, /globalThis/);
+  assert.doesNotMatch(runtimeInstance, /__aiKnowledgeDurable/);
+
   assert.match(historyRoute, /listDurableExecutionHistory/);
   assert.match(historyRoute, /state\.state !== "DURABLE_AVAILABLE"/);
   assert.match(historyRoute, /"PROCESS_LOCAL_DEGRADED"/);

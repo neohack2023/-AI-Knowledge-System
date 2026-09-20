@@ -34,6 +34,7 @@ export type D1SchemaFailureDetail =
   | "SQLITE_SCHEMA_OBJECT_CONFLICT"
   | "SQLITE_PERMISSION_DENIED"
   | "SQLITE_MISSING_OBJECT"
+  | "D1_SCHEMA_PROBE_FAILED"
   | "D1_SCHEMA_BATCH_FAILED";
 
 type D1ExecutionHistoryBackendState = ExecutionHistoryBackendState & {
@@ -108,13 +109,36 @@ export const executionHistorySchemaStatements = [
 
 export const executionHistorySchemaSql = `${executionHistorySchemaStatements.join(";\n")}\n`;
 
+export const executionHistoryRequiredTables = [
+  "workflow_executions",
+  "workflow_execution_events",
+  "workflow_execution_links",
+] as const;
+
+const executionHistoryReadinessQueries = executionHistoryRequiredTables.map(
+  (table) => `SELECT 1 AS ready FROM ${table} LIMIT 0`,
+);
+
+const safeErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (
+    error !== null
+    && typeof error === "object"
+    && "message" in error
+    && typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return String(error);
+};
+
 export const sanitizeD1SchemaFailure = (error: unknown): D1SchemaFailureDetail => {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = safeErrorMessage(error);
   if (/syntax error|near\s+.+syntax/i.test(message)) return "SQLITE_SYNTAX_ERROR";
   if (/already exists|duplicate|constraint/i.test(message)) return "SQLITE_SCHEMA_OBJECT_CONFLICT";
   if (/permission|not authorized|unauthorized|forbidden/i.test(message)) return "SQLITE_PERMISSION_DENIED";
   if (/no such (table|index)|missing (table|index)/i.test(message)) return "SQLITE_MISSING_OBJECT";
-  return "D1_SCHEMA_BATCH_FAILED";
+  return "D1_SCHEMA_PROBE_FAILED";
 };
 
 type ExecutionRow = {
@@ -363,7 +387,9 @@ export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
 
   async initialize() {
     try {
-      await this.db.batch(executionHistorySchemaStatements.map((sql) => this.db.prepare(sql)));
+      for (const query of executionHistoryReadinessQueries) {
+        await this.db.prepare(query).all();
+      }
       this.state = { backend: "D1", state: "DURABLE_AVAILABLE", reason_code: null };
     } catch (error) {
       this.state = {
