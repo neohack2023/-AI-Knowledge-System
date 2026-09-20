@@ -5,6 +5,7 @@ import test from "node:test";
 import type { DurableExecutionHistoryBundle } from "../shared/execution-history.ts";
 import {
   D1ExecutionHistoryStore,
+  executionHistoryRequiredSchemaObjects,
   executionHistorySchemaSql,
   executionHistorySchemaStatements,
   type D1DatabaseLike,
@@ -34,8 +35,16 @@ class FakeD1 implements D1DatabaseLike {
   batchError: Error | null = null;
   executionRow: Record<string, unknown> | null = null;
   eventHead: Record<string, unknown> | null = null;
+  schemaObjects: Record<string, unknown>[] | null = null;
 
   prepare(query: string) {
+    if (query.includes("FROM sqlite_master")) {
+      return new FakeStatement(
+        query,
+        null,
+        this.schemaObjects ?? executionHistoryRequiredSchemaObjects.map(([type, name]) => ({ type, name })),
+      );
+    }
     if (query.includes("SELECT * FROM workflow_executions")) {
       return new FakeStatement(query, this.executionRow);
     }
@@ -150,7 +159,7 @@ const executionRow = (value: DurableExecutionHistoryBundle) => ({
   authority_state: value.execution.authority_state,
 });
 
-test("B02.2 D1 schema initializes through one prepared statement per operation in a batch", async () => {
+test("B02.2 D1 runtime verifies the migrated schema without replaying DDL", async () => {
   const db = new FakeD1();
   const store = await new D1ExecutionHistoryStore(db).initialize();
   assert.deepEqual(store.getBackendState(), {
@@ -158,27 +167,40 @@ test("B02.2 D1 schema initializes through one prepared statement per operation i
     state: "DURABLE_AVAILABLE",
     reason_code: null,
   });
-  assert.equal(db.execSql.length, 0, "schema initialization must not use multi-statement D1 exec");
-  assert.equal(db.batches.length, 1);
-  assert.equal(db.batches[0].length, executionHistorySchemaStatements.length);
-  assert.equal(executionHistorySchemaStatements.length, 10);
-  assert.equal(
-    db.batches[0].every((statement) => statement.query.trimStart().startsWith("CREATE ")),
-    true,
-  );
-  assert.equal(
-    db.batches[0].some((statement) => /;\s*CREATE\s/i.test(statement.query)),
-    false,
-    "each prepared schema operation must contain one SQL statement",
-  );
-  for (const table of ["workflow_executions", "workflow_execution_events", "workflow_execution_links"]) {
-    assert.match(executionHistorySchemaSql, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
-  }
+  assert.equal(db.execSql.length, 0);
+  assert.equal(db.batches.length, 0);
+  assert.equal(executionHistoryRequiredSchemaObjects.length, 10);
+});
+
+test("B02.2 missing migrated schema objects fail closed with an exact reason", async () => {
+  const db = new FakeD1();
+  db.schemaObjects = executionHistoryRequiredSchemaObjects
+    .filter(([, name]) => name !== "workflow_execution_links_type_idx")
+    .map(([type, name]) => ({ type, name }));
+  const store = await new D1ExecutionHistoryStore(db).initialize();
+  assert.deepEqual(store.getBackendState(), {
+    backend: "D1",
+    state: "DURABLE_UNAVAILABLE",
+    reason_code: "D1_SCHEMA_UNAVAILABLE",
+    reason_detail: "SQLITE_MISSING_OBJECT",
+  });
+  assert.equal(db.batches.length, 0);
 });
 
 test("B02.2 schema initialization failure preserves a sanitized reason without echoing raw D1 text", async () => {
   const db = new FakeD1();
-  db.schemaBatchError = new Error('near "secret-value": syntax error; token=should-not-escape');
+  db.schemaObjects = null;
+  const originalPrepare = db.prepare.bind(db);
+  db.prepare = (query: string) => {
+    if (query.includes("FROM sqlite_master")) {
+      return {
+        bind() { return this; },
+        async first() { return null; },
+        async all() { throw new Error('near "secret-value": syntax error; token=should-not-escape'); },
+      } as D1PreparedStatementLike;
+    }
+    return originalPrepare(query);
+  };
   const store = await new D1ExecutionHistoryStore(db).initialize();
   const state = store.getBackendState();
   assert.deepEqual(state, {
@@ -189,6 +211,7 @@ test("B02.2 schema initialization failure preserves a sanitized reason without e
   });
   assert.doesNotMatch(JSON.stringify(state), /secret-value|should-not-escape/);
   assert.equal(db.execSql.length, 0);
+  assert.equal(db.batches.length, 0);
 });
 
 test("B02.2 repository includes a registered SQL migration for all execution-history objects", async () => {
