@@ -5,7 +5,7 @@ import test from "node:test";
 import type { DurableExecutionHistoryBundle } from "../shared/execution-history.ts";
 import {
   D1ExecutionHistoryStore,
-  executionHistoryRequiredSchemaObjects,
+  executionHistoryRequiredTables,
   executionHistorySchemaSql,
   executionHistorySchemaStatements,
   type D1DatabaseLike,
@@ -35,15 +35,24 @@ class FakeD1 implements D1DatabaseLike {
   batchError: Error | null = null;
   executionRow: Record<string, unknown> | null = null;
   eventHead: Record<string, unknown> | null = null;
-  schemaObjects: Record<string, unknown>[] | null = null;
+  missingReadinessTable: string | null = null;
+  readinessError: Error | null = null;
 
   prepare(query: string) {
-    if (query.includes("FROM sqlite_master")) {
-      return new FakeStatement(
-        query,
-        null,
-        this.schemaObjects ?? executionHistoryRequiredSchemaObjects.map(([type, name]) => ({ type, name })),
-      );
+    const thisDb = this;
+    if (query.startsWith("SELECT 1 AS ready FROM ")) {
+      const table = query.split(" ")[5];
+      return {
+        bind() { return this; },
+        async first() { return null; },
+        async all() {
+          if (thisDb.readinessError) throw thisDb.readinessError;
+          if (thisDb.missingReadinessTable === table) {
+            throw new Error(`no such table: ${table}`);
+          }
+          return { results: [] };
+        },
+      } as D1PreparedStatementLike;
     }
     if (query.includes("SELECT * FROM workflow_executions")) {
       return new FakeStatement(query, this.executionRow);
@@ -169,14 +178,16 @@ test("B02.2 D1 runtime verifies the migrated schema without replaying DDL", asyn
   });
   assert.equal(db.execSql.length, 0);
   assert.equal(db.batches.length, 0);
-  assert.equal(executionHistoryRequiredSchemaObjects.length, 10);
+  assert.deepEqual(executionHistoryRequiredTables, [
+    "workflow_executions",
+    "workflow_execution_events",
+    "workflow_execution_links",
+  ]);
 });
 
-test("B02.2 missing migrated schema objects fail closed with an exact reason", async () => {
+test("B02.2 missing migrated table fails closed with an exact reason", async () => {
   const db = new FakeD1();
-  db.schemaObjects = executionHistoryRequiredSchemaObjects
-    .filter(([, name]) => name !== "workflow_execution_links_type_idx")
-    .map(([type, name]) => ({ type, name }));
+  db.missingReadinessTable = "workflow_execution_links";
   const store = await new D1ExecutionHistoryStore(db).initialize();
   assert.deepEqual(store.getBackendState(), {
     backend: "D1",
@@ -189,18 +200,7 @@ test("B02.2 missing migrated schema objects fail closed with an exact reason", a
 
 test("B02.2 schema initialization failure preserves a sanitized reason without echoing raw D1 text", async () => {
   const db = new FakeD1();
-  db.schemaObjects = null;
-  const originalPrepare = db.prepare.bind(db);
-  db.prepare = (query: string) => {
-    if (query.includes("FROM sqlite_master")) {
-      return {
-        bind() { return this; },
-        async first() { return null; },
-        async all() { throw new Error('near "secret-value": syntax error; token=should-not-escape'); },
-      } as D1PreparedStatementLike;
-    }
-    return originalPrepare(query);
-  };
+  db.readinessError = new Error('near "secret-value": syntax error; token=should-not-escape');
   const store = await new D1ExecutionHistoryStore(db).initialize();
   const state = store.getBackendState();
   assert.deepEqual(state, {
