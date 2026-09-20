@@ -108,6 +108,21 @@ export const executionHistorySchemaStatements = [
 
 export const executionHistorySchemaSql = `${executionHistorySchemaStatements.join(";\n")}\n`;
 
+export const executionHistoryRequiredSchemaObjects = [
+  ["table", "workflow_executions"],
+  ["index", "workflow_executions_identity_idx"],
+  ["index", "workflow_executions_scope_created_idx"],
+  ["index", "workflow_executions_capability_created_idx"],
+  ["table", "workflow_execution_events"],
+  ["index", "workflow_execution_events_sequence_idx"],
+  ["index", "workflow_execution_events_identity_idx"],
+  ["table", "workflow_execution_links"],
+  ["index", "workflow_execution_links_identity_idx"],
+  ["index", "workflow_execution_links_type_idx"],
+] as const;
+
+type SchemaObjectRow = { type: string; name: string };
+
 export const sanitizeD1SchemaFailure = (error: unknown): D1SchemaFailureDetail => {
   const message = error instanceof Error ? error.message : String(error);
   if (/syntax error|near\s+.+syntax/i.test(message)) return "SQLITE_SYNTAX_ERROR";
@@ -363,7 +378,32 @@ export class D1ExecutionHistoryStore implements ExecutionHistoryStore {
 
   async initialize() {
     try {
-      await this.db.batch(executionHistorySchemaStatements.map((sql) => this.db.prepare(sql)));
+      const schema = await this.db
+        .prepare(
+          "SELECT type, name FROM sqlite_master WHERE name IN (" +
+          executionHistoryRequiredSchemaObjects.map(() => "?").join(", ") +
+          ")"
+        )
+        .bind(...executionHistoryRequiredSchemaObjects.map(([, name]) => name))
+        .all<SchemaObjectRow>();
+
+      const observed = new Set(
+        (schema.results ?? []).map((row) => `${row.type}:${row.name}`)
+      );
+      const missing = executionHistoryRequiredSchemaObjects.filter(
+        ([type, name]) => !observed.has(`${type}:${name}`)
+      );
+
+      if (missing.length > 0) {
+        this.state = {
+          backend: "D1",
+          state: "DURABLE_UNAVAILABLE",
+          reason_code: "D1_SCHEMA_UNAVAILABLE",
+          reason_detail: "SQLITE_MISSING_OBJECT",
+        };
+        return this;
+      }
+
       this.state = { backend: "D1", state: "DURABLE_AVAILABLE", reason_code: null };
     } catch (error) {
       this.state = {
