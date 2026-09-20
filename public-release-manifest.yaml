@@ -221,6 +221,12 @@
       "reason": "Application build configuration."
     },
     {
+      "id": "root-wrangler-config",
+      "pattern": "wrangler.jsonc",
+      "classification": "PUBLIC_TEMPLATE",
+      "reason": "Cloudflare Workers deployment configuration without credentials or account-specific resource IDs."
+    },
+    {
       "id": "root-drizzle-config",
       "pattern": "drizzle.config.ts",
       "classification": "PUBLIC_TEMPLATE",
