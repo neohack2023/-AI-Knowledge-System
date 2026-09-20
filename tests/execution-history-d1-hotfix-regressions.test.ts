@@ -77,11 +77,11 @@ test("B02.2 runtime preserves the initialized D1 store when schema setup fails",
 });
 
 
-test("B02.2 runtime readiness probe does not replay schema DDL after deploy-time migrations", async () => {
+test("B02.2 runtime readiness probe uses required-table reads and does not replay schema DDL after deploy-time migrations", async () => {
   const source = await readFile(
     new URL("../server/workflows/d1-execution-history-store.ts", import.meta.url),
     "utf8",
   );
-  assert.match(source, /FROM sqlite_master/);
+  assert.match(source, /SELECT 1 AS ready FROM/);
   assert.doesNotMatch(source, /await this\.db\.batch\(executionHistorySchemaStatements/);
 });
