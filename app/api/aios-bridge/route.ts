@@ -77,6 +77,8 @@ export async function GET(request: Request) {
     })),
     routes: {
       bridge: "/api/aios-bridge",
+      mcp: "/aios-mcp",
+      mcp_alias: "/api/aios-mcp",
       workflows: "/api/workflow-executions",
       capabilities: "/api/capabilities",
       gog_3d_lab: "/gog-3d-lab",
