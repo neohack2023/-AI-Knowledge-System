@@ -8,6 +8,7 @@ import {
   executionHistoryRequiredTables,
   executionHistorySchemaSql,
   executionHistorySchemaStatements,
+  sanitizeD1SchemaFailure,
   type D1DatabaseLike,
   type D1PreparedStatementLike,
 } from "../server/workflows/d1-execution-history-store.ts";
