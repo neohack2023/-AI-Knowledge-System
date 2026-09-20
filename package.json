@@ -20,7 +20,9 @@
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "coding-harness:receipt": "node --experimental-transform-types scripts/coding-harness/emit-receipt.ts",
-    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
+    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
+    "db:migrations:apply:cloudflare": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run db:migrations:apply:cloudflare && wrangler deploy"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

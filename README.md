@@ -44,7 +44,7 @@ Scripts that need writable project-scoped home, npm, XDG, and temporary paths us
 - `tests/` contains synthetic contract and regression tests
 - `reusable-code/` contains the governed reusable-code lane
 - `.openai/hosting.json` declares optional OpenAI Sites D1 and R2 bindings
-- `wrangler.jsonc` declares the Cloudflare Workers entry point and provider-side bindings without account-specific resource IDs
+- `wrangler.jsonc` declares the Cloudflare Workers entry point, provider-side bindings, and the `drizzle/` D1 migration directory without account-specific resource IDs
 - `vite.config.ts` lets the Cloudflare Vite plugin consume that deployment configuration for local development and build output
 - `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
 - `db/schema.ts` starts intentionally empty
@@ -106,6 +106,8 @@ Use SIWC for account pages, user-specific dashboards, saved records, and write a
 - `npm run coding-harness:receipt -- <input.json>`: derive verifier-owned acceptance receipts from execution evidence
 - `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
 - `npm run db:generate`: generate Drizzle migrations after schema changes
+- `npm run db:migrations:apply:cloudflare`: apply unapplied `drizzle/` migrations to the bound remote D1 database
+- `npm run deploy`: apply remote D1 migrations first, then deploy the Cloudflare Worker
 
 Use build and validation commands for targeted diagnosis after a remote failure, not as a blind repeated pre-checkpoint loop.
 
