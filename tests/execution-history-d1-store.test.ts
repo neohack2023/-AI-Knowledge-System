@@ -303,3 +303,11 @@ test("B02.2 Sites hosting manifest requests the managed D1 DB binding", async ()
   const manifest = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   assert.equal(manifest.d1, "DB");
 });
+
+
+test("B02.2 structured D1 errors preserve safe classifier signal", () => {
+  assert.equal(
+    sanitizeD1SchemaFailure({ message: "D1_ERROR: no such table: workflow_executions" }),
+    "SQLITE_MISSING_OBJECT",
+  );
+});
