@@ -67,12 +67,16 @@ test("B02.2 committed Drizzle baseline does not generate a duplicate follow-up m
   }
 });
 
-test("B02.2 runtime preserves the initialized D1 store when schema setup fails", async () => {
+test("B02.2 runtime keeps D1-backed I/O request-local while preserving fail-visible initialization", async () => {
   const source = await readFile(
     new URL("../server/workflows/durable-runtime-instance.ts", import.meta.url),
     "utf8",
   );
   assert.match(source, /return new D1ExecutionHistoryStore\(db\)\.initialize\(\);/);
+  assert.match(source, /getExecutionHistoryStore = \(\) => createStore\(\)/);
+  assert.match(source, /const store = await createStore\(\)/);
+  assert.doesNotMatch(source, /globalThis/);
+  assert.doesNotMatch(source, /__aiKnowledgeDurable/);
   assert.doesNotMatch(source, /UnavailableExecutionHistoryStore\("D1_SCHEMA_UNAVAILABLE"\)/);
 });
 
