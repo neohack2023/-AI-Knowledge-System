@@ -85,7 +85,7 @@ The first Phase 5 receipt is `GSYNC-20260904-001`. It records `MATERIAL_DELTA_RE
 1. explicit owner-authorized direct-main staging was reconciled as a phase-specific, non-reusable exception while branch/PR delivery remains the default;
 2. the recurring upstream source set was normalized to stable governance contracts rather than mutable repository implementation plans.
 
-`valid_through` remains `2026-10-04`, mechanically derived from the 30-day freshness policy and the 2026-09-04 sync date. A same-day synchronization does not invent a longer freshness horizon.
+`valid_through` is now `2026-10-20`, mechanically derived from the 30-day freshness policy and the owner-triggered 2026-09-20 synchronization. The latest receipt is `GSYNC-20260920-001` and records a reconciled Drive-first global control-plane authority delta.
 
 ## Freshness law
 
@@ -101,6 +101,8 @@ Each authorization is narrow and non-reusable without new owner direction. Phase
 
 ## Active concerns
 
+- The hosted Cloudflare execution kernel is operational, while Drive-backed knowledge retrieval is not yet connected to the hosted runtime. The next implementation concern is a read-only Drive registry adapter with exact-scope and smallest-packet tests; destination writes remain blocked.
+- The repository now records Drive as current for global routing/control-plane state and Notion as exact read-only `LEGACY_SOURCE` fallback. This is an external authority snapshot, not a GitHub authority cutover.
 - PR #69 remains a separate SENSITIVE exact-head CI correction with an unresolved direct-child YAML-binding P2. Repository-autonomy work does not silently resolve it.
 - PR #71 and PR #72 are closed without merge as superseded staging carriers.
 - Global/cross-repository AIOS authority has not cut over into GitHub. The checked-in governance bundle is the repository-safe execution snapshot for normal work.
