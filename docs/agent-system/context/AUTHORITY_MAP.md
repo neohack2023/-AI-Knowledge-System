@@ -10,6 +10,8 @@ This map answers: **where should an agent look first, and which surface owns the
 | semantic repository handoff | `context/REPOSITORY_HANDOFF.md` | upstream project handoff may seed/synchronize it |
 | feature provenance | feature dossier + Git history + PR/CI evidence | upstream may retain cross-project episode memory |
 | repository decisions | `decisions/**` | global decisions remain upstream until explicitly synchronized |
+| global AIOS routing/control-plane state | vendored public-safe snapshot only | Google Drive is current; Notion is exact read-only `LEGACY_SOURCE` fallback for absent/unverified/conflicted objects |
+| verified/current external knowledge objects | no private object bodies stored here | Google Drive object registry governs declared object authority; GitHub remains live repo truth |
 | task execution plans | repository plan/exec-plan surfaces | upstream may retain program-level planning |
 | anti-pattern candidates and promoted PR rules | `anti-patterns/**` + `pr-rules/**` | cross-repo promotion remains upstream-governed |
 | secrets, personal memory, private evidence, provider bindings | **not stored here** | private external surfaces only |
