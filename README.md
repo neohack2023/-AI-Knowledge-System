@@ -106,7 +106,7 @@ Use SIWC for account pages, user-specific dashboards, saved records, and write a
 - `npm run coding-harness:receipt -- <input.json>`: derive verifier-owned acceptance receipts from execution evidence
 - `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
 - `npm run db:generate`: generate Drizzle migrations after schema changes
-- `npm run db:migrations:apply:cloudflare`: apply unapplied `drizzle/` migrations to the bound remote D1 database
+- `npm run db:migrations:apply:cloudflare`: resolve the provisioned `ai-knowledge-system-db` by exact name through Wrangler, generate a temporary UUID-bound migration config, and apply unapplied `drizzle/` migrations to that remote D1 database
 - `npm run deploy`: apply remote D1 migrations first, then deploy the Cloudflare Worker
 
 Use build and validation commands for targeted diagnosis after a remote failure, not as a blind repeated pre-checkpoint loop.

@@ -21,7 +21,7 @@
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "coding-harness:receipt": "node --experimental-transform-types scripts/coding-harness/emit-receipt.ts",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
-    "db:migrations:apply:cloudflare": "wrangler d1 migrations apply DB --remote",
+    "db:migrations:apply:cloudflare": "node scripts/cloudflare/apply-d1-migrations.mjs",
     "deploy": "npm run db:migrations:apply:cloudflare && wrangler deploy"
   },
   "dependencies": {
