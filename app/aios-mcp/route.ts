@@ -230,7 +230,7 @@ async function invokeTool(request: Request, name: string, args: Record<string, u
       };
     }
     default:
-      throw new Error(`UNKNOWN_AI0S_MCP_TOOL: ${name}`);
+      throw new Error(`UNKNOWN_AIOS_MCP_TOOL: ${name}`);
   }
 }
 
