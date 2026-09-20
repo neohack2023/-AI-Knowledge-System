@@ -32,7 +32,6 @@ EXPECTED_TOOLS = {
     "run_backend_workflow",
     "open_aios_workbench",
 }
-WIDGET_URI = "ui://aios/repo-workbench-v0.2.html"
 
 
 def text_from_result(result: Any) -> str:
@@ -55,10 +54,18 @@ def parse_json_result(result: Any) -> dict[str, Any]:
     return value
 
 
+def endpoint_contract(url: str) -> tuple[str, str]:
+    path = urlparse(url).path.rstrip("/")
+    if path == "/aios-mcp":
+        return "ui://aios/repo-workbench-v0.3.html", "cloudflare-native"
+    if path == "/mcp":
+        return "ui://aios/repo-workbench-v0.2.html", "remote-dev"
+    raise SystemExit("MCP URL must end in /mcp or /aios-mcp")
+
+
 def validate_url(url: str, allow_http_localhost: bool) -> None:
     parsed = urlparse(url)
-    if parsed.path.rstrip("/") != "/mcp":
-        raise SystemExit("MCP URL must end in /mcp")
+    endpoint_contract(url)
     if parsed.scheme == "https":
         return
     if allow_http_localhost and parsed.scheme == "http" and parsed.hostname in {
@@ -71,6 +78,7 @@ def validate_url(url: str, allow_http_localhost: bool) -> None:
 
 
 async def verify(url: str, run_safe_workflow: bool) -> None:
+    widget_uri, expected_profile = endpoint_contract(url)
     async with streamable_http_client(url) as streams:
         # MCP Python 2.x returns the read/write pair. Older supported SDK
         # builds also included a third session-id callback, so consume only
@@ -96,15 +104,15 @@ async def verify(url: str, run_safe_workflow: bool) -> None:
                 (
                     resource
                     for resource in resources_result.resources
-                    if str(resource.uri) == WIDGET_URI
+                    if str(resource.uri) == widget_uri
                 ),
                 None,
             )
-            assert widget is not None, f"Missing UI resource {WIDGET_URI}"
+            assert widget is not None, f"Missing UI resource {widget_uri}"
             mime = getattr(widget, "mime_type", None) or getattr(widget, "mimeType", None)
             assert mime == "text/html;profile=mcp-app", mime
 
-            widget_result = await session.read_resource(WIDGET_URI)
+            widget_result = await session.read_resource(widget_uri)
             assert widget_result.contents, "Widget resource returned no content"
             widget_text = getattr(widget_result.contents[0], "text", "")
             assert "AIOS Repo Workbench" in widget_text
@@ -135,7 +143,7 @@ async def verify(url: str, run_safe_workflow: bool) -> None:
                 await session.call_tool("open_aios_workbench", arguments={})
             )
             assert opened.get("status") == "READY", opened
-            assert opened.get("deployment_profile") == "remote-dev", opened
+            assert opened.get("deployment_profile") == expected_profile, opened
             assert str(opened.get("backend_origin", "")).startswith("https://"), opened
 
             if run_safe_workflow:

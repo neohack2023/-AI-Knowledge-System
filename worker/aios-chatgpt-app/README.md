@@ -67,6 +67,20 @@ python worker/aios-chatgpt-app/server.py
 
 The local endpoint is `http://127.0.0.1:8000/mcp`.
 
+## Cloudflare-native direct binding
+
+The deployed Vinext Worker now has a separate AIOS MCP lane at `/aios-mcp` with `/api/aios-mcp` as an alias. It delegates in-process to the governed TypeScript bridge and D1 runtime, so the Python sidecar and Secure MCP Tunnel are no longer mandatory for the Cloudflare deployment.
+
+The existing SWARM Glassbox ownership of `/mcp` and `/api/mcp` is intentionally preserved. Do not replace or merge those authority domains implicitly.
+
+Use this endpoint for the Cloudflare-native ChatGPT Developer Mode connection:
+
+```text
+https://<deployed-aios-origin>/aios-mcp
+```
+
+The seven-tool contract, MCP Apps resource, `write_authorization=NONE`, and A0 process-local workflow boundary remain unchanged. The older Python `/mcp` worker remains available as a private/tunnel or separately hosted compatibility path.
+
 ## Remote Developer Mode binding
 
 Use `remote-dev` only after the AI Knowledge System backend has a stable HTTPS origin.
