@@ -27,7 +27,7 @@ The web application runs on [vinext](https://github.com/cloudflare/vinext), with
 
 The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
 
-This repository does not use `wrangler.jsonc`.
+`wrangler.jsonc` is the Cloudflare Workers deployment source of truth. It keeps the Worker entry point, assets/image bindings, and Cloudflare-side D1 binding explicit while `.openai/hosting.json` continues to describe the existing OpenAI Sites bindings. The Cloudflare D1 entry intentionally omits an account-specific database ID so Wrangler can provision and bind the Cloudflare-side database without committing tenant-specific identifiers.
 
 `install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout and then validates the Sites artifact. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
 
@@ -43,8 +43,9 @@ Scripts that need writable project-scoped home, npm, XDG, and temporary paths us
 - `schemas/` contains versioned public schemas
 - `tests/` contains synthetic contract and regression tests
 - `reusable-code/` contains the governed reusable-code lane
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
+- `.openai/hosting.json` declares optional OpenAI Sites D1 and R2 bindings
+- `wrangler.jsonc` declares the Cloudflare Workers entry point and provider-side bindings without account-specific resource IDs
+- `vite.config.ts` lets the Cloudflare Vite plugin consume that deployment configuration for local development and build output
 - `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
 - `db/schema.ts` starts intentionally empty
 - `examples/d1/` contains an optional D1 example surface
