@@ -185,3 +185,18 @@ test("code-bearing holdout lane rejects docs-only candidates", () => {
   assert.equal(pool.rejected_count, 1);
   assert.equal(pool.admitted[0].external_pr_number, 170002);
 });
+
+test("cross-repository holdout records negative transfer explicitly", async () => {
+  const evaluationUrl = new URL(
+    "../config/failure-learning/evaluations/holdout-0004-node-cross-repo.v0.1.json",
+    import.meta.url,
+  );
+  const evaluation = JSON.parse(await readFile(evaluationUrl, "utf8"));
+  assert.equal(evaluation.selection.contamination_state, "CLEAN");
+  assert.equal(evaluation.lane, "CODE_BEARING_CROSS_REPO");
+  assert.ok(evaluation.observed_delta < 0);
+  assert.equal(evaluation.negative_transfer.classification, "HARM_MINOR");
+  assert.equal(evaluation.memory_action_effect, "MEMORY_HARMED_MINOR");
+  assert.equal(evaluation.global_promotion_authorized, false);
+  assert.equal(evaluation.authority_effect, "NONE");
+});
