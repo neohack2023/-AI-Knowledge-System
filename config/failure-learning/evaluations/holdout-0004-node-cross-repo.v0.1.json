@@ -1,0 +1,87 @@
+{
+  "schema_name": "FailureLearningPairedEvaluation",
+  "schema_version": "0.1",
+  "evaluation_id": "failure-learning-holdout-0004-node-cross-repo",
+  "lane": "CODE_BEARING_CROSS_REPO",
+  "repository_id": "github:27193779",
+  "research_source_registration": {
+    "registry": "AIOS Research Atlas Registry",
+    "sheet": "GitHub Repositories",
+    "repository": "nodejs/node",
+    "role": "External Research Source — blind failure-learning holdouts"
+  },
+  "revealed_target": {
+    "repository": "nodejs/node",
+    "pr_number": 58087
+  },
+  "selection": {
+    "selected_candidate_id": "holdout:01aa906d",
+    "cutoff_kind": "IMMUTABLE_INITIAL_COMMIT",
+    "immutable_source_ref": "git-commit:54605697fa0fff69186fea638ef57b3ff297723b",
+    "source_digest": "git-commit:54605697fa0fff69186fea638ef57b3ff297723b",
+    "contamination_state": "CLEAN"
+  },
+  "lessons_off": {
+    "mechanism_code": "HUMAN_READABLE_RULE_FORMAT_USED_AS_PERSISTENCE_PROTOCOL",
+    "fix_class": "DEFINE_STABLE_SERIALIZATION_CONTRACT_OR_REUSE_AUTHORITATIVE_RULE_PARSER",
+    "score": {
+      "root_mechanism_accuracy": 0.75,
+      "fix_class_precision": 0,
+      "edge_case_prediction": 0.8,
+      "validation_quality": 0.8,
+      "total": 2.35
+    }
+  },
+  "lessons_on": {
+    "activated_lesson_ids": [
+      "cpy121143-nk02",
+      "cpy121143-pk02"
+    ],
+    "grading_lesson_ids": [
+      "cpy121143-nk01",
+      "cpy121143-pk03"
+    ],
+    "conditionally_applicable_lesson_ids": [
+      "cpy121143-nk04",
+      "cpy121143-pk01"
+    ],
+    "mechanism_code": "SEMANTIC_ROUNDTRIP_CONTRACT_CONFLATED_WITH_TEXTUAL_TRACE_FORMAT",
+    "fix_class": "PERSIST_SEMANTIC_RULE_DATA_NOT_PRESENTATION_STRINGS",
+    "score": {
+      "root_mechanism_accuracy": 0.25,
+      "fix_class_precision": 0,
+      "edge_case_prediction": 0.8,
+      "validation_quality": 0.9,
+      "total": 1.95
+    }
+  },
+  "observed_delta": -0.4,
+  "negative_transfer": {
+    "classification": "HARM_MINOR",
+    "penalty_class": -0.5,
+    "causal_lesson_id": "cpy121143-nk02",
+    "causal_mechanism_code": "INCIDENTAL_TRACE_OVERFIT",
+    "reason": "The lesson treated BlockList.rules strings as presentation-only even though Node maintainers intentionally promoted them into the public persistence contract."
+  },
+  "useful_transfer": [
+    "behavior-level round-trip validation remained useful",
+    "IPv6 completeness was correctly predicted as review-critical",
+    "invalid-input semantics and repeated fromJSON calls were correctly predicted as useful tests"
+  ],
+  "candidate_negative_knowledge": {
+    "mechanism_code": "CROSS_REPO_AUTHORITY_ASSUMPTION",
+    "state": "CANDIDATE_ONLY",
+    "statement": "Before transferring an implementation-versus-semantic lesson across repositories, determine whether the target project intentionally defines that representation as part of its public contract."
+  },
+  "memory_action_effect": "MEMORY_HARMED_MINOR",
+  "prevention_claim_state": "CROSS_REPO_NEGATIVE_TRANSFER_OBSERVED",
+  "global_promotion_authorized": false,
+  "evidence_summary": [
+    "maintainers explicitly steered the feature toward BlockList.toJSON/fromJSON rather than filesystem coupling",
+    "review required IPv6 support, type validation, and behavior-focused tests",
+    "merged implementation retained rules-string parsing",
+    "bounded post-merge repository search found release references rather than corrective/revert lineage",
+    "current Node.js v26.9.0 docs retain fromJSON/toJSON at Stability 1.2 release candidate"
+  ],
+  "authority_effect": "NONE"
+}
