@@ -128,15 +128,15 @@ Track at minimum:
 
 PR #95 was opened as a draft at branch head `7237cab5232a1c36cca5008b01901d0c1c191f1b`.
 
-At handoff creation, GitHub had not yet returned workflow runs or commit statuses for that head. Treat CI as PENDING/UNVERIFIED, not green.
+CI run #350 (run ID 35553415470) completed successfully on head `466d3b6b3493b79a9fab7a92e148a7297756b619`.
 
-Do not deploy the D1 migration or merge the PR until CI and review evidence are current.
+Implementation CI is GREEN at this checkpoint. Deployment is still UNVERIFIED because the D1 migration has not been applied to the live Cloudflare database. Merge/deploy remains a separate human gate.
 
 ## Next bounded slice
 
-1. Read PR #95 live head and CI first.
-2. Repair any CI/test/schema-generation failure without widening scope.
-3. When green, materialize CPython PR #121143 as a chronological D1 episode.
+1. Read PR #95 live head and confirm CI has not regressed from run #350.
+2. After human merge/deploy authorization, verify the D1 migration and `failure_learning_status` readiness.
+3. Materialize CPython PR #121143 as a chronological D1 episode.
 4. Use source pointers/digests + bounded normalized summaries; do not commit copied review threads.
 5. Select an early cutoff before the portability outcome is known.
 6. Run the LLM hypothesis step and persist the sealed hypothesis.
