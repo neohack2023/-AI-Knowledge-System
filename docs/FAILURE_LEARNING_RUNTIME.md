@@ -67,3 +67,15 @@ The first registered source is `python/cpython`. Pilot episode `PR #121143` late
 ## Authority
 
 This runtime stores evidence and candidate learning. It grants no upstream write authority and no AIOS canon-promotion authority.
+
+## Historical holdout integrity
+
+A historical PR is clean for prevention evaluation only when the model-facing cutoff is bound to immutable evidence. Current PR title/body are mutable and MUST NOT be treated as the opening state unless an authoritative edit history reconstructs that exact state.
+
+Preferred cutoff:
+
+`blind structural selection -> opaque candidate ID -> resolve first PR commit internally -> freeze immutable commit SHA + diff digest -> seal LESSONS_OFF and LESSONS_ON predictions -> reveal later PR history -> grade`
+
+If mutable PR metadata is exposed before prediction, mark the run `TAINTED_MUTABLE_PR_METADATA`. Preserve it as calibration evidence, but exclude it from prevention-gain metrics.
+
+Holdout 0001 discovered this leak. Holdout 0002 used an immutable initial-commit cutoff and produced the first clean paired result. Its single-case result favored LESSONS_ON, but it does not authorize global promotion.
