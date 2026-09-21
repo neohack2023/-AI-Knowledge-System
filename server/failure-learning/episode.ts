@@ -125,3 +125,91 @@ export const validateEpisodeFixture = (fixture: FailureLearningEpisodeFixture) =
     authority_effect: "NONE",
   } as const;
 };
+
+
+export const buildEpisodeMaterializationPlan = (fixture: FailureLearningEpisodeFixture) => {
+  const validation = validateEpisodeFixture(fixture);
+  const eventBySequence = new Map(fixture.events.map((event) => [event.sequence, event]));
+  const sourceDigest = validation.digest;
+
+  return {
+    contract: "FailureLearningMaterializationPlan/0.1",
+    validation,
+    episode: {
+      episode_id: fixture.episode.episode_id,
+      repository_id: fixture.episode.repository_id,
+      external_pr_number: fixture.episode.external_pr_number,
+      split: fixture.episode.split,
+      state: fixture.episode.state,
+      terminal_label: fixture.episode.terminal_label,
+      opened_at: fixture.episode.opened_at,
+      completed_at: fixture.episode.completed_at,
+      event_count: fixture.events.length,
+      source_digest: sourceDigest,
+      created_at: fixture.episode.completed_at,
+    },
+    events: fixture.events.map((event) => ({
+      ...event,
+      episode_id: fixture.episode.episode_id,
+      features_json: JSON.stringify(event.features),
+      summary_json: JSON.stringify(event.summary),
+    })),
+    hypotheses: fixture.hypotheses.map((hypothesis) => ({
+      hypothesis_id: hypothesis.hypothesis_id,
+      episode_id: fixture.episode.episode_id,
+      evidence_cutoff_sequence: hypothesis.evidence_cutoff_sequence,
+      mechanism_code: hypothesis.mechanism_code,
+      predicted_fix_class: hypothesis.predicted_fix_class,
+      claim_json: JSON.stringify({
+        source: "FROZEN_EPISODE_FIXTURE",
+        mechanism_code: hypothesis.mechanism_code,
+        predicted_fix_class: hypothesis.predicted_fix_class,
+      }),
+      verdict: hypothesis.verdict,
+      score_json: JSON.stringify({
+        temporal_cutoff_respected: true,
+        verdict: hypothesis.verdict,
+      }),
+      created_at: eventBySequence.get(Math.max(1, hypothesis.evidence_cutoff_sequence))?.occurred_at
+        ?? fixture.episode.opened_at,
+      resolved_at: eventBySequence.get(hypothesis.resolution_event_sequence)?.occurred_at
+        ?? fixture.episode.completed_at,
+      resolution_event_sequence: hypothesis.resolution_event_sequence,
+    })),
+    lessons: fixture.lessons.map((lesson) => {
+      const eligibleEvent = eventBySequence.get(lesson.eligible_after_sequence);
+      if (!eligibleEvent) throw new TypeError("Lesson eligibility event is missing.");
+      return {
+        lesson_id: lesson.lesson_id,
+        source_episode_id: fixture.episode.episode_id,
+        lesson_type: lesson.lesson_type,
+        mechanism_code: lesson.mechanism_code,
+        lesson_json: JSON.stringify({
+          source: "FROZEN_EPISODE_FIXTURE",
+          mechanism_code: lesson.mechanism_code,
+        }),
+        eligible_after: eligibleEvent.occurred_at,
+        state: lesson.state,
+        created_at: fixture.episode.completed_at,
+      };
+    }),
+    checkpoint: {
+      checkpoint_id: fixture.checkpoint.checkpoint_id,
+      dataset_version: fixture.checkpoint.dataset_version,
+      completed_episode_id: fixture.episode.episode_id,
+      episode_count: 1,
+      hypothesis_count: fixture.hypotheses.length,
+      prevention_metrics: {
+        prevention_claimed: false,
+        training_episode_only: true,
+        supported_hypotheses: fixture.hypotheses.filter((item) => item.verdict === "SUPPORTED").length,
+        rejected_hypotheses: fixture.hypotheses.filter((item) => item.verdict === "REJECTED").length,
+        inconclusive_hypotheses: fixture.hypotheses.filter((item) => item.verdict === "INCONCLUSIVE").length,
+      },
+      failure_features: fixture.checkpoint.failure_features,
+      failure_observed: fixture.checkpoint.failure_observed,
+      created_at: fixture.episode.completed_at,
+    },
+    authority_effect: "NONE",
+  } as const;
+};
