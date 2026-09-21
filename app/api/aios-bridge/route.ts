@@ -12,11 +12,16 @@ import { WorkflowKernelError } from "../../../server/workflows/kernel.ts";
 import { getDurableWorkflowRuntime } from "../../../server/workflows/durable-runtime-instance.ts";
 import { capabilityDiscoveryRuntime } from "../../../server/capabilities/index.ts";
 import type { JsonObject } from "../../../server/workflows/types.ts";
+import {
+  getFailureLearningStatus,
+  predictFailureLearningRisk,
+  replayFailureLearningEpisode,
+} from "../../../server/failure-learning/runtime.ts";
 
 export const runtime = "edge";
 
 type BridgeBody = {
-  action?: "search" | "fetch" | "execute_safe_workflow" | "read_execution" | "read_execution_provenance";
+  action?: "search" | "fetch" | "execute_safe_workflow" | "read_execution" | "read_execution_provenance" | "failure_learning_status" | "failure_learning_replay" | "failure_learning_predict";
   query?: string;
   id?: string;
   limit?: number;
@@ -24,6 +29,9 @@ type BridgeBody = {
   workflow_id?: string;
   execution_id?: string;
   provenance_envelope_id?: string;
+  episode_id?: string;
+  evidence_cutoff_sequence?: number;
+  features?: string[];
   input?: JsonObject;
 };
 
@@ -84,7 +92,7 @@ export async function GET(request: Request) {
       gog_3d_lab: "/gog-3d-lab",
       gog_3d_provider: "/api/gog-3d-lab/run",
     },
-    allowed_bridge_actions: ["search", "fetch", "read_execution", "read_execution_provenance", "execute_safe_workflow"],
+    allowed_bridge_actions: ["search", "fetch", "read_execution", "read_execution_provenance", "failure_learning_status", "failure_learning_replay", "failure_learning_predict", "execute_safe_workflow"],
     execution_policy: {
       mode: "LIVE",
       autonomy_band: "A0",
@@ -98,7 +106,8 @@ export async function GET(request: Request) {
     },
     boundaries: [
       "This bridge exposes repository execution truth, not the full Notion or Drive memory authority surface.",
-      "Search and fetch are read-only.",
+      "Search, fetch, and failure-learning MCP surfaces are read-only.",
+      "Failure-learning risk is SHADOW_ONLY and cannot select a specialist, fix, retry, or GitHub action.",
       "Workflow execution is admitted only when the capability satisfies the bridge's A0 process-local policy.",
       "D1 is authoritative for durable execution history only when execution_history.state is DURABLE_AVAILABLE.",
       "A missing D1 binding is reported as PROCESS_LOCAL_DEGRADED and is never described as durable.",
@@ -216,6 +225,34 @@ export async function POST(request: Request) {
         execution_history: durableRuntime.getBackendState(),
         provenance,
       });
+    }
+
+    if (body.action === "failure_learning_status") {
+      return NextResponse.json(await getFailureLearningStatus());
+    }
+
+    if (body.action === "failure_learning_replay") {
+      const episodeId = body.episode_id?.trim();
+      const cutoff = body.evidence_cutoff_sequence;
+      if (!episodeId || !Number.isInteger(cutoff) || (cutoff ?? -1) < 0) {
+        return NextResponse.json(
+          { error: { code: "FAILURE_LEARNING_REPLAY_INPUT_REQUIRED", message: "episode_id and a non-negative integer evidence_cutoff_sequence are required." } },
+          { status: 400 },
+        );
+      }
+      const replay = await replayFailureLearningEpisode(episodeId, cutoff as number);
+      return NextResponse.json(replay);
+    }
+
+    if (body.action === "failure_learning_predict") {
+      const features = body.features;
+      if (!Array.isArray(features) || features.length === 0 || !features.every((feature) => typeof feature === "string" && feature.trim())) {
+        return NextResponse.json(
+          { error: { code: "FAILURE_LEARNING_FEATURES_REQUIRED", message: "features must be a non-empty string array." } },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json(await predictFailureLearningRisk(features));
     }
 
     if (body.action === "execute_safe_workflow") {
