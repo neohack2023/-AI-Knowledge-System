@@ -1,0 +1,57 @@
+{
+  "schema_name": "FailureLearningPairedEvaluation",
+  "schema_version": "0.1",
+  "evaluation_id": "failure-learning-holdout-0002",
+  "repository_id": "github:81598961",
+  "revealed_target": {
+    "repository": "python/cpython",
+    "pr_number": 137215
+  },
+  "selection": {
+    "selected_candidate_id": "holdout:adf35aed",
+    "cutoff_kind": "IMMUTABLE_INITIAL_COMMIT",
+    "immutable_source_ref": "git-commit:05b35b08d7f254fac394e540c65552abffa9eda6",
+    "source_digest": "git-commit:05b35b08d7f254fac394e540c65552abffa9eda6",
+    "contamination_state": "CLEAN"
+  },
+  "lessons_off": {
+    "mechanism_code": "PUBLIC_SEMANTICS_OVERSTATED_FROM_IMPLEMENTATION_MODEL",
+    "fix_class": "REWRITE_FOR_PUBLIC_SEMANTIC_ACCURACY_AND_REMOVE_ABSOLUTE_CLAIMS",
+    "score": {
+      "mechanism_accuracy": 2,
+      "fix_class_precision": 1.5,
+      "useful_validation_or_review_targets": 0.5,
+      "total": 4
+    }
+  },
+  "lessons_on": {
+    "activated_lesson_ids": [
+      "cpy121143-nk02",
+      "cpy121143-pk02"
+    ],
+    "grading_lesson_ids": [
+      "cpy121143-nk01",
+      "cpy121143-pk03"
+    ],
+    "mechanism_code": "PUBLIC_SEMANTIC_CONTRACT_CONFLATED_WITH_ONE_EXECUTION_TRACE",
+    "fix_class": "ANCHOR_GUIDE_TO_STABLE_PUBLIC_SEMANTICS_AND_LABEL_IMPLEMENTATION_DETAILS",
+    "score": {
+      "mechanism_accuracy": 2,
+      "fix_class_precision": 1.75,
+      "useful_validation_or_review_targets": 1,
+      "total": 4.75
+    }
+  },
+  "observed_delta": 0.75,
+  "memory_action_effect": "MEMORY_HELPED",
+  "prevention_claim_state": "SINGLE_CLEAN_HOLDOUT_POSITIVE",
+  "global_promotion_authorized": false,
+  "evidence_summary": [
+    "review corrected event-loop scope to one loop per thread rather than a global singleton",
+    "reviewers rejected queue as the primary event-loop mental model and emphasized scheduling ready work",
+    "review noted that awaiting a task does not guarantee yielding when eager execution completes immediately",
+    "final guide was substantially rewritten before merge",
+    "post-merge lineage found backports rather than a corrective or revert PR for the guide"
+  ],
+  "authority_effect": "NONE"
+}
