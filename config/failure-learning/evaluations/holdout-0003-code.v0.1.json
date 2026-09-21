@@ -1,0 +1,65 @@
+{
+  "schema_name": "FailureLearningPairedEvaluation",
+  "schema_version": "0.1",
+  "evaluation_id": "failure-learning-holdout-0003",
+  "lane": "CODE_BEARING",
+  "repository_id": "github:81598961",
+  "revealed_target": {
+    "repository": "python/cpython",
+    "pr_number": 131282
+  },
+  "selection": {
+    "selected_candidate_id": "holdout:9fea1922",
+    "cutoff_kind": "IMMUTABLE_INITIAL_COMMIT",
+    "immutable_source_ref": "git-commit:87a974bc8cfbefc120f85a950b135a4e920c9678",
+    "source_digest": "git-commit:87a974bc8cfbefc120f85a950b135a4e920c9678",
+    "contamination_state": "CLEAN"
+  },
+  "lessons_off": {
+    "mechanism_code": "GLOBAL_POINTER_CACHE_STRONG_REFERENCE_LIFETIME_COUPLING",
+    "fix_class": "TYPE_LOCAL_POINTER_CACHE_WITH_GC_TRAVERSE_AND_CLEAR",
+    "score": {
+      "root_mechanism_accuracy": 2,
+      "fix_class_precision": 1,
+      "edge_case_prediction": 0.9,
+      "validation_quality": 0.6,
+      "total": 4.5
+    }
+  },
+  "lessons_on": {
+    "activated_lesson_ids": [
+      "cpy121143-pk02"
+    ],
+    "weak_lesson_ids": [
+      "cpy121143-nk02",
+      "cpy121143-nk03"
+    ],
+    "grading_lesson_ids": [
+      "cpy121143-nk01",
+      "cpy121143-pk03"
+    ],
+    "mechanism_code": "POINTER_IDENTITY_SEMANTIC_INVARIANT_WITH_CACHE_OWNERSHIP_RELOCATION",
+    "fix_class": "PRESERVE_CANONICAL_POINTER_IDENTITY_PLUS_COLLECTABILITY",
+    "score": {
+      "root_mechanism_accuracy": 2,
+      "fix_class_precision": 1,
+      "edge_case_prediction": 0.9,
+      "validation_quality": 1,
+      "total": 4.9
+    }
+  },
+  "observed_delta": 0.4,
+  "memory_action_effect": "MEMORY_HELPED_SMALL",
+  "prevention_claim_state": "FIRST_CODE_BEARING_CLEAN_HOLDOUT_POSITIVE",
+  "global_promotion_authorized": false,
+  "evidence_summary": [
+    "review preserved rejection of ctypes object instances passed to POINTER",
+    "review explicitly requested SetPointerType compatibility until removal",
+    "discussion identified string-defined pointer and fallback-cache compatibility behavior",
+    "final implementation added weak-reference collectability tests",
+    "final implementation preserved canonical pointer identity while relocating ordinary cache ownership",
+    "final implementation added a regression test preventing StgInfo clone cache sharing",
+    "bounded post-merge search found no corrective or revert PR referencing 131282"
+  ],
+  "authority_effect": "NONE"
+}
