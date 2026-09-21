@@ -118,6 +118,42 @@ const tools: ToolDefinition[] = [
     annotations: processLocalExecution,
   },
   {
+    name: "failure_learning_status",
+    title: "Read failure-learning status",
+    description: "Read D1 corpus, hypothesis, evaluation, model, and checkpoint counts without mutating learning state.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: readOnly,
+  },
+  {
+    name: "failure_learning_replay",
+    title: "Replay a failure-learning episode",
+    description: "Read only the historical evidence visible at an exact event cutoff. Future PR evidence remains hidden.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        episode_id: { type: "string", minLength: 1 },
+        evidence_cutoff_sequence: { type: "integer", minimum: 0 },
+      },
+      required: ["episode_id", "evidence_cutoff_sequence"],
+      additionalProperties: false,
+    },
+    annotations: readOnly,
+  },
+  {
+    name: "failure_learning_predict",
+    title: "Predict coarse failure risk",
+    description: "Run the current shadow-only online failure-risk model over normalized categorical features. The score grants no specialist or execution authority.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        features: { type: "array", minItems: 1, items: { type: "string", minLength: 1 } },
+      },
+      required: ["features"],
+      additionalProperties: false,
+    },
+    annotations: readOnly,
+  },
+  {
     name: "open_aios_workbench",
     title: "Open AIOS Repo Workbench",
     description: "Render the inline AIOS workbench with current backend status.",
@@ -209,6 +245,21 @@ async function invokeTool(request: Request, name: string, args: Record<string, u
         provenance_envelope_id: args.provenance_envelope_id,
         scope_key: SCOPE_KEY,
       });
+    case "failure_learning_status":
+      return bridgePayload(request, { action: "failure_learning_status", scope_key: SCOPE_KEY });
+    case "failure_learning_replay":
+      return bridgePayload(request, {
+        action: "failure_learning_replay",
+        episode_id: args.episode_id,
+        evidence_cutoff_sequence: args.evidence_cutoff_sequence,
+        scope_key: SCOPE_KEY,
+      });
+    case "failure_learning_predict":
+      return bridgePayload(request, {
+        action: "failure_learning_predict",
+        features: args.features,
+        scope_key: SCOPE_KEY,
+      });
     case "run_backend_workflow":
       return bridgePayload(request, {
         action: "execute_safe_workflow",
@@ -244,7 +295,7 @@ async function handleOne(request: Request, message: RpcRequest) {
         result: {
           protocolVersion: PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } },
-          serverInfo: { name: "aios-cloudflare-native", title: "AI Knowledge System", version: "0.3.0" },
+          serverInfo: { name: "aios-cloudflare-native", title: "AI Knowledge System", version: "0.4.0" },
           instructions: "Use this endpoint for AIOS repository execution truth and policy-bounded A0 diagnostics. It grants no Drive/Notion authority or destination-write permission.",
         },
       };

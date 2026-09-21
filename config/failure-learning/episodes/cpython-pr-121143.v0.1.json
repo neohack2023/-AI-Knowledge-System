@@ -1,0 +1,314 @@
+{
+  "schema_name": "FailureLearningEpisodeFixture",
+  "schema_version": "0.1",
+  "episode": {
+    "episode_id": "github:python/cpython:pr:121143",
+    "repository_id": "github:81598961",
+    "external_pr_number": 121143,
+    "split": "TRAIN",
+    "state": "COMPLETE",
+    "terminal_label": "MERGED_THEN_REVERTED",
+    "opened_at": "2024-06-29T03:03:59Z",
+    "completed_at": "2024-08-24T21:54:31Z"
+  },
+  "events": [
+    {
+      "event_id": "cpy121143-e01",
+      "sequence": 1,
+      "event_type": "PR_OPENED",
+      "occurred_at": "2024-06-29T03:03:59Z",
+      "source_ref": "github:python/cpython:pr:121143",
+      "source_digest": "sha256:4a034b8c941fa44fa30c776135b9f20aa7bcc8fd51d17c43758b035c1d5fa846",
+      "features": [
+        "linux",
+        "strace",
+        "regression-test",
+        "exact-trace"
+      ],
+      "summary": {
+        "phase": "opening",
+        "mechanism_hint": "exact low-level trace proposed as regression invariant"
+      }
+    },
+    {
+      "event_id": "cpy121143-e02",
+      "sequence": 2,
+      "event_type": "REVIEW_INVARIANT_CHALLENGE",
+      "occurred_at": "2024-07-06T01:58:50Z",
+      "source_ref": "github:python/cpython:pr:121143:review:1667229329",
+      "source_digest": "sha256:b917dd0a8f86a0fbe6d8a1e87a1a5a20165c81323bf430df6d67d17bfbe99ca4",
+      "features": [
+        "review",
+        "fragile-test",
+        "incidental-behavior"
+      ],
+      "summary": {
+        "phase": "review",
+        "mechanism_hint": "review challenges exact syscall equality as over-specific"
+      }
+    },
+    {
+      "event_id": "cpy121143-e03",
+      "sequence": 3,
+      "event_type": "REVIEW_DATA_BOUNDARY",
+      "occurred_at": "2024-07-06T02:00:00Z",
+      "source_ref": "github:python/cpython:pr:121143:review:data-boundary",
+      "source_digest": "sha256:8d24f9d5fc4e7f45a4dbe12a550aa990fc94fd56a1ff65960d89e39d2a38a233",
+      "features": [
+        "binary-output",
+        "encoding",
+        "subprocess"
+      ],
+      "summary": {
+        "phase": "review",
+        "mechanism_hint": "child output should not assume undeclared text encoding"
+      }
+    },
+    {
+      "event_id": "cpy121143-e04",
+      "sequence": 4,
+      "event_type": "CI_PLATFORM_VARIANCE",
+      "occurred_at": "2024-07-08T00:00:00Z",
+      "source_ref": "github:python/cpython:pr:121143:ci:ubuntu",
+      "source_digest": "sha256:fa3152ad3843ec15c31c2b976cd4f6d9b6c563659249ff207341fcb3c86a7bb8",
+      "features": [
+        "ci",
+        "glibc",
+        "platform-variance",
+        "fstat-family"
+      ],
+      "summary": {
+        "phase": "ci",
+        "mechanism_hint": "supported environment uses equivalent alternate syscall"
+      }
+    },
+    {
+      "event_id": "cpy121143-e05",
+      "sequence": 5,
+      "event_type": "MERGED",
+      "occurred_at": "2024-08-24T20:42:41Z",
+      "source_ref": "github:python/cpython:pr:121143:merge",
+      "source_digest": "sha256:e38d0afe3548b856ccf0b05c01ed3eefc69cb3e7c33363c3f89de4b65fb18f5",
+      "features": [
+        "merged",
+        "accepted"
+      ],
+      "summary": {
+        "phase": "acceptance",
+        "truth_label": false
+      }
+    },
+    {
+      "event_id": "cpy121143-e06",
+      "sequence": 6,
+      "event_type": "REVERTED",
+      "occurred_at": "2024-08-24T21:54:31Z",
+      "source_ref": "github:python/cpython:pr:123303",
+      "source_digest": "sha256:8b7f49a37e27283d845e2d2b9a0eab061ff2b65bcab068838ab63868a9c7e966",
+      "features": [
+        "revert",
+        "post-merge-failure",
+        "platform-variance"
+      ],
+      "summary": {
+        "phase": "terminal",
+        "terminal_label": "MERGED_THEN_REVERTED"
+      }
+    },
+    {
+      "event_id": "cpy121143-e07",
+      "sequence": 7,
+      "event_type": "SUCCESSOR_REAPPLY",
+      "occurred_at": "2024-08-28T05:36:59Z",
+      "source_ref": "github:python/cpython:pr:123413",
+      "source_digest": "sha256:e196d3de8794d6ed2aad48eb9d11e61ebfb2edee4de115809f00557f06330409",
+      "features": [
+        "successor",
+        "buildbot",
+        "semantic-fd-check"
+      ],
+      "summary": {
+        "phase": "successor",
+        "mechanism_hint": "revised implementation expands platform handling and diagnostics"
+      }
+    },
+    {
+      "event_id": "cpy121143-e08",
+      "sequence": 8,
+      "event_type": "BUILD_FLEET_DISCRIMINATION",
+      "occurred_at": "2024-08-29T00:57:08Z",
+      "source_ref": "github:python/cpython:pr:123413:comment:2316518834",
+      "source_digest": "sha256:1e182a228e1719a145ddf61a7bc4bc1e198ae8c17c389925b61a026b6ad0dd69",
+      "features": [
+        "buildbot",
+        "baseline-comparison",
+        "failure-attribution"
+      ],
+      "summary": {
+        "phase": "validation",
+        "mechanism_hint": "separates candidate-related failures from unrelated fleet failures"
+      }
+    },
+    {
+      "event_id": "cpy121143-e09",
+      "sequence": 9,
+      "event_type": "SANITIZER_ENVIRONMENT_CONFLICT",
+      "occurred_at": "2024-10-08T20:26:02Z",
+      "source_ref": "github:python/cpython:pr:123413:comment:2400757234",
+      "source_digest": "sha256:edc0523c7304bbad14224591651a5f340a8b2bf7f41fd923387280224399064d",
+      "features": [
+        "asan",
+        "lsan",
+        "ptrace",
+        "environment-conflict"
+      ],
+      "summary": {
+        "phase": "validation",
+        "mechanism_hint": "tooling environment itself changes validity"
+      }
+    },
+    {
+      "event_id": "cpy121143-e10",
+      "sequence": 10,
+      "event_type": "SUCCESSOR_MERGED",
+      "occurred_at": "2024-11-03T03:36:26Z",
+      "source_ref": "github:python/cpython:pr:123413:approval",
+      "source_digest": "sha256:7781de61814af3989d079012a1226da33e4f027efbea2cd2bd0b19cb20da9f74",
+      "features": [
+        "merged",
+        "successor",
+        "accepted"
+      ],
+      "summary": {
+        "phase": "acceptance",
+        "truth_label": false
+      }
+    },
+    {
+      "event_id": "cpy121143-e11",
+      "sequence": 11,
+      "event_type": "POST_MERGE_GENTOO_VARIANCE",
+      "occurred_at": "2024-11-20T10:23:46Z",
+      "source_ref": "github:python/cpython:pr:123413:comment:2488181841",
+      "source_digest": "sha256:0848383234343528236979557360628fc9d4aaa56b15357c4c680c48f5d51b62",
+      "features": [
+        "gentoo",
+        "sandbox",
+        "preparatory-syscalls",
+        "first-event-assumption"
+      ],
+      "summary": {
+        "phase": "post-merge",
+        "mechanism_hint": "environment inserts valid preparatory calls before target operation"
+      }
+    },
+    {
+      "event_id": "cpy121143-e12",
+      "sequence": 12,
+      "event_type": "POST_MERGE_MUSL_VARIANCE",
+      "occurred_at": "2024-11-20T11:12:30Z",
+      "source_ref": "github:python/cpython:pr:123413:comment:2488297673",
+      "source_digest": "sha256:4cc90a7f61c915b936a375ab70a40f707f4ff54189d27499d2a643be0ec39be0",
+      "features": [
+        "musl",
+        "platform-variance",
+        "trace-shape"
+      ],
+      "summary": {
+        "phase": "post-merge",
+        "mechanism_hint": "different libc produces another valid trace spelling"
+      }
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesis_id": "cpy121143-h01",
+      "evidence_cutoff_sequence": 1,
+      "mechanism_code": "EXACT_TRACE_IS_PORTABLE_INVARIANT",
+      "predicted_fix_class": "STRICT_SEQUENCE_ASSERTION",
+      "verdict": "REJECTED",
+      "resolution_event_sequence": 2
+    },
+    {
+      "hypothesis_id": "cpy121143-h02",
+      "evidence_cutoff_sequence": 4,
+      "mechanism_code": "PLATFORM_LIBC_ENV_VARIANCE",
+      "predicted_fix_class": "SEMANTIC_MATCH_PLUS_HETEROGENEOUS_VALIDATION",
+      "verdict": "SUPPORTED",
+      "resolution_event_sequence": 7
+    },
+    {
+      "hypothesis_id": "cpy121143-h03",
+      "evidence_cutoff_sequence": 10,
+      "mechanism_code": "SUCCESSOR_MERGE_CLOSES_PORTABILITY",
+      "predicted_fix_class": "NO_FURTHER_PORTABILITY_WORK",
+      "verdict": "REJECTED",
+      "resolution_event_sequence": 11
+    }
+  ],
+  "lessons": [
+    {
+      "lesson_id": "cpy121143-nk01",
+      "lesson_type": "NEGATIVE",
+      "mechanism_code": "MERGE_IS_NOT_CORRECTNESS",
+      "eligible_after_sequence": 6,
+      "state": "CANDIDATE_ONLY"
+    },
+    {
+      "lesson_id": "cpy121143-nk02",
+      "lesson_type": "NEGATIVE",
+      "mechanism_code": "INCIDENTAL_TRACE_OVERFIT",
+      "eligible_after_sequence": 2,
+      "state": "CANDIDATE_ONLY"
+    },
+    {
+      "lesson_id": "cpy121143-nk03",
+      "lesson_type": "NEGATIVE",
+      "mechanism_code": "FIRST_EVENT_ASSUMPTION",
+      "eligible_after_sequence": 11,
+      "state": "CANDIDATE_ONLY"
+    },
+    {
+      "lesson_id": "cpy121143-nk04",
+      "lesson_type": "NEGATIVE",
+      "mechanism_code": "CI_FAILURE_ATTRIBUTION",
+      "eligible_after_sequence": 8,
+      "state": "CANDIDATE_ONLY"
+    },
+    {
+      "lesson_id": "cpy121143-pk01",
+      "lesson_type": "PROCEDURAL",
+      "mechanism_code": "CROSS_ENVIRONMENT_REGRESSION_GATE",
+      "eligible_after_sequence": 12,
+      "state": "CANDIDATE_ONLY"
+    },
+    {
+      "lesson_id": "cpy121143-pk02",
+      "lesson_type": "PROCEDURAL",
+      "mechanism_code": "SEMANTIC_TRACE_MATCHING",
+      "eligible_after_sequence": 7,
+      "state": "CANDIDATE_ONLY"
+    },
+    {
+      "lesson_id": "cpy121143-pk03",
+      "lesson_type": "PROCEDURAL",
+      "mechanism_code": "POST_MERGE_LINEAGE_CHECK",
+      "eligible_after_sequence": 6,
+      "state": "CANDIDATE_ONLY"
+    }
+  ],
+  "checkpoint": {
+    "checkpoint_id": "failure-learning-checkpoint-0001",
+    "dataset_version": "failure-learning-dataset-0.1.1",
+    "failure_observed": true,
+    "failure_features": [
+      "platform-variance",
+      "fragile-test",
+      "incidental-trace-overfit",
+      "post-merge-revert",
+      "environment-specific-behavior"
+    ]
+  },
+  "raw_review_content_embedded": false,
+  "authority_effect": "NONE"
+}

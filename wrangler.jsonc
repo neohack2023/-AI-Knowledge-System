@@ -2,9 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ai-knowledge-system",
   "compatibility_date": "2026-09-19",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "main": "./worker/index.ts",
   "preview_urls": true,
   "assets": {
@@ -18,6 +16,10 @@
     {
       "binding": "DB",
       "migrations_dir": "drizzle"
+    },
+    {
+      "binding": "FAILURE_DB",
+      "migrations_dir": "db/failure-learning/migrations"
     }
   ]
 }

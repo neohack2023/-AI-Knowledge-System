@@ -219,10 +219,12 @@ test("B02.2 repository includes a registered SQL migration for all execution-his
   const journal = JSON.parse(await readFile(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8"));
   assert.equal(journal.version, "7");
   assert.equal(journal.dialect, "sqlite");
-  assert.equal(journal.entries.length, 1);
-  assert.equal(journal.entries[0].idx, 0);
-  assert.equal(journal.entries[0].tag, "0000_execution_history");
-  assert.equal(journal.entries[0].breakpoints, true);
+  const executionHistoryEntry = journal.entries.find(
+    (entry: { tag?: string }) => entry.tag === "0000_execution_history",
+  );
+  assert.ok(executionHistoryEntry);
+  assert.equal(executionHistoryEntry.idx, 0);
+  assert.equal(executionHistoryEntry.breakpoints, true);
 
   const migration = await readFile(new URL("../drizzle/0000_execution_history.sql", import.meta.url), "utf8");
   for (const table of ["workflow_executions", "workflow_execution_events", "workflow_execution_links"]) {

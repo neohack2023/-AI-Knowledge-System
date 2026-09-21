@@ -1,0 +1,15 @@
+{
+  "schema_name": "FailureLearningCalibration",
+  "schema_version": "0.1",
+  "evaluation_id": "failure-learning-holdout-0001-calibration",
+  "selected_candidate_id": "holdout:8f337f80",
+  "revealed_target": {
+    "repository": "python/cpython",
+    "pr_number": 135057
+  },
+  "contamination_state": "TAINTED_MUTABLE_PR_METADATA",
+  "clean_for_prevention_claim": false,
+  "reason_code": "MUTABLE_PR_METADATA_NOT_OPENING_STATE",
+  "discovered_rule": "Mutable PR title/body is not a clean historical cutoff. Bind clean holdouts to immutable opening-state evidence such as the initial commit.",
+  "authority_effect": "NONE"
+}
