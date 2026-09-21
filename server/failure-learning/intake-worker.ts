@@ -14,6 +14,7 @@ export type StructuralCandidateInput = {
   discussion_count: number;
   review_count: number;
   changed_file_count: number;
+  changed_file_classes?: string[];
   contamination_state: HoldoutCandidate["contamination_state"];
 };
 
@@ -21,7 +22,17 @@ export type IntakePolicy = {
   min_discussion_count: number;
   min_review_count: number;
   max_changed_file_count: number;
+  require_code_bearing?: boolean;
 };
+
+const CODE_BEARING_CLASSES = new Set([
+  "SOURCE",
+  "RUNTIME",
+  "MODULE",
+  "LIBRARY",
+  "NATIVE",
+  "SCRIPT",
+]);
 
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -38,6 +49,12 @@ export const buildBlindCandidatePool = (
       && input.review_count >= policy.min_review_count
       && input.changed_file_count >= 1
       && input.changed_file_count <= policy.max_changed_file_count
+      && (
+        policy.require_code_bearing !== true
+        || (input.changed_file_classes ?? []).some((value) =>
+          CODE_BEARING_CLASSES.has(value.toUpperCase())
+        )
+      )
     )
     .map<HoldoutCandidate>((input) => ({
       opaque_candidate_id: `holdout:${digest(
