@@ -23,7 +23,10 @@ test("Cloudflare deployment config is portable and preserves Sites binding metad
   assert.equal(wrangler.assets.binding, "ASSETS");
   assert.equal(wrangler.images.binding, "IMAGES");
 
-  assert.deepEqual(wrangler.d1_databases, [{ binding: "DB", migrations_dir: "drizzle" }]);
+  assert.deepEqual(wrangler.d1_databases, [
+    { binding: "DB", migrations_dir: "drizzle" },
+    { binding: "FAILURE_DB", migrations_dir: "db/failure-learning/migrations" },
+  ]);
   assert.ok(!wranglerText.includes("database_id"));
   assert.ok(!wranglerText.includes("00000000-0000-4000-8000-000000000000"));
 
@@ -59,15 +62,37 @@ test("Cloudflare D1 resolver binds an exact remote database without committing i
   });
 
   const generated = buildMigrationConfig(
-    { name: "ai-knowledge-system", d1_databases: [{ binding: "DB", migrations_dir: "drizzle" }] },
-    resolved,
+    {
+      name: "ai-knowledge-system",
+      d1_databases: [
+        { binding: "DB", migrations_dir: "drizzle" },
+        { binding: "FAILURE_DB", migrations_dir: "db/failure-learning/migrations" },
+      ],
+    },
+    [
+      { ...resolved, binding: "DB", migrationsDir: "drizzle" },
+      {
+        databaseName: "aios-failure-learning-db",
+        databaseId: "33333333-3333-4333-8333-333333333333",
+        binding: "FAILURE_DB",
+        migrationsDir: "db/failure-learning/migrations",
+      },
+    ],
   );
-  assert.deepEqual(generated.d1_databases, [{
-    binding: "DB",
-    database_name: "ai-knowledge-system-db",
-    database_id: "22222222-2222-4222-8222-222222222222",
-    migrations_dir: "drizzle",
-  }]);
+  assert.deepEqual(generated.d1_databases, [
+    {
+      binding: "DB",
+      database_name: "ai-knowledge-system-db",
+      database_id: "22222222-2222-4222-8222-222222222222",
+      migrations_dir: "drizzle",
+    },
+    {
+      binding: "FAILURE_DB",
+      database_name: "aios-failure-learning-db",
+      database_id: "33333333-3333-4333-8333-333333333333",
+      migrations_dir: "db/failure-learning/migrations",
+    },
+  ]);
 });
 
 test("Cloudflare D1 resolver fails closed on missing or ambiguous database identity", () => {
