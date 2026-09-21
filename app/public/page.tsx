@@ -20,19 +20,19 @@ export default function PublicGatePage() {
           private memory access, repository mutation, or runtime write permission.
         </p>
         <div className={styles.actions}>
-          <Link className={styles.primary} href="/public/knowledge">Explore public knowledge</Link>
+          <Link className={styles.primary} href="/public/app">Open public workbench</Link>
+          <Link className={styles.secondary} href="/public/knowledge">Explore public knowledge</Link>
           <Link className={styles.secondary} href="/public/contribute">Enter as contributor</Link>
-          <a className={styles.secondary} href="#observe">Browse as observer</a>
         </div>
       </section>
 
       <section className={styles.grid} aria-label="Public gate roles">
         <article className={styles.card}>
           <span className={styles.kicker}>PUBLIC OBSERVER</span>
-          <h2>Read the public projection</h2>
-          <p>Explore curated AIOS lessons, governance summaries, and future accepted-learning projections without access to private project state.</p>
-          <Link className={styles.secondary} href="/public/knowledge">Open knowledge library</Link>
-          <span className={styles.status}>PUBLIC KNOWLEDGE · READ ONLY</span>
+          <h2>Use the public workbench</h2>
+          <p>Search curated AIOS lessons, inspect governance boundaries, and navigate the public projection without access to private project state.</p>
+          <Link className={styles.secondary} href="/public/app">Launch workbench</Link>
+          <span className={styles.status}>PUBLIC APP · READ ONLY</span>
         </article>
         <article className={styles.card}>
           <span className={styles.kicker}>PUBLIC CONTRIBUTOR</span>
