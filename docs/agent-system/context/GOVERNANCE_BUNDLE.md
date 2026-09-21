@@ -17,6 +17,18 @@ It is a **derived repository execution contract**, not a declaration that global
 - A configured breaker ends an automatic repair loop; it never bypasses review, verification, or owner authorization.
 - Merge eligibility does not imply merge authorization.
 
+## Current external authority snapshot
+
+The repository-local bundle now records the externally governed Drive-first global control-plane state:
+
+- Google Drive is current for global AIOS routing/control-plane state and for objects explicitly marked verified/current by the external registry.
+- GitHub remains authoritative for live repository implementation and execution facts.
+- Notion is a read-only `LEGACY_SOURCE` fallback for exact objects that are absent, unverified, or conflicted in Drive.
+- Object-level authority remains registry-governed; this repository snapshot does not bulk-promote project memory or grant destination-write authority.
+- Normal repository work remains local-first. External retrieval is still limited to the declared synchronization/conflict triggers.
+
+This is a repository-safe execution snapshot of an external authority decision. It does not move global AIOS authority into GitHub.
+
 ## Repository work pipeline
 
 For normal repository-scoped work:

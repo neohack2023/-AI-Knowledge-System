@@ -2,7 +2,7 @@ bundle_id: REPOSITORY_GOVERNANCE_BUNDLE_01
 bundle_version: 0.5
 state: ACTIVE
 materialized_on: 2026-09-04
-valid_through: 2026-10-04
+valid_through: 2026-10-20
 normal_repo_work_external_fetch_required: false
 upstream_authority_cutover: false
 repository_autonomy_phase: 5
@@ -15,10 +15,10 @@ audit_fail_closed: true
 upstream_sync_state: ACTIVE
 sync_skill: sync-governance
 sync_receipt_root: docs/agent-system/governance-sync/receipts
-last_sync_id: GSYNC-20260904-001
-last_sync_receipt: docs/agent-system/governance-sync/receipts/GSYNC-20260904-001.json
-last_sync_receipt_sha256: sha256:c41754790ca6dd0f249cbe6a56ea3d2b797077592fdd8bb40a99aa856235a769
-last_upstream_sync: 2026-09-04
+last_sync_id: GSYNC-20260920-001
+last_sync_receipt: docs/agent-system/governance-sync/receipts/GSYNC-20260920-001.json
+last_sync_receipt_sha256: sha256:1ba2bf1fd3b41dff14ea567b0ec0f49d4500a3491ba95d90fc8a446bb269aae8
+last_upstream_sync: 2026-09-20
 sync_freshness_days: 30
 installed_skill_root: .github/skills
 installed_skills:
