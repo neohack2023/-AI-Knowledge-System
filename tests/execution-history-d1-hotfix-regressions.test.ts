@@ -10,6 +10,8 @@ const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const migrationPath = fileURLToPath(new URL("../drizzle/0000_execution_history.sql", import.meta.url));
 const journalPath = fileURLToPath(new URL("../drizzle/meta/_journal.json", import.meta.url));
 const snapshotPath = fileURLToPath(new URL("../drizzle/meta/0000_snapshot.json", import.meta.url));
+const failureLearningMigrationPath = fileURLToPath(new URL("../drizzle/0001_failure_learning.sql", import.meta.url));
+const failureLearningSnapshotPath = fileURLToPath(new URL("../drizzle/meta/0001_snapshot.json", import.meta.url));
 const schemaPath = fileURLToPath(new URL("../db/schema.ts", import.meta.url));
 
 test("B02.2 baseline Drizzle snapshot contains the complete execution-history schema", async () => {
@@ -45,8 +47,10 @@ test("B02.2 committed Drizzle baseline does not generate a duplicate follow-up m
     await mkdir(metaDir, { recursive: true });
     await Promise.all([
       copyFile(migrationPath, join(outDir, "0000_execution_history.sql")),
+      copyFile(failureLearningMigrationPath, join(outDir, "0001_failure_learning.sql")),
       copyFile(journalPath, join(metaDir, "_journal.json")),
       copyFile(snapshotPath, join(metaDir, "0000_snapshot.json")),
+      copyFile(failureLearningSnapshotPath, join(metaDir, "0001_snapshot.json")),
     ]);
     await writeFile(configPath, `export default {\n  out: ${JSON.stringify(outDir)},\n  schema: ${JSON.stringify(schemaPath)},\n  dialect: "sqlite",\n};\n`);
 
@@ -57,11 +61,19 @@ test("B02.2 committed Drizzle baseline does not generate a duplicate follow-up m
       stdio: "pipe",
     });
 
-    assert.deepEqual((await readdir(outDir)).sort(), ["0000_execution_history.sql", "meta"]);
-    assert.deepEqual((await readdir(metaDir)).sort(), ["0000_snapshot.json", "_journal.json"]);
+    assert.deepEqual(
+      (await readdir(outDir)).sort(),
+      ["0000_execution_history.sql", "0001_failure_learning.sql", "meta"],
+    );
+    assert.deepEqual(
+      (await readdir(metaDir)).sort(),
+      ["0000_snapshot.json", "0001_snapshot.json", "_journal.json"],
+    );
     const journal = JSON.parse(await readFile(join(metaDir, "_journal.json"), "utf8"));
-    assert.equal(journal.entries.length, 1);
-    assert.equal(journal.entries[0].tag, "0000_execution_history");
+    assert.deepEqual(
+      journal.entries.map((entry: any) => entry.tag),
+      ["0000_execution_history", "0001_failure_learning"],
+    );
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
