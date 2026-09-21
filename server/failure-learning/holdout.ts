@@ -4,6 +4,7 @@ export type HoldoutContaminationState =
   | "CLEAN"
   | "TAINTED_DISCOVERY"
   | "TAINTED_PRIOR_REVIEW"
+  | "TAINTED_MUTABLE_PR_METADATA"
   | "REVEALED_AFTER_CUTOFF";
 
 export type HoldoutCandidate = {
@@ -82,5 +83,45 @@ export const selectBlindHoldout = (
     contamination_state: selected.contamination_state,
     eligible_for_prevention_claim: selected.contamination_state === "CLEAN",
     authority_effect: "NONE",
+  };
+};
+
+
+export type HoldoutCutoffKind =
+  | "IMMUTABLE_INITIAL_COMMIT"
+  | "MUTABLE_PR_DESCRIPTION"
+  | "MUTABLE_PR_TITLE"
+  | "OTHER";
+
+export type HoldoutEvidenceCutoff = {
+  selected_candidate_id: string;
+  cutoff_kind: HoldoutCutoffKind;
+  immutable_source_ref: string | null;
+  source_digest: string | null;
+  future_evidence_visible: false;
+  contamination_state: HoldoutContaminationState;
+  authority_effect: "NONE";
+};
+
+export const validateHoldoutEvidenceCutoff = (
+  cutoff: HoldoutEvidenceCutoff,
+) => {
+  const clean =
+    cutoff.cutoff_kind === "IMMUTABLE_INITIAL_COMMIT"
+    && Boolean(cutoff.immutable_source_ref)
+    && Boolean(cutoff.source_digest)
+    && cutoff.contamination_state === "CLEAN";
+
+  return {
+    contract: "FailureLearningHoldoutCutoffValidation/0.1",
+    selected_candidate_id: cutoff.selected_candidate_id,
+    clean_for_prevention_claim: clean,
+    reason_code: clean
+      ? null
+      : cutoff.cutoff_kind === "MUTABLE_PR_DESCRIPTION"
+        || cutoff.cutoff_kind === "MUTABLE_PR_TITLE"
+        ? "MUTABLE_PR_METADATA_NOT_OPENING_STATE"
+        : "HOLDOUT_CUTOFF_NOT_IMMUTABLY_BOUND",
+    authority_effect: "NONE" as const,
   };
 };
