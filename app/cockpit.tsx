@@ -4,7 +4,8 @@ import {
   Activity, Box, BrainCircuit, Braces, Check, ChevronDown, CirclePause,
   CirclePlay, Clock3, Code2, Database, FileClock, FileSearch, GitBranch, Grid3X3, History,
   Layers3, Library, MemoryStick, Network, OctagonAlert, Play, Radio, RotateCcw,
-  Search, ShieldCheck, Sparkles, Square, TerminalSquare, X, Zap,
+  Search, ShieldCheck, Sparkles, Square, TerminalSquare, X, Zap, Bot, KeyRound,
+  LockKeyhole, LogOut, Send, Settings2, UserRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -173,6 +174,128 @@ function ApprovalPanel({ workflow, scope, event, expanded, onInspect, onApprove,
     {expanded && <pre className="write-plan">{`WRITE PLAN / ${workflow.id}\n01  verify current fingerprint\n02  bind exact destination: ${scope}\n03  execute declared delta only\n04  re-fetch destination\n05  compare expected state\n06  create immutable receipt\n\nSimulation: no external mutation will occur.`}</pre>}
     <div className="approval-actions"><button className="ghost-btn" onClick={onInspect}><FileSearch size={14} />{expanded ? "Hide plan" : "Inspect"}</button><button className="reject-btn" onClick={onReject}><X size={14} />Reject</button><button className="approve-btn" onClick={onApprove}><Check size={14} />Approve simulation</button></div>
   </div>;
+}
+
+type AiConnectionState = {
+  connected: boolean;
+  model: string;
+  key_suffix: string | null;
+  expires_at: string | null;
+  credential_mode: "SESSION_ONLY";
+};
+
+type ChatTurn = { role: "user" | "assistant"; content: string; responseId?: string };
+
+const defaultConnection: AiConnectionState = {
+  connected: false, model: "gpt-5.6-luna", key_suffix: null, expires_at: null, credential_mode: "SESSION_ONLY",
+};
+
+function AskAios() {
+  const [connection, setConnection] = useState<AiConnectionState>(defaultConnection);
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState(defaultConnection.model);
+  const [scopeKey, setScopeKey] = useState("global-working-memory");
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string>();
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const response = await fetch("/api/ai-connection", { cache: "no-store" });
+      if (!response.ok) throw new Error();
+      const next = await response.json() as AiConnectionState;
+      setConnection(next); setModel(next.model);
+    } catch { setNotice("AI connection status is unavailable."); }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/ai-connection", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const next = await response.json() as AiConnectionState;
+        if (active) { setConnection(next); setModel(next.model); }
+      })
+      .catch(() => { if (active) setNotice("AI connection status is unavailable."); });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [turns, busy]);
+
+  const connect = async (event: React.FormEvent) => {
+    event.preventDefault(); setBusy(true); setNotice(undefined);
+    try {
+      const response = await fetch("/api/ai-connection", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ api_key: apiKey, model }),
+      });
+      const payload = await response.json() as AiConnectionState & { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "CONNECTION_FAILED");
+      setConnection(payload); setApiKey(""); setNotice("Encrypted session connected. Raw key discarded by the browser form.");
+    } catch (error) {
+      setNotice(error instanceof Error && error.message === "OPENAI_AUTH_FAILED" ? "OpenAI rejected that key or model access." : "Connection failed safely. The key was not stored in browser storage.");
+    } finally { setBusy(false); }
+  };
+
+  const disconnect = async () => {
+    setBusy(true); setNotice(undefined);
+    try {
+      await fetch("/api/ai-connection", { method: "DELETE" });
+      setConnection(defaultConnection); setTurns([]); setNotice("Session credential destroyed.");
+    } finally { setBusy(false); }
+  };
+
+  const send = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const message = draft.trim();
+    if (!message || busy || !connection.connected) return;
+    const nextTurns = [...turns, { role: "user" as const, content: message }];
+    setTurns(nextTurns); setDraft(""); setBusy(true); setNotice(undefined);
+    try {
+      const response = await fetch("/api/llm/chat", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scope_key: scopeKey, messages: nextTurns.map(({ role, content }) => ({ role, content })) }),
+      });
+      const payload = await response.json() as { message?: string; response_id?: string; error?: string };
+      if (!response.ok || !payload.message) throw new Error(payload.error ?? "CHAT_FAILED");
+      setTurns((current) => [...current, { role: "assistant", content: payload.message!, responseId: payload.response_id }]);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "CHAT_FAILED";
+      setNotice(code === "AI_CONNECTION_REQUIRED" || code === "OPENAI_AUTH_FAILED" ? "The AI session expired or was rejected. Reconnect to continue." : code === "OPENAI_RATE_LIMITED" ? "OpenAI rate limit reached. Try again shortly." : "Ask AIOS could not complete that request.");
+      if (code === "AI_CONNECTION_REQUIRED" || code === "OPENAI_AUTH_FAILED") void refresh();
+    } finally { setBusy(false); }
+  };
+
+  return <section className="ai-room">
+    <div className="section-heading"><div><MiniLabel>05 / OPERATOR CONVERSATION</MiniLabel><h1>Ask AIOS</h1><p>A real model lane with a session-only key and an explicit read-only authority envelope.</p></div><div className="ai-room-state"><span className={connection.connected ? "connected" : "disconnected"}><i />{connection.connected ? "OPENAI CONNECTED" : "CONNECTION REQUIRED"}</span><code>WRITE_AUTHORIZATION=NONE</code></div></div>
+    <div className="ai-room-grid">
+      <aside className="connection-panel panel-cut">
+        <div className="panel-bar"><div><MiniLabel>SETTINGS / AI CONNECTION</MiniLabel><strong><Settings2 size={15} /> Bring your own key</strong></div><LockKeyhole size={18} /></div>
+        {connection.connected ? <div className="connection-live">
+          <div className="connection-seal"><KeyRound size={24} /><span>SESSION ONLY</span></div>
+          <dl><div><dt>Status</dt><dd>Connected</dd></div><div><dt>Key</dt><dd>••••{connection.key_suffix}</dd></div><div><dt>Model</dt><dd>{connection.model}</dd></div><div><dt>Expires</dt><dd>{connection.expires_at ? new Date(connection.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</dd></div></dl>
+          <button className="disconnect-btn" onClick={disconnect} disabled={busy}><LogOut size={14} />Disconnect and destroy session</button>
+        </div> : <form className="connection-form" onSubmit={connect}>
+          <label><span>OpenAI API key</span><input type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="sk-••••••••••••••••" required minLength={24} maxLength={512} /></label>
+          <label><span>Model</span><div className="select-wrap"><select value={model} onChange={(event) => setModel(event.target.value)}><option value="gpt-5.6-luna">GPT-5.6 Luna · efficient</option><option value="gpt-5.6-terra">GPT-5.6 Terra · balanced</option><option value="gpt-5.6-sol">GPT-5.6 Sol · deepest</option></select><ChevronDown size={14} /></div></label>
+          <button className="connect-btn" disabled={busy || apiKey.length < 24}><KeyRound size={14} />{busy ? "Validating…" : "Connect secure session"}</button>
+          <p><ShieldCheck size={13} />Encrypted HttpOnly cookie · 30 minutes · no localStorage · no logs</p>
+        </form>}
+        <div className="authority-card"><MiniLabel>AUTHORITY ENVELOPE</MiniLabel><span>Notion <b>NOT ACCESSED</b></span><span>Drive <b>NOT ACCESSED</b></span><span>GitHub live <b>NOT ACCESSED</b></span><span>Durable writes <b>BLOCKED</b></span></div>
+      </aside>
+      <div className="conversation-panel panel-cut">
+        <div className="conversation-head"><div><MiniLabel>MODEL SESSION</MiniLabel><strong>{connection.connected ? connection.model : "No model connected"}</strong></div><label><span>Resolved scope</span><div className="select-wrap"><select value={scopeKey} onChange={(event) => setScopeKey(event.target.value)} disabled={busy}><option value="global-working-memory">AIOS / global-working-memory</option><option value="udio-algorithms">Ne0 Hack × Lexi Con</option><option value="girls-of-gaming">Girls of Gaming</option><option value="github:neohack2023/Looper">Looper repository</option></select><ChevronDown size={14} /></div></label></div>
+        <div className="conversation-stream" aria-live="polite">
+          {turns.length === 0 && <div className="conversation-empty"><Bot size={32} /><strong>{connection.connected ? "The operator lane is ready" : "Connect an OpenAI project key to begin"}</strong><span>Responses stay bound to the selected scope and report which authority sources were actually touched.</span></div>}
+          {turns.map((turn, index) => <div key={`${turn.role}-${index}`} className={`chat-turn ${turn.role}`}><div>{turn.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div><article><span>{turn.role === "user" ? "OPERATOR" : "ASK AIOS"}</span><p>{turn.content}</p>{turn.responseId && <code>{turn.responseId}</code>}</article></div>)}
+          {busy && connection.connected && turns.at(-1)?.role === "user" && <div className="chat-working"><i /><i /><i />Model request in flight</div>}
+          <div ref={endRef} />
+        </div>
+        {notice && <div className="ai-notice"><OctagonAlert size={14} />{notice}</div>}
+        <form className="composer" onSubmit={send}><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={connection.connected ? "Ask AIOS about the selected scope…" : "Connect a key before sending a request"} disabled={!connection.connected || busy} maxLength={4000} rows={3} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} /><div><span>{draft.length} / 4000 · Enter to send · Shift+Enter for line break</span><button disabled={!connection.connected || busy || !draft.trim()}><Send size={15} />Send</button></div></form>
+      </div>
+    </div>
+  </section>;
 }
 
 function Observatory() {
@@ -396,7 +519,7 @@ function Observatory() {
 function Overview({ onOpenScope }: { onOpenScope: (key: string) => void }) {
   return <section className="overview-page">
     <div className="hero-row"><div><MiniLabel>AI_KNOWLEDGE_SYSTEM / CONTROL PLANE</MiniLabel><h1>External cognition.<br /><span>Governed memory.</span></h1><p>Observe authority, resolve exact scope, retrieve the smallest trustworthy packet, and execute only through visible governance.</p></div><div className="hero-orbit"><BrainCircuit size={48} /><span>STONE</span><span>MASON</span><span>VERIFY</span></div></div>
-    <div className="ask-bar"><Sparkles size={17} /><span>Ask AI Knowledge System…</span><kbd>⌘ K</kbd></div>
+    <div className="ask-bar"><Sparkles size={17} /><span>Ask AI Knowledge System through the governed operator lane</span><kbd>OPEN ASK AIOS</kbd></div>
     <div className="source-grid">
       <div><Database size={17} /><span>NOTION<small>Memory authority</small></span><b>SNAPSHOT · AUTHORITATIVE</b></div>
       <div><Layers3 size={17} /><span>GOOGLE DRIVE<small>Runtime / control plane</small></span><b>SNAPSHOT · DRIVE SHADOW</b></div>
@@ -420,7 +543,7 @@ function CommandPalette({ onClose, onNavigate }: { onClose: () => void; onNaviga
 }
 
 const navGroups = [
-  { label: "", items: [["overview", "Overview", Grid3X3]] },
+  { label: "", items: [["overview", "Overview", Grid3X3], ["assistant", "Ask AIOS", Bot]] },
   { label: "KNOWLEDGE DOMAINS", items: [["memory", "Memory", MemoryStick], ["research", "Research", Library], ["assets", "Assets", Box], ["repositories", "Repositories", GitBranch], ["sources", "Sources", FileSearch], ["execution", "Execution", TerminalSquare]] },
   { label: "RUNTIME", items: [["observatory", "Observatory", Activity]] },
   { label: "SYSTEM REGISTRIES", items: [["scope-registry", "Project Scope", Database], ["capabilities", "Capabilities", Braces], ["memory-objects", "Memory Objects", BrainCircuit], ["migration", "Migration Ledger", FileClock], ["mason-ledger", "MASON Episodes", History], ["agent-traces", "Agent Traces", Network]] },
@@ -437,8 +560,8 @@ export default function Cockpit() {
       <div className="nav-footer"><div><span>AUTHORITY MODEL</span><strong>notion_authoritative</strong><small>→ drive_shadow</small></div><button><Code2 size={14} />Governed cockpit</button></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div className="crumbs"><span>AI_KNOWLEDGE_SYSTEM</span><b>/</b><strong>{view.toUpperCase().replaceAll("-", "_")}</strong>{scopeFocus && <><b>/</b><code>{scopeFocus}</code></>}</div><button className="command-trigger" onClick={() => setPalette(true)}><Search size={14} /><span>Ask AI Knowledge System…</span><kbd>⌘K</kbd></button><div className="top-status"><span><i />NEXT ACTIONS ACTIVE</span><b>23 JUL 2026</b></div></header>
-      <div className="content-shell">{view === "observatory" ? <Observatory /> : <Overview onOpenScope={(key) => { setScopeFocus(key); setView("observatory"); }} />}</div>
+      <header className="topbar"><div className="crumbs"><span>AI_KNOWLEDGE_SYSTEM</span><b>/</b><strong>{view.toUpperCase().replaceAll("-", "_")}</strong>{scopeFocus && <><b>/</b><code>{scopeFocus}</code></>}</div><button className="command-trigger" onClick={() => setView("assistant")}><Sparkles size={14} /><span>Open Ask AIOS…</span><kbd>LIVE</kbd></button><div className="top-status"><span><i />NEXT ACTIONS ACTIVE</span><b>11 AUG 2026</b></div></header>
+      <div className="content-shell">{view === "observatory" ? <Observatory /> : view === "assistant" ? <AskAios /> : <Overview onOpenScope={(key) => { setScopeFocus(key); setView("observatory"); }} />}</div>
       <footer><span>AI_KNOWLEDGE_SYSTEM / OBSERVABILITY LAYER</span><span>READ ≠ WRITE</span><span>NEXT ACTION ≠ AUTHORIZATION</span><b>PRIVATE AGENT PREVIEW</b></footer>
     </div>
     {palette && <CommandPalette onClose={() => setPalette(false)} onNavigate={setView} />}
