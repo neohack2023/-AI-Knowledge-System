@@ -79,3 +79,45 @@ Preferred cutoff:
 If mutable PR metadata is exposed before prediction, mark the run `TAINTED_MUTABLE_PR_METADATA`. Preserve it as calibration evidence, but exclude it from prevention-gain metrics.
 
 Holdout 0001 discovered this leak. Holdout 0002 used an immutable initial-commit cutoff and produced the first clean paired result. Its single-case result favored LESSONS_ON, but it does not authorize global promotion.
+
+## Cross-repository applicability gate
+
+A lesson that was useful in one repository MUST NOT activate in another repository solely because the local code pattern looks similar.
+
+Before cross-repository activation, classify the target representation or behavior:
+
+- `TARGET_PUBLIC_CONTRACT`
+- `TARGET_INTERNAL_IMPLEMENTATION`
+- `TARGET_UNRESOLVED`
+
+A lesson such as `INCIDENTAL_TRACE_OVERFIT` may challenge a representation only when evidence supports `TARGET_INTERNAL_IMPLEMENTATION` or when the target contract remains unresolved and the lesson is used as a question rather than a conclusion.
+
+If the target project intentionally documents, reviews, or promotes the representation as a public contract, treating it as incidental is negative transfer.
+
+Holdout 0004 in `nodejs/node` is the first cross-repository harm fixture. The CPython-derived `INCIDENTAL_TRACE_OVERFIT` lesson overreached because Node maintainers intentionally made `BlockList.rules` the `toJSON/fromJSON` persistence interface.
+
+## Negative-transfer accounting
+
+Every clean paired evaluation records improvement and harm separately.
+
+Required states:
+
+- `MEMORY_HELPED`
+- `MEMORY_HELPED_SMALL`
+- `MEMORY_NEUTRAL`
+- `MEMORY_HARMED_MINOR`
+- `MEMORY_HARMED_MAJOR`
+
+A negative-transfer event is never averaged away. Record the lesson, mechanism, target-repository applicability error, and harm class.
+
+Current clean holdout aggregate after Holdout 0004:
+
+- clean holdouts: 3
+- positive transfer: 2
+- neutral transfer: 0
+- negative transfer: 1
+- minor harm: 1
+- major harm: 0
+- negative-transfer rate: 33.3%
+
+This sample is too small for promotion. The harm result strengthens the requirement for repository-specific applicability evidence before lesson activation.
