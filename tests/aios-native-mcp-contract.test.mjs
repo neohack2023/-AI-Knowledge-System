@@ -17,7 +17,7 @@ test("Cloudflare-native AIOS MCP is isolated from the existing Glassbox MCP", ()
   assert.doesNotMatch(glassboxMcp, /AIOS_CLOUDFLARE_NATIVE_MCP_01/);
 });
 
-test("AIOS MCP exposes the governed seven-tool surface", () => {
+test("AIOS MCP exposes the governed ten-tool surface", () => {
   for (const name of [
     "search",
     "fetch",
@@ -25,6 +25,9 @@ test("AIOS MCP exposes the governed seven-tool surface", () => {
     "read_execution",
     "read_execution_provenance",
     "run_backend_workflow",
+    "failure_learning_status",
+    "failure_learning_replay",
+    "failure_learning_predict",
     "open_aios_workbench",
   ]) {
     assert.ok(aiosMcp.includes(`name: "${name}"`), `missing MCP tool ${name}`);
@@ -42,6 +45,9 @@ test("MCP delegates to the existing bridge and preserves authority boundaries", 
   assert.match(aiosMcp, /grants no Drive\/Notion authority/);
   assert.match(bridge, /governed_write_probe: "BLOCKED"/);
   assert.match(bridge, /destination_write_authorized: false/);
+  assert.match(aiosMcp, /failure_learning_predict/);
+  assert.match(aiosMcp, /shadow-only online failure-risk model/);
+  assert.doesNotMatch(aiosMcp, /name: "failure_learning_(record|train|checkpoint)/);
 });
 
 test("internal bridge authentication never trusts an incoming MCP bearer token", () => {
