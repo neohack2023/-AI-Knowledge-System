@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_DATABASE_NAME = "ai-knowledge-system-db";
+const DEFAULT_FAILURE_DATABASE_NAME = "aios-failure-learning-db";
 const GENERATED_CONFIG_NAME = ".wrangler-migrations.generated.jsonc";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -21,15 +22,16 @@ export function resolveDatabaseRecord(databases, databaseName) {
   return { databaseName, databaseId };
 }
 
-export function buildMigrationConfig(baseConfig, database) {
+export function buildMigrationConfig(baseConfig, databases) {
+  const records = Array.isArray(databases) ? databases : [databases];
   return {
     ...baseConfig,
-    d1_databases: [{
-      binding: "DB",
+    d1_databases: records.map((database) => ({
+      binding: database.binding ?? "DB",
       database_name: database.databaseName,
       database_id: database.databaseId,
-      migrations_dir: "drizzle",
-    }],
+      migrations_dir: database.migrationsDir ?? "drizzle",
+    })),
   };
 }
 
@@ -48,9 +50,19 @@ function runWrangler(args, capture = false) {
 
 export async function applyCloudflareD1Migrations(
   databaseName = process.env.AIOS_CLOUDFLARE_D1_NAME ?? DEFAULT_DATABASE_NAME,
+  failureDatabaseName = process.env.AIOS_FAILURE_LEARNING_D1_NAME ?? DEFAULT_FAILURE_DATABASE_NAME,
 ) {
   const inventory = JSON.parse(runWrangler(["d1", "list", "--json"], true));
-  const database = resolveDatabaseRecord(inventory, databaseName);
+  const main = {
+    ...resolveDatabaseRecord(inventory, databaseName),
+    binding: "DB",
+    migrationsDir: "drizzle",
+  };
+  const failure = {
+    ...resolveDatabaseRecord(inventory, failureDatabaseName),
+    binding: "FAILURE_DB",
+    migrationsDir: "db/failure-learning/migrations",
+  };
 
   const repoRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
   const baseConfig = JSON.parse(await readFile(resolve(repoRoot, "wrangler.jsonc"), "utf8"));
@@ -59,13 +71,15 @@ export async function applyCloudflareD1Migrations(
   try {
     await writeFile(
       generatedConfigPath,
-      `${JSON.stringify(buildMigrationConfig(baseConfig, database), null, 2)}\n`,
+      `${JSON.stringify(buildMigrationConfig(baseConfig, [main, failure]), null, 2)}\n`,
       { mode: 0o600 },
     );
-    console.log(`Resolved remote D1 ${database.databaseName}; applying registered migrations.`);
-    runWrangler([
-      "d1", "migrations", "apply", "DB", "--remote", "--config", generatedConfigPath,
-    ]);
+    for (const database of [main, failure]) {
+      console.log(`Resolved remote D1 ${database.databaseName}; applying ${database.binding} migrations.`);
+      runWrangler([
+        "d1", "migrations", "apply", database.binding, "--remote", "--config", generatedConfigPath,
+      ]);
+    }
   } finally {
     await rm(generatedConfigPath, { force: true });
   }
