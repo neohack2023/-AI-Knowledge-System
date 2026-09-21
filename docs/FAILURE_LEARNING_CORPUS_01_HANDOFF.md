@@ -3,8 +3,9 @@
 Status: DRAFT PR / implementation candidate
 PR: #95
 Branch: `aios/failure-learning-corpus-01`
-Observed branch head: `7237cab5232a1c36cca5008b01901d0c1c191f1b`
-Base main: `286942c933b3d5447034ebdeba77c02e85dbe55f`
+Live PR head: resolve from PR #95 at resume time; do not trust a cached head in this handoff.
+Known-green implementation/handoff head: `466d3b6b3493b79a9fab7a92e148a7297756b619` passed CI run #350.
+Base main at branch creation: `286942c933b3d5447034ebdeba77c02e85dbe55f`
 
 ## Resume here first
 
@@ -126,9 +127,9 @@ Track at minimum:
 
 ## Current validation state
 
-PR #95 was opened as a draft at branch head `7237cab5232a1c36cca5008b01901d0c1c191f1b`.
+PR #95 is an open draft. Always resolve its live head before making an exact-head claim.
 
-CI run #350 (run ID 35553415470) completed successfully on head `466d3b6b3493b79a9fab7a92e148a7297756b619`.
+CI run #350 (run ID 35553415470) completed successfully on head `466d3b6b3493b79a9fab7a92e148a7297756b619`. Later handoff-only commits may move the PR head and require a fresh CI check; do not transfer the green result across a changed SHA.
 
 Implementation CI is GREEN at this checkpoint. Deployment is still UNVERIFIED because the D1 migration has not been applied to the live Cloudflare database. Merge/deploy remains a separate human gate.
 
