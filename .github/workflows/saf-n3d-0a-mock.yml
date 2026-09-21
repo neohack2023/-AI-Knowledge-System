@@ -57,7 +57,7 @@ jobs:
         run: node scripts/saf-n3d-0a/verify-generated-package.mjs outputs/saf-n3d-0a
 
       - name: Upload non-authoritative candidate package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: saf-n3d-0a-${{ github.run_id }}-${{ github.run_attempt }}
           path: outputs/saf-n3d-0a/
