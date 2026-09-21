@@ -151,3 +151,37 @@ test("clean paired prevention run requires immutable initial commit binding", ()
     },
   ]).valid, true);
 });
+
+
+test("code-bearing holdout lane rejects docs-only candidates", () => {
+  const pool = buildBlindCandidatePool([
+    {
+      repository_id: "github:81598961",
+      external_pr_number: 170001,
+      opened_at: "2026-02-01T00:00:00Z",
+      discussion_count: 12,
+      review_count: 3,
+      changed_file_count: 3,
+      changed_file_classes: ["DOCS", "NEWS"],
+      contamination_state: "CLEAN",
+    },
+    {
+      repository_id: "github:81598961",
+      external_pr_number: 170002,
+      opened_at: "2026-02-02T00:00:00Z",
+      discussion_count: 12,
+      review_count: 3,
+      changed_file_count: 4,
+      changed_file_classes: ["SOURCE", "TEST"],
+      contamination_state: "CLEAN",
+    },
+  ], "private-salt", {
+    min_discussion_count: 8,
+    min_review_count: 2,
+    max_changed_file_count: 20,
+    require_code_bearing: true,
+  });
+  assert.equal(pool.admitted.length, 1);
+  assert.equal(pool.rejected_count, 1);
+  assert.equal(pool.admitted[0].external_pr_number, 170002);
+});
