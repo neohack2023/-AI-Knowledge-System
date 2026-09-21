@@ -1,0 +1,28 @@
+{
+  "schema_name": "FailureLearningCorpus",
+  "schema_version": "0.1",
+  "authority_effect": "NONE",
+  "repositories": [
+    {
+      "repository_id": "github:81598961",
+      "full_name": "python/cpython",
+      "binding": "RESEARCH_SOURCE",
+      "default_branch": "main",
+      "drive_context_packet_id": "1k0nMqDJajc_RKDqIt0EIExTu_QkzxcuBTiVCQ2cbnpY",
+      "episodes": [
+        {
+          "episode_id": "github:python/cpython:pr:121143",
+          "pr_number": 121143,
+          "split": "TRAIN",
+          "lineage": {
+            "reverted_by_pr": 123303,
+            "superseded_by_pr": 123413
+          },
+          "expected_terminal_label": "MERGED_THEN_REVERTED",
+          "raw_review_content_embedded": false,
+          "source_policy": "Fetch live public GitHub evidence by source pointer; persist normalized features, digests, event types, and bounded summaries rather than copying review threads into source control."
+        }
+      ]
+    }
+  ]
+}
