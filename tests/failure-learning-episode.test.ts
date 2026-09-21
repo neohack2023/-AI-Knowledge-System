@@ -10,7 +10,16 @@ import {
   markHoldoutContaminated,
   opaqueHoldoutCandidateId,
   selectBlindHoldout,
+  validateHoldoutEvidenceCutoff,
 } from "../server/failure-learning/holdout.ts";
+import {
+  assertCleanPreventionCutoff,
+  buildBlindCandidatePool,
+  freezeInitialCommitCutoff,
+  freezeMutablePrDescriptionCutoff,
+  selectBlindCandidate,
+  validatePairedPredictions,
+} from "../server/failure-learning/intake-worker.ts";
 
 const fixtureUrl = new URL("../config/failure-learning/episodes/cpython-pr-121143.v0.1.json", import.meta.url);
 
@@ -66,4 +75,79 @@ test("blind sampler is deterministic and tainted discovery blocks prevention cla
     assert.equal(first.eligible_for_prevention_claim, false);
   }
   assert.equal(first.authority_effect, "NONE");
+});
+
+
+test("mutable PR metadata is not a clean prevention cutoff", () => {
+  const cutoff = freezeMutablePrDescriptionCutoff({
+    selected_candidate_id: "holdout:mutable",
+  });
+  const validation = validateHoldoutEvidenceCutoff(cutoff);
+  assert.equal(validation.clean_for_prevention_claim, false);
+  assert.equal(validation.reason_code, "MUTABLE_PR_METADATA_NOT_OPENING_STATE");
+  assert.throws(() => assertCleanPreventionCutoff(cutoff));
+});
+
+test("blind intake worker admits structural candidates without task text", () => {
+  const pool = buildBlindCandidatePool([
+    {
+      repository_id: "github:81598961",
+      external_pr_number: 160001,
+      opened_at: "2026-01-01T00:00:00Z",
+      discussion_count: 12,
+      review_count: 3,
+      changed_file_count: 4,
+      contamination_state: "CLEAN",
+    },
+    {
+      repository_id: "github:81598961",
+      external_pr_number: 160002,
+      opened_at: "2026-01-02T00:00:00Z",
+      discussion_count: 1,
+      review_count: 0,
+      changed_file_count: 2,
+      contamination_state: "CLEAN",
+    },
+  ], "private-salt", {
+    min_discussion_count: 8,
+    min_review_count: 2,
+    max_changed_file_count: 20,
+  });
+  assert.equal(pool.admitted.length, 1);
+  assert.equal(pool.rejected_count, 1);
+  assert.doesNotMatch(pool.admitted[0].opaque_candidate_id, /160001/);
+  const selection = selectBlindCandidate(pool, "seed", "2026-09-20T00:00:00Z");
+  assert.equal(selection.eligible_for_prevention_claim, true);
+});
+
+test("clean paired prevention run requires immutable initial commit binding", () => {
+  const cutoff = freezeInitialCommitCutoff({
+    selected_candidate_id: "holdout:clean",
+    commit_sha: "abc123",
+    immutable_diff_digest: "sha256:deadbeef",
+    contamination_state: "CLEAN",
+  });
+  assert.equal(assertCleanPreventionCutoff(cutoff).clean_for_prevention_claim, true);
+  assert.equal(validatePairedPredictions(cutoff, [
+    {
+      mode: "LESSONS_OFF",
+      selected_candidate_id: "holdout:clean",
+      source_digest: "sha256:deadbeef",
+      mechanism_code: "M1",
+      fix_class: "F1",
+      validation_targets: ["T1"],
+      activated_lesson_ids: [],
+      created_before_reveal: true,
+    },
+    {
+      mode: "LESSONS_ON",
+      selected_candidate_id: "holdout:clean",
+      source_digest: "sha256:deadbeef",
+      mechanism_code: "M1",
+      fix_class: "F2",
+      validation_targets: ["T1"],
+      activated_lesson_ids: ["L1"],
+      created_before_reveal: true,
+    },
+  ]).valid, true);
 });
