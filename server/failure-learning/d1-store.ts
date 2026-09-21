@@ -5,6 +5,10 @@ import {
   type FailureLearningEvent,
 } from "./replay.ts";
 import {
+  buildEpisodeMaterializationPlan,
+  type FailureLearningEpisodeFixture,
+} from "./episode.ts";
+import {
   createFailureRiskModel,
   FAILURE_RISK_MODEL_ID,
   FAILURE_RISK_MODEL_KIND,
@@ -358,6 +362,102 @@ export class D1FailureLearningStore {
       JSON.stringify(input.claim),
       input.created_at,
     ).all();
+  }
+
+  async materializeEpisodeFixture(fixture: FailureLearningEpisodeFixture) {
+    this.requireAvailable();
+    const plan = buildEpisodeMaterializationPlan(fixture);
+    const existing = await this.db
+      .prepare("SELECT episode_id, source_digest FROM failure_learning_episodes WHERE episode_id = ? LIMIT 1")
+      .bind(plan.episode.episode_id)
+      .first<{ episode_id: string; source_digest: string | null }>();
+
+    if (existing) {
+      if (existing.source_digest !== plan.episode.source_digest) {
+        throw new Error("FAILURE_LEARNING_EPISODE_DIGEST_CONFLICT");
+      }
+      return {
+        contract: "FailureLearningMaterializationResult/0.1",
+        episode_id: plan.episode.episode_id,
+        state: "ALREADY_MATERIALIZED" as const,
+        source_digest: plan.episode.source_digest,
+        authority_effect: "NONE" as const,
+      };
+    }
+
+    const statements = [
+      this.db.prepare(
+        "INSERT INTO failure_learning_episodes (episode_id, repository_id, external_pr_number, split, state, terminal_label, opened_at, completed_at, event_count, source_digest, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        plan.episode.episode_id,
+        plan.episode.repository_id,
+        plan.episode.external_pr_number,
+        plan.episode.split,
+        plan.episode.state,
+        plan.episode.terminal_label,
+        plan.episode.opened_at,
+        plan.episode.completed_at,
+        plan.episode.event_count,
+        plan.episode.source_digest,
+        plan.episode.created_at,
+      ),
+      ...plan.events.map((event) => this.db.prepare(
+        "INSERT INTO failure_learning_events (event_id, episode_id, sequence, event_type, occurred_at, source_ref, source_digest, features_json, summary_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        event.event_id,
+        event.episode_id,
+        event.sequence,
+        event.event_type,
+        event.occurred_at,
+        event.source_ref,
+        event.source_digest,
+        event.features_json,
+        event.summary_json,
+      )),
+      ...plan.hypotheses.map((hypothesis) => this.db.prepare(
+        "INSERT INTO failure_learning_hypotheses (hypothesis_id, episode_id, evidence_cutoff_sequence, mechanism_code, predicted_fix_class, claim_json, verdict, score_json, created_at, resolved_at, resolution_event_sequence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        hypothesis.hypothesis_id,
+        hypothesis.episode_id,
+        hypothesis.evidence_cutoff_sequence,
+        hypothesis.mechanism_code,
+        hypothesis.predicted_fix_class,
+        hypothesis.claim_json,
+        hypothesis.verdict,
+        hypothesis.score_json,
+        hypothesis.created_at,
+        hypothesis.resolved_at,
+        hypothesis.resolution_event_sequence,
+      )),
+      ...plan.lessons.map((lesson) => this.db.prepare(
+        "INSERT INTO failure_learning_lessons (lesson_id, source_episode_id, lesson_type, mechanism_code, lesson_json, eligible_after, state, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        lesson.lesson_id,
+        lesson.source_episode_id,
+        lesson.lesson_type,
+        lesson.mechanism_code,
+        lesson.lesson_json,
+        lesson.eligible_after,
+        lesson.state,
+        lesson.created_at,
+      )),
+    ];
+
+    await this.db.batch(statements);
+    const model = await this.recordCheckpointAndTrain(plan.checkpoint);
+
+    return {
+      contract: "FailureLearningMaterializationResult/0.1",
+      episode_id: plan.episode.episode_id,
+      state: "MATERIALIZED_AND_CHECKPOINTED" as const,
+      source_digest: plan.episode.source_digest,
+      event_count: plan.events.length,
+      hypothesis_count: plan.hypotheses.length,
+      lesson_count: plan.lessons.length,
+      model_id: model.model_id,
+      trained_episode_count: model.trained_episode_count,
+      authority_effect: "NONE" as const,
+    };
   }
 
   async recordCheckpointAndTrain(input: {
