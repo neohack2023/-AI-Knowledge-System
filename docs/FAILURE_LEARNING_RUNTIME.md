@@ -121,3 +121,29 @@ Current clean holdout aggregate after Holdout 0004:
 - negative-transfer rate: 33.3%
 
 This sample is too small for promotion. The harm result strengthens the requirement for repository-specific applicability evidence before lesson activation.
+
+## Database isolation and promotion lifecycle
+
+Failure learning uses a dedicated D1 binding and migration lane.
+
+- `DB`: primary AIOS/runtime database.
+- `FAILURE_DB`: mutable failure-learning training database.
+- primary migrations: `drizzle/**`.
+- failure-learning migrations: `db/failure-learning/migrations/**`.
+
+Training evidence, contradictory hypotheses, neutral/harmful transfer results, model state, and candidate lessons remain in `FAILURE_DB`. They do not become AIOS knowledge merely because they exist or because a newer episode was observed.
+
+Operational persistence follows four surfaces:
+
+1. AIOS Drive stores checkpoints, result copies, and human-readable documentation.
+2. The portable tool's own database stores active learned/training state.
+3. Repacked tool artifacts carry that learned state while preserving the engine release identity separately.
+4. GitHub AIOS receives only distilled knowledge that has earned promotion.
+
+Promotion is copy-with-provenance, never move or write-through:
+
+`TRAINING (FAILURE_DB) -> PROMOTABLE -> MASON adjudication -> promotion envelope -> governed materialization into DB`
+
+The learner itself has no cross-database write authority. A promotion envelope has `write_authority: NONE` and binds the source pattern IDs, failure-database head digest, evidence digest, scope, and MASON decision. Original training records remain in `FAILURE_DB` after promotion.
+
+The default promotion gate is deliberately conservative: replay verified, at least three clean evaluations, at least two positive transfers, no major harm, no unresolved applicability boundary, and an explicit MASON decision. Meeting these prerequisites makes knowledge `PROMOTABLE`; it does not make it universal or self-authorizing.
