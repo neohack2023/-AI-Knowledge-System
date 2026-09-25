@@ -33,3 +33,11 @@ test("workbench route is server-auth aware", async () => {
   assert.match(page, /oai-authenticated-user-email/);
   assert.match(page, /oai-authenticated-user-full-name/);
 });
+
+
+test("workbench honors wildcard scope and live workflow inventory", async () => {
+  const source = await read("app/workbench/workbench.tsx");
+  assert.match(source, /scope_allowlist\?\.includes\("\*"\)/);
+  assert.match(source, /liveWorkflowIds\.has\(selectedCapability\.workflow_id\)/);
+  assert.match(source, /workflow currently advertised by the live execution runtime/);
+});
