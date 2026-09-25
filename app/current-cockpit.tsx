@@ -282,7 +282,7 @@ export default function CurrentCockpit({ viewer }: { viewer?: string | null }) {
           <button className={view === "execution" ? styles.active : ""} onClick={() => setView("execution")}><TerminalSquare size={14} />Execution<span className={styles.navMeta}>D1 AWARE</span></button>
           <button className={view === "capabilities" ? styles.active : ""} onClick={() => setView("capabilities")}><Braces size={14} />Capabilities<span className={styles.navMeta}>API</span></button>
           <button className={view === "repository" ? styles.active : ""} onClick={() => setView("repository")}><GitBranch size={14} />Repository<span className={styles.navMeta}>READ ONLY</span></button>
-          <a href="/gog-3d-lab"><Database size={14} />GoG 2D→3D Lab<span className={styles.navMeta}><ExternalLink size={10} /></span></a>
+          <a href="/workbench"><TerminalSquare size={14} />Workbench<span className={styles.navMeta}>EXPERIMENT</span></a>\n          <a href="/gog-3d-lab"><Database size={14} />GoG 2D→3D Lab<span className={styles.navMeta}><ExternalLink size={10} /></span></a>
         </nav>
       </div>
       <div>
