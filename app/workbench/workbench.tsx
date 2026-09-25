@@ -160,11 +160,20 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
     [executions, scopeFilter],
   );
 
+  const liveWorkflowIds = useMemo(
+    () => new Set((workflows?.live_workflows ?? []).flatMap((item) => item.workflow_id ? [item.workflow_id] : [])),
+    [workflows],
+  );
+  const scopeAllowed = selectedCapability?.scope_allowlist?.includes("*") === true
+    || selectedCapability?.scope_allowlist?.includes(scopeFilter) === true;
+  const workflowLive = Boolean(
+    selectedCapability?.workflow_id
+    && liveWorkflowIds.has(selectedCapability.workflow_id),
+  );
   const legalSimulation = selectedCapability?.status === "ACTIVE"
     && selectedCapability.approval_required === false
-    && Boolean(selectedCapability.workflow_id)
-    && (selectedCapability.scope_allowlist?.length ?? 0) > 0
-    && selectedCapability.scope_allowlist?.includes(scopeFilter) !== false;
+    && scopeAllowed
+    && workflowLive;
 
   const selectExecution = async (executionId: string) => {
     setSelectedExecutionId(executionId);
@@ -311,7 +320,7 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
             {!selectedCapability && <div className={styles.info}>Choose a capability from the decision layer. The workbench does not invent routes.</div>}
             {selectedCapability && !legalSimulation && (
               <div className={styles.info}>
-                This capability is inspectable but not directly runnable here. Workbench v0.1 only executes ACTIVE, no-approval capabilities with a registered workflow and matching scope.
+                This capability is inspectable but not directly runnable here. Workbench v0.1 requires ACTIVE status, no approval gate, a matching scope (including wildcard scope), and a workflow currently advertised by the live execution runtime.
               </div>
             )}
             {simulationResult?.execution?.execution_id && (
