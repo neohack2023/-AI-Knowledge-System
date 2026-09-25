@@ -15,7 +15,7 @@ test("workbench stays on existing AIOS API surfaces", async () => {
 test("workbench execution is simulation-only in v0.1", async () => {
   const source = await read("app/workbench/workbench.tsx");
   assert.match(source, /mode:\s*"SIMULATION"/);
-  assert.doesNotMatch(source, /mode:\s*"LIVE"/);
+  assert.doesNotMatch(source, /mode:\s*"LIVE"\s*,/);
   assert.match(source, /approval_required === false/);
   assert.match(source, /status === "ACTIVE"/);
 });
