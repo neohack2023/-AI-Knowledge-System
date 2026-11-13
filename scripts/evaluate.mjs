@@ -18,6 +18,7 @@ const profiles = {
     "tests/workflow-kernel.test.mjs",
     "tests/aios-bridge-live-read.test.mjs",
   ],
+  d1: ["tests/d1-runtime.integration.ts"],
 };
 const exists = async (path) => access(path, constants.F_OK).then(() => true).catch(() => false);
 
@@ -62,16 +63,18 @@ export async function evaluateScenario({ name, command, args = [], cwd = root, r
 }
 
 export async function runEvaluation({ profile = "learning", cwd = root, outputDir = join(root, "outputs", "evaluations"), writeReceipt = true } = {}) {
-  if (!["learning", "runtime", "both"].includes(profile)) throw new Error("Profile must be learning, runtime, or both.");
+  if (!["learning", "runtime", "d1", "both", "all"].includes(profile)) throw new Error("Profile must be learning, runtime, d1, both, or all.");
   const startedAt = new Date().toISOString();
-  const scenarios = profile === "both" ? ["learning", "runtime"] : [profile];
+  const scenarios = profile === "all" ? ["learning", "runtime", "d1"]
+    : profile === "both" ? ["learning", "runtime"] : [profile];
   const results = [];
   for (const name of scenarios) {
     const tests = profiles[name];
     results.push(await evaluateScenario({
       name, command: process.execPath,
       args: ["--experimental-transform-types", "--test", ...tests],
-      cwd, requiredPaths: name === "runtime" ? ["dist/server/index.js", ...tests] : tests,
+      cwd, requiredPaths: name === "runtime" ? ["dist/server/index.js", ...tests]
+        : name === "d1" ? ["node_modules/miniflare/package.json", ...tests] : tests,
       timeoutMs: name === "runtime" ? 180000 : 90000,
     }));
   }

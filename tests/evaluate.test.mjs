@@ -53,6 +53,6 @@ test("receipt reports incomplete coverage without falsely awarding acceptance", 
 
 test("GitHub CI executes the same behavioral profiles and preserves their independent receipt", async () => {
   const ci = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-  assert.match(ci, /name: Run behavioral evaluation profiles\s+if: always\(\)\s+run: npm run evaluate -- --profile=both/);
+  assert.match(ci, /name: Run behavioral evaluation profiles\s+if: always\(\)\s+run: npm run evaluate -- --profile=all/);
   assert.match(ci, /name: Upload behavioral evaluation receipt[\s\S]*?outputs\/evaluations\/latest\.json[\s\S]*?outputs\/evaluations\/runs\.jsonl/);
 });

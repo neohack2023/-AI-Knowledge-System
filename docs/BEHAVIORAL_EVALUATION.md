@@ -48,3 +48,13 @@ The public repository's existing governance lock remains expired (`valid_through
 Owner direction supersedes the earlier CI governance gate arrangements described above. `.github/workflows/agent-system-audit.yml` was removed; the standalone governance audit step and automatic governance-sync checks were removed from `.github/workflows/ci.yml` and the default `npm test` chain. Only build, executable tests, spatial compiler checks, behavioral evaluation profiles, public-release boundary, and exact-head execution receipts remain as CI obligations. The existing governance CLI tools and source history are retained for optional/manual diagnosis, but the expired `valid_through` no longer blocks CI. No freshness renewal was claimed, and this does not disable the public-release boundary or grant deployment authority.
 
 Changelog: 2026-11-13 — Retired redundant governance-only GitHub Actions and associated automatic gate; reduced duplicated test invocation and preserved manual tooling.
+
+## Real D1 integration profile (2026-11-13)
+
+`npm run evaluate -- --profile=d1` runs `tests/d1-runtime.integration.ts` against **Miniflare's actual local D1/SQLite backend**, using the already pinned Cloudflare toolchain. `--profile=all` runs the existing learning and bundled Worker profiles plus this D1 integration once. `--profile=both` is retained for compatibility. The integration is intentionally outside the generic `tests/*.test.*` glob to avoid duplicate execution.
+
+The independent executable tests cover real SQL schema readiness and missing-schema classification; a new LIVE diagnostic execution and database rows/events/provenance; fresh kernel readback across separate runtime instances; and an injected SQLite trigger failure with rollback and successful recovery. The D1 binding is ephemeral and has no production credentials, remote connection, file-based database state, knowledge promotion, or write to Drive.
+
+A profile PASS is evidence for local Cloudflare D1 semantics only. HTTP routing, deployed Cloudflare data, an independent UI flow, ML benefit, repeated statistics and public benchmark scores remain untested until separate probes are executed. A missing Miniflare installation reports `ENVIRONMENT_NOT_READY` without claiming code failure. Any new evaluation evidence goes through the existing `outputs/evaluations/latest.json` + `runs.jsonl` receipt path. No numbered tool forks.
+
+Changelog: 2026-11-13 — Added real D1 integration and negative-control profile to the existing canonical evaluator, without changing the owner-retired governance CI.
