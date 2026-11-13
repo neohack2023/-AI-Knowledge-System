@@ -66,7 +66,7 @@ The compiler is non-destructive, treats an existing `devos/`, `.devos/`, or cohe
 - `npm run check:agent-system` — deterministic repository organization audit and JSON receipt.
 - `npm run test:governance-sync` — unit tests for governance synchronization semantics.
 - `npm run check:governance-sync` — validates the active sync receipt, digest binding, source set, delta disposition, and freshness derivation.
-- `.github/workflows/agent-system-audit.yml` — PR, `main` push, and manual CI lane for organization and governance-sync integrity.
+- Governance organization and sync checks are available on demand through the commands above; no separate governance CI lane remains.
 
 ## Governance synchronization
 

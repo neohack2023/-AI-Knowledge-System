@@ -8,7 +8,7 @@ The audit is intentionally narrower than code review. It verifies the structural
 
 - `npm run test:agent-system` tests the audit logic itself.
 - `npm run check:agent-system` audits the current repository and writes `outputs/agent-system-audit.json`.
-- `.github/workflows/agent-system-audit.yml` runs the same checks on relevant pull requests, pushes to `main`, and manual dispatch.
+- The organization audit is **manual/on-demand only**. It is not a GitHub Actions required check or a code merge blocker.
 
 ## Fail-closed checks
 

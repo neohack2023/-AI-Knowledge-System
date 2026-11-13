@@ -31,7 +31,7 @@ A meaningful AIOS evaluation must specify a real task, starting state, expected 
 
 The organization auditor has two explicitly reported modes: `STRICT` for manual runs, main-branch pushes, changed governance/workflow surfaces, and unknown identities; and `STRUCTURAL_WITH_STALE_WARNING` for an exact-head GitHub PR that changes only non-governance files. Scoped mode validates the same repository structure and anti-pattern rules while placing *only* an expired existing governance snapshot in the warnings array. It does not certify governance freshness or grant permission to merge, release, or promote.
 
-The strict command remains `npm run check:agent-system`. CI calls `npm run check:agent-system:ci` with immutable base/head identities and full Git history. The audit report exposes `state`, `audit_mode`, `issues`, `warnings`, and which checks were completed. A malformed identity, missing Git history, unknown event, or any change to governance or workflow files requires strict freshness; no silent PASS.
+The strict command remains available on demand as `npm run check:agent-system`. CI no longer runs the governance audit or synchronization gate. Its former CI-scoped mode is retained only as historical implementation behavior. The audit report exposes `state`, `audit_mode`, `issues`, `warnings`, and which checks were completed. A malformed identity, missing Git history, unknown event, or any change to governance or workflow files requires strict freshness; no silent PASS.
 
 The auditor and sync receipt validator now normalize Windows CRLF versus Git-canonical LF text. Hashes still validate the original committed receipt content. This fixes platform-induced false failures without relaxing schema, provenance, digest, source-set or stale-lock checks.
 
@@ -42,3 +42,9 @@ The public repository's existing governance lock remains expired (`valid_through
 - 2026-11-12 — Split scoped code CI from strict governance freshness; preserve warnings, exact-head scope proofs, and fail-closed sensitive-path enforcement. Repaired CRLF parsing and governance receipt hashing for Host 02 Windows parity.
 
 - 2026-11-12 — Removed the governance freshness audit from the `npm test` chain and put it in its own always-run GitHub Actions step. This preserves execution of the spatial compiler, release check and the complete build-and-test verdict even when governance is blocked. The governance step itself still fails under strict scope, so no merge authorization is implied.
+
+## Decision: retire governance-only CI (2026-11-13)
+
+Owner direction supersedes the earlier CI governance gate arrangements described above. `.github/workflows/agent-system-audit.yml` was removed; the standalone governance audit step and automatic governance-sync checks were removed from `.github/workflows/ci.yml` and the default `npm test` chain. Only build, executable tests, spatial compiler checks, behavioral evaluation profiles, public-release boundary, and exact-head execution receipts remain as CI obligations. The existing governance CLI tools and source history are retained for optional/manual diagnosis, but the expired `valid_through` no longer blocks CI. No freshness renewal was claimed, and this does not disable the public-release boundary or grant deployment authority.
+
+Changelog: 2026-11-13 — Retired redundant governance-only GitHub Actions and associated automatic gate; reduced duplicated test invocation and preserved manual tooling.

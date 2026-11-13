@@ -13,8 +13,6 @@ jobs:
     env:
       PUBLIC_RELEASE_PRIVATE_TERMS: aios-ci-private-term-${{ github.run_id }}
       PUBLIC_RELEASE_PRIVATE_TERMS_MODE: SENTINEL_ONLY
-      AIOS_AUDIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      AIOS_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@v4
@@ -48,10 +46,6 @@ jobs:
       - name: Build and test
         id: build_test
         run: npm test
-
-      - name: Audit governance scope independently
-        if: always()
-        run: npm run check:agent-system:ci
 
       - name: Run behavioral evaluation profiles
         if: always()

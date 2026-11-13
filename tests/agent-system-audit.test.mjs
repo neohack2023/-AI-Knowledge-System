@@ -99,6 +99,8 @@ test('governance freshness cannot abort functional tests before spatial and rele
   assert.ok(pkg.scripts.test.includes('npm run test:spatial-compiler'));
   assert.ok(pkg.scripts.test.includes('npm run check:public-release'));
   assert.ok(!pkg.scripts.test.includes('npm run check:agent-system:ci'));
-  assert.match(ci, /name: Audit governance scope independently\s+if: always\(\)\s+run: npm run check:agent-system:ci/);
-  assert.ok(ci.indexOf('name: Build and test') < ci.indexOf('name: Audit governance scope independently'));
+  assert.ok(!pkg.scripts.test.includes('check:governance-sync'));
+  assert.doesNotMatch(ci, /Audit governance scope independently|check:agent-system:ci|check:governance-sync/);
+  assert.match(ci, /name: Run behavioral evaluation profiles/);
+  assert.match(ci, /name: Upload CodingHarness receipt/);
 });
