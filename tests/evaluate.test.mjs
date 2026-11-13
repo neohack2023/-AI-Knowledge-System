@@ -94,3 +94,15 @@ test("optional real-browser profile stays outside ordinary four-profile CI and f
     assert.match(source, /profile === "all" \? \["learning", "runtime", "d1", "http"\]/);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
+
+test("ML profile is explicitly opt-in and reports missing Python prerequisites", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "aios-ml-missing-"));
+  try {
+    const receipt = await runEvaluation({ profile: "ml", cwd, writeReceipt: false });
+    assert.equal(receipt.status, "BLOCKED");
+    assert.equal(receipt.authorization_effect, "NONE");
+    assert.equal(receipt.coverage.requested, 1);
+    assert.equal(receipt.coverage.executed, 0);
+    assert.ok(receipt.results[0].missing.some(path => path.includes("failure-learning-ml.integration.mjs")));
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});

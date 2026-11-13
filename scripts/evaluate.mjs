@@ -21,6 +21,7 @@ const profiles = {
   d1: ["tests/d1-runtime.integration.ts"],
   http: ["tests/http-runtime.integration.ts"],
   browser: ["tests/workbench-browser.integration.mjs"],
+  ml: ["tests/failure-learning-ml.integration.mjs"],
 };
 const exists = async (path) => access(path, constants.F_OK).then(() => true).catch(() => false);
 
@@ -65,7 +66,7 @@ export async function evaluateScenario({ name, command, args = [], cwd = root, r
 }
 
 export async function runEvaluation({ profile = "learning", cwd = root, outputDir = join(root, "outputs", "evaluations"), writeReceipt = true } = {}) {
-  if (!["learning", "runtime", "d1", "http", "browser", "both", "all"].includes(profile)) throw new Error("Profile must be learning, runtime, d1, http, browser, both, or all.");
+  if (!["learning", "runtime", "d1", "http", "browser", "ml", "both", "all"].includes(profile)) throw new Error("Profile must be learning, runtime, d1, http, browser, ml, both, or all.");
   const startedAt = new Date().toISOString();
   const browserPath = process.env.AIOS_BROWSER_PATH
     || (process.platform === "win32" ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" : "AIOS_BROWSER_PATH");
@@ -80,8 +81,9 @@ export async function runEvaluation({ profile = "learning", cwd = root, outputDi
       cwd, requiredPaths: name === "runtime" ? ["dist/server/index.js", ...tests]
         : name === "d1" ? ["node_modules/miniflare/package.json", ...tests]
         : name === "http" ? ["node_modules/miniflare/package.json", "dist/server/index.js", "drizzle/0000_execution_history.sql", ...tests]
-        : name === "browser" ? ["node_modules/miniflare/package.json", "dist/server/index.js", "dist/client", "drizzle/0000_execution_history.sql", browserPath, ...tests] : tests,
-      timeoutMs: name === "runtime" ? 180000 : 90000,
+        : name === "browser" ? ["node_modules/miniflare/package.json", "dist/server/index.js", "dist/client", "drizzle/0000_execution_history.sql", browserPath, ...tests]
+        : name === "ml" ? [process.env.AIOS_ML_PYTHON || "__AIOS_ML_PYTHON_NOT_CONFIGURED__", "scripts/failure-learning/train_evaluate.py", "scripts/failure-learning/train-risk.mjs", "tests/failure_learning_ml_test.py", ...tests] : tests,
+      timeoutMs: name === "runtime" ? 180000 : name === "ml" ? 120000 : 90000,
       capture: true,
     });
     const { captured, ...receiptResult } = outcome;
