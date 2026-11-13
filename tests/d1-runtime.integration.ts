@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 import { WorkflowExecutionKernel } from "../server/workflows/kernel.ts";
 import { DurableWorkflowRuntime } from "../server/workflows/durable-runtime.ts";
-import { D1ExecutionHistoryStore, executionHistorySchemaSql } from "../server/workflows/d1-execution-history-store.ts";
+import { D1ExecutionHistoryStore } from "../server/workflows/d1-execution-history-store.ts";
 import { listDurableExecutionHistory } from "../server/workflows/execution-history-store.ts";
 
 // Actual workerd-backed D1 SQLite. No production credentials, remote database,
@@ -15,12 +16,17 @@ const makeFixture = async ({ migrate = true } = {}) => {
   const mf = new Miniflare({
     modules: true,
     script: 'export default { fetch() { return new Response("READY"); } };',
-    compatibilityDate: "2026-09-19",
+    // Pinned workerd@1.20260515.1 supports up to 2026-05-22.
+    compatibilityDate: "2026-05-22",
     d1Databases: { DB: "aios-isolated-evaluation" },
   });
   try {
     const db = await mf.getD1Database("DB");
-    if (migrate) await db.exec(executionHistorySchemaSql);
+    if (migrate) {
+      const migration = await readFile(new URL("../drizzle/0000_execution_history.sql", import.meta.url), "utf8");
+      const statements = migration.split("--> statement-breakpoint").map((sql) => sql.trim()).filter(Boolean);
+      await db.batch(statements.map((statement) => db.prepare(statement)));
+    }
     return { mf, db };
   } catch (error) {
     await mf.dispose();
