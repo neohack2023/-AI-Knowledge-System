@@ -26,3 +26,17 @@ A meaningful AIOS evaluation must specify a real task, starting state, expected 
 
 - 2026-11-12 — Initial canonical execution runner with two bounded profiles, environment-vs-functional failure classification, compact receipt history, and positive/negative/timeout regression controls.
 - 2026-11-12 — GitHub CI now invokes the same profiles as an independent post-build step and uploads its own receipts even when the legacy build-and-test bundle fails. Existing governance gates remain unchanged.
+
+## CI governance freshness and Windows parity
+
+The organization auditor has two explicitly reported modes: `STRICT` for manual runs, main-branch pushes, changed governance/workflow surfaces, and unknown identities; and `STRUCTURAL_WITH_STALE_WARNING` for an exact-head GitHub PR that changes only non-governance files. Scoped mode validates the same repository structure and anti-pattern rules while placing *only* an expired existing governance snapshot in the warnings array. It does not certify governance freshness or grant permission to merge, release, or promote.
+
+The strict command remains `npm run check:agent-system`. CI calls `npm run check:agent-system:ci` with immutable base/head identities and full Git history. The audit report exposes `state`, `audit_mode`, `issues`, `warnings`, and which checks were completed. A malformed identity, missing Git history, unknown event, or any change to governance or workflow files requires strict freshness; no silent PASS.
+
+The auditor and sync receipt validator now normalize Windows CRLF versus Git-canonical LF text. Hashes still validate the original committed receipt content. This fixes platform-induced false failures without relaxing schema, provenance, digest, source-set or stale-lock checks.
+
+The public repository's existing governance lock remains expired (`valid_through: 2026-10-20`). Do not manually advance the date; the dedicated Knowledge Steward sync-governance procedure must resolve exact current Drive authority, classify deltas, and issue an independently verifiable receipt.
+
+### Changelog
+
+- 2026-11-12 — Split scoped code CI from strict governance freshness; preserve warnings, exact-head scope proofs, and fail-closed sensitive-path enforcement. Repaired CRLF parsing and governance receipt hashing for Host 02 Windows parity.

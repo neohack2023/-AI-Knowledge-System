@@ -24,7 +24,7 @@ function parseYamlScalar(text, key) {
 }
 
 function parseYamlList(text, key) {
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === `${key}:`);
   if (start === -1) return [];
   const values = [];
@@ -55,7 +55,9 @@ export function deriveValidThrough(performedOn, freshnessDays) {
 }
 
 export function receiptDigest(text) {
-  return `sha256:${createHash('sha256').update(text, 'utf8').digest('hex')}`;
+  // Hash canonical Git text content, not platform-specific CRLF checkout bytes.
+  // Exact receipt JSON semantics and digest remain identical across Windows/Linux.
+  return `sha256:${createHash('sha256').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex')}`;
 }
 
 export function validateGovernanceSyncReceipt(receipt, {

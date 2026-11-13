@@ -79,3 +79,8 @@ test('missing upstream snapshot fails validation', () => {
   const problems = validateGovernanceSyncReceipt(receipt, { requiredSources: [source.source_id] });
   assert.ok(problems.some((problem) => problem.code === 'GOVERNANCE_SYNC_SOURCE_SET_MISMATCH'));
 });
+
+test('checkout newline styles produce the same canonical receipt digest', () => {
+  const lf = '{\n  "schema_name": "GovernanceSyncReceipt"\n}\n';
+  assert.equal(receiptDigest(lf), receiptDigest(lf.replace(/\n/g, '\r\n')));
+});

@@ -41,6 +41,7 @@ function stripQuotes(value) {
 }
 
 export function parseFrontmatter(text) {
+  text = text.replace(/\r\n?/g, '\n');
   if (!text.startsWith('---\n')) return null;
   const end = text.indexOf('\n---\n', 4);
   if (end === -1) return null;
@@ -68,7 +69,7 @@ function parseYamlScalar(text, key) {
 }
 
 function parseYamlList(text, key) {
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === `${key}:`);
   if (start === -1) return [];
   const values = [];
@@ -85,6 +86,33 @@ export function isGovernanceExpired(validThrough, now = new Date()) {
   if (!validThrough || !/^\d{4}-\d{2}-\d{2}$/.test(validThrough)) return true;
   const end = new Date(`${validThrough}T23:59:59.999Z`);
   return Number.isNaN(end.getTime()) || now.getTime() > end.getTime();
+}
+
+// Only a current, exact-head PR with no governance-bearing edits may report a
+// pre-existing expired snapshot as a warning. Manual, push and unknown contexts
+// remain strict; this is not a governance freshness renewal or authority grant.
+const GOVERNANCE_PATHS = [
+  /^AGENTS\.md$/,
+  /^\.github\/(?:agents|skills|instructions)\//,
+  /^\.github\/copilot-instructions\.md$/,
+  /^\.github\/workflows\//,
+  /^config\/agent-system-audit\.json$/,
+  /^docs\/agent-system\//,
+  /^scripts\/agent-system\//,
+  /^tests\/(?:agent-system-audit|governance-sync)\.test\.mjs$/,
+  /^server\/(?:governance|coding-harness)\//,
+];
+
+export function classifyCiAuditScope({ eventName, baseSha, headSha, checkedOutHead, changedPaths } = {}) {
+  if (eventName !== 'pull_request' ||
+      !/^[a-f0-9]{40}$/i.test(baseSha || '') ||
+      !/^[a-f0-9]{40}$/i.test(headSha || '') ||
+      checkedOutHead !== headSha ||
+      !Array.isArray(changedPaths) || !changedPaths.length) return 'STRICT';
+  if (changedPaths.some((file) => typeof file !== 'string' || !file ||
+      file.startsWith('/') || file.includes('..') ||
+      GOVERNANCE_PATHS.some((pattern) => pattern.test(file.replaceAll(String.fromCharCode(92), '/'))))) return 'STRICT';
+  return 'STRUCTURAL_WITH_STALE_WARNING';
 }
 
 function extractMarkdownTargets(text) {
@@ -213,8 +241,9 @@ function currentHead() {
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { return null; }
 }
 
-export async function auditRepository(root = process.cwd(), { now = new Date() } = {}) {
+export async function auditRepository(root = process.cwd(), { now = new Date(), staleSnapshotWarning = false } = {}) {
   const problems = [];
+  const warnings = [];
   const configPath = path.join(root, 'config/agent-system-audit.json');
   const config = await loadJson(configPath);
 
@@ -250,7 +279,7 @@ export async function auditRepository(root = process.cwd(), { now = new Date() }
   const validThrough = parseYamlScalar(lock, config.governance_valid_through_key);
   if (!Number.isInteger(phase) || phase < config.minimum_repository_autonomy_phase) problems.push(issue('GOVERNANCE_LOCK_PHASE_INVALID', config.governance_lock, `repository_autonomy_phase must be >= ${config.minimum_repository_autonomy_phase}.`));
   if (parseYamlScalar(lock, 'organization_audit_state') !== 'ACTIVE') problems.push(issue('GOVERNANCE_AUDIT_NOT_ACTIVE', config.governance_lock, 'organization_audit_state must be ACTIVE.'));
-  if (isGovernanceExpired(validThrough, now)) problems.push(issue('GOVERNANCE_LOCK_STALE', config.governance_lock, `Governance lock expired or lacks valid ${config.governance_valid_through_key}: ${validThrough || '<missing>'}.`));
+  if (isGovernanceExpired(validThrough, now)) (staleSnapshotWarning ? warnings : problems).push(issue('GOVERNANCE_LOCK_STALE', config.governance_lock, `Governance lock expired or lacks valid ${config.governance_valid_through_key}: ${validThrough || '<missing>'}.`));
   const lockSkills = parseYamlList(lock, 'installed_skills').sort();
   if (JSON.stringify(lockSkills) !== JSON.stringify(expectedSkills)) problems.push(issue('GOVERNANCE_SKILL_DRIFT', config.governance_lock, 'installed_skills does not match the audited skill registry.'));
 
@@ -273,32 +302,57 @@ export async function auditRepository(root = process.cwd(), { now = new Date() }
     schema_version: '1.0',
     generated_at: new Date().toISOString(),
     audited_head_sha: currentHead(),
-    state: problems.length ? 'FAIL' : 'PASS',
+    state: problems.length ? 'FAIL' : warnings.length ? 'PASS_WITH_WARNINGS' : 'PASS',
+    audit_mode: staleSnapshotWarning ? 'STRUCTURAL_WITH_STALE_WARNING' : 'STRICT',
     checks: {
       skill_frontmatter_and_registry: true,
       role_to_skill_bindings: true,
       repository_relative_markdown_links: true,
-      governance_lock_freshness: true,
+      governance_lock_freshness: !staleSnapshotWarning,
       anti_pattern_provenance: true,
       feature_decision_plan_indexing: true,
       handoff_phase_drift: true
     },
     issue_counts: counts,
+    warnings,
     issues: problems.sort((a, b) => `${a.code}:${a.file}`.localeCompare(`${b.code}:${b.file}`))
   };
+}
+
+function ciAuditScopeFromGit() {
+  const baseSha = process.env.AIOS_AUDIT_BASE_SHA;
+  const headSha = process.env.AIOS_AUDIT_HEAD_SHA;
+  const eventName = process.env.GITHUB_EVENT_NAME;
+  try {
+    const checkedOutHead = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    if (eventName !== 'pull_request' || !/^[a-f0-9]{40}$/i.test(baseSha || '') ||
+        !/^[a-f0-9]{40}$/i.test(headSha || '') || checkedOutHead !== headSha) return 'STRICT';
+    // Use the merge base, not a direct two-dot diff that includes unrelated main changes.
+    const changedPaths = execFileSync('git', ['diff', '--name-only', '-z', `${baseSha}...${headSha}`], { encoding: 'utf8' })
+      .split(String.fromCharCode(0)).filter(Boolean);
+    return classifyCiAuditScope({ eventName, baseSha, headSha, checkedOutHead, changedPaths });
+  } catch {
+    return 'STRICT'; // Missing refs or shallow history cannot weaken freshness enforcement.
+  }
 }
 
 async function main() {
   const reportIndex = process.argv.indexOf('--report');
   const reportPath = reportIndex >= 0 ? process.argv[reportIndex + 1] : null;
   const now = process.env.AIOS_AUDIT_NOW ? new Date(process.env.AIOS_AUDIT_NOW) : new Date();
-  const report = await auditRepository(process.cwd(), { now });
+  const scope = process.argv.includes('--ci-scoped') ? ciAuditScopeFromGit() : 'STRICT';
+  const report = await auditRepository(process.cwd(), { now, staleSnapshotWarning: scope === 'STRUCTURAL_WITH_STALE_WARNING' });
   if (reportPath) {
     await mkdir(path.dirname(reportPath), { recursive: true });
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   }
   if (report.state === 'PASS') console.log('Agent-system audit PASS');
-  else {
+  else if (report.state === 'PASS_WITH_WARNINGS') {
+    console.warn('Agent-system structure PASS; governance freshness NOT VERIFIED (strict mode remains available).');
+    for (const warning of report.warnings) {
+      console.warn(`::warning file=${warning.file}::${warning.code} ${warning.message}`);
+    }
+  } else {
     console.error(`Agent-system audit FAIL (${report.issues.length} issue${report.issues.length === 1 ? '' : 's'})`);
     for (const item of report.issues) console.error(`${item.code} ${item.file}: ${item.message}`);
     process.exitCode = 1;
