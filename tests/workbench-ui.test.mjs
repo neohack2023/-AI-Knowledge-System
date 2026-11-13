@@ -12,12 +12,20 @@ test("workbench stays on existing AIOS API surfaces", async () => {
   assert.doesNotMatch(source, /fetch\([^\n]*\/api\/(memory|mason|stone|write|deploy)/i);
 });
 
-test("workbench execution is simulation-only in v0.1", async () => {
+test("workbench runs only the exact A0 diagnostic supported by the LIVE kernel", async () => {
   const source = await read("app/workbench/workbench.tsx");
-  assert.match(source, /mode:\s*"SIMULATION"/);
-  assert.doesNotMatch(source, /mode:\s*"LIVE"\s*,/);
-  assert.match(source, /approval_required === false/);
-  assert.match(source, /status === "ACTIVE"/);
+  assert.match(source, /mode:\s*"LIVE"/);
+  assert.doesNotMatch(source, /mode:\s*"SIMULATION"/);
+  assert.match(source, /selectedCapability\?\.capability_id === "cap:internal-runtime-diagnostic"/);
+  assert.match(source, /selectedCapability\.workflow_id === "internal-runtime-diagnostic"/);
+  assert.match(source, /selectedCapability\.autonomy_band === "A0"/);
+  assert.match(source, /selectedCapability\.approval_required === false/);
+  assert.match(source, /selectedCapability\.status === "ACTIVE"/);
+  assert.match(source, /scopeFilter === "global-working-memory"/);
+  assert.match(source, /workflows\?\.execution_history\?\.state === "DURABLE_AVAILABLE"/);
+  assert.match(source, /disabled=\{!legalDiagnostic \|\| loading \|\| running\}/);
+  assert.match(source, /setRunning\(true\)/);
+  assert.match(source, /setRunning\(false\)/);
 });
 
 test("workbench makes governance boundaries visible", async () => {
@@ -39,5 +47,5 @@ test("workbench honors wildcard scope and live workflow inventory", async () => 
   const source = await read("app/workbench/workbench.tsx");
   assert.match(source, /scope_allowlist\?\.includes\("\*"\)/);
   assert.match(source, /liveWorkflowIds\.has\(selectedCapability\.workflow_id\)/);
-  assert.match(source, /workflow currently advertised by the live execution runtime/);
+  assert.match(source, /other actions require their separate execution policies/);
 });

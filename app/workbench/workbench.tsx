@@ -111,6 +111,7 @@ const statusClass = (status?: string) => {
 
 export default function Workbench({ viewer }: { viewer?: string | null }) {
   const [loading, setLoading] = useState(false);
+  const [running, setRunning] = useState(false);
   const [capabilities, setCapabilities] = useState<CapabilityInventory>();
   const [history, setHistory] = useState<HistoryInventory>();
   const [workflows, setWorkflows] = useState<WorkflowInventory>();
@@ -121,7 +122,7 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
   const [taskNote, setTaskNote] = useState("");
   const [scopeFilter, setScopeFilter] = useState("global-working-memory");
   const [error, setError] = useState<string>();
-  const [simulationResult, setSimulationResult] = useState<ExecutionSnapshot>();
+  const [diagnosticResult, setDiagnosticResult] = useState<ExecutionSnapshot>();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -170,8 +171,13 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
     selectedCapability?.workflow_id
     && liveWorkflowIds.has(selectedCapability.workflow_id),
   );
-  const legalSimulation = selectedCapability?.status === "ACTIVE"
+  const legalDiagnostic = selectedCapability?.capability_id === "cap:internal-runtime-diagnostic"
+    && selectedCapability.workflow_id === "internal-runtime-diagnostic"
+    && selectedCapability.status === "ACTIVE"
+    && selectedCapability.autonomy_band === "A0"
     && selectedCapability.approval_required === false
+    && scopeFilter === "global-working-memory"
+    && workflows?.execution_history?.state === "DURABLE_AVAILABLE"
     && scopeAllowed
     && workflowLive;
 
@@ -188,10 +194,11 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
     }
   };
 
-  const runSimulation = async () => {
-    if (!selectedCapability?.workflow_id || !legalSimulation) return;
+  const runDiagnostic = async () => {
+    if (!selectedCapability?.workflow_id || !legalDiagnostic || running) return;
+    setRunning(true);
     setError(undefined);
-    setSimulationResult(undefined);
+    setDiagnosticResult(undefined);
     try {
       const result = await fetchJson<ExecutionSnapshot>("/api/workflow-executions", {
         method: "POST",
@@ -200,21 +207,23 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
           action: "execute",
           workflow_id: selectedCapability.workflow_id,
           scope_key: scopeFilter,
-          mode: "SIMULATION",
+          mode: "LIVE",
           input: {
-            source: "aios-workbench-keel-ui-01",
+            source: "aios-workbench-a0-diagnostic",
             operator_note: taskNote.trim() || undefined,
             capability_id: selectedCapability.capability_id,
           },
         }),
       });
-      if (!result.ok) throw new Error(result.body.error?.message ?? `Simulation failed with HTTP ${result.status}.`);
-      setSimulationResult(result.body);
+      if (!result.ok) throw new Error(result.body.error?.message ?? `Diagnostic failed with HTTP ${result.status}.`);
+      setDiagnosticResult(result.body);
       const id = result.body.execution?.execution_id;
       if (id) await selectExecution(id);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Simulation failed.");
+      setError(cause instanceof Error ? cause.message : "Diagnostic failed.");
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -262,7 +271,7 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
         <div className={styles.guardrails}>
           <span>READ ≠ WRITE</span>
           <span>ROUTE ≠ AUTHORIZATION</span>
-          <span>SIMULATION FIRST</span>
+          <span>A0 DIAGNOSTIC ONLY</span>
         </div>
       </aside>
 
@@ -281,7 +290,7 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
         <div className={styles.grid}>
           <section className={styles.taskDesk}>
             <div className={styles.sectionHead}>
-              <div><span>TASK DESK</span><h1>Prepare a governed route before execution.</h1></div>
+              <div><span>TASK DESK</span><h1>Inspect capabilities and run a bounded A0 diagnostic.</h1></div>
               <div className={styles.statusCluster}>
                 <b className={statusClass(workflows?.execution_history?.state)}>{workflows?.execution_history?.state ?? "UNKNOWN"}</b>
                 <b className={statusClass(history?.persistence)}>{history?.persistence ?? "UNKNOWN"}</b>
@@ -295,7 +304,7 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
               <textarea
                 value={taskNote}
                 onChange={(event) => setTaskNote(event.target.value)}
-                placeholder="Describe the bounded task. This note is passed only to the selected simulation workflow."
+                placeholder="Optional note for the A0 process-local diagnostic. Do not include secrets."
               />
             </label>
 
@@ -310,21 +319,21 @@ export default function Workbench({ viewer }: { viewer?: string | null }) {
               </div>
               <div>
                 <span>MODE</span>
-                <strong>SIMULATION</strong>
+                <strong>LIVE / A0 DIAGNOSTIC</strong>
               </div>
-              <button onClick={() => void runSimulation()} disabled={!legalSimulation}>
-                <Play size={14} />Run selected simulation
+              <button onClick={() => void runDiagnostic()} disabled={!legalDiagnostic || loading || running}>
+                <Play size={14} />{running ? "Running diagnostic" : "Run A0 diagnostic"}
               </button>
             </div>
 
             {!selectedCapability && <div className={styles.info}>Choose a capability from the decision layer. The workbench does not invent routes.</div>}
-            {selectedCapability && !legalSimulation && (
+            {selectedCapability && !legalDiagnostic && (
               <div className={styles.info}>
-                This capability is inspectable but not directly runnable here. Workbench v0.1 requires ACTIVE status, no approval gate, a matching scope (including wildcard scope), and a workflow currently advertised by the live execution runtime.
+                This capability is inspectable only. The Workbench can run the exact registered Internal Runtime Diagnostic (A0, LIVE, no approval), in global-working-memory when D1 durable history is healthy; other actions require their separate execution policies.
               </div>
             )}
-            {simulationResult?.execution?.execution_id && (
-              <div className={styles.success}>Simulation created: <code>{simulationResult.execution.execution_id}</code></div>
+            {diagnosticResult?.execution?.execution_id && (
+              <div className={styles.success}>Diagnostic {diagnosticResult.execution?.status}: <code>{diagnosticResult.execution.execution_id}</code></div>
             )}
 
             <div className={styles.capabilityList}>

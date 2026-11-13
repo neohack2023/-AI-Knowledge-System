@@ -20,6 +20,7 @@ const profiles = {
   ],
   d1: ["tests/d1-runtime.integration.ts"],
   http: ["tests/http-runtime.integration.ts"],
+  browser: ["tests/workbench-browser.integration.mjs"],
 };
 const exists = async (path) => access(path, constants.F_OK).then(() => true).catch(() => false);
 
@@ -64,8 +65,10 @@ export async function evaluateScenario({ name, command, args = [], cwd = root, r
 }
 
 export async function runEvaluation({ profile = "learning", cwd = root, outputDir = join(root, "outputs", "evaluations"), writeReceipt = true } = {}) {
-  if (!["learning", "runtime", "d1", "http", "both", "all"].includes(profile)) throw new Error("Profile must be learning, runtime, d1, http, both, or all.");
+  if (!["learning", "runtime", "d1", "http", "browser", "both", "all"].includes(profile)) throw new Error("Profile must be learning, runtime, d1, http, browser, both, or all.");
   const startedAt = new Date().toISOString();
+  const browserPath = process.env.AIOS_BROWSER_PATH
+    || (process.platform === "win32" ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" : "AIOS_BROWSER_PATH");
   const scenarios = profile === "all" ? ["learning", "runtime", "d1", "http"]
     : profile === "both" ? ["learning", "runtime"] : [profile];
   const results = [];
@@ -76,7 +79,8 @@ export async function runEvaluation({ profile = "learning", cwd = root, outputDi
       args: ["--experimental-transform-types", "--test", ...tests],
       cwd, requiredPaths: name === "runtime" ? ["dist/server/index.js", ...tests]
         : name === "d1" ? ["node_modules/miniflare/package.json", ...tests]
-        : name === "http" ? ["node_modules/miniflare/package.json", "dist/server/index.js", "drizzle/0000_execution_history.sql", ...tests] : tests,
+        : name === "http" ? ["node_modules/miniflare/package.json", "dist/server/index.js", "drizzle/0000_execution_history.sql", ...tests]
+        : name === "browser" ? ["node_modules/miniflare/package.json", "dist/server/index.js", "dist/client", "drizzle/0000_execution_history.sql", browserPath, ...tests] : tests,
       timeoutMs: name === "runtime" ? 180000 : 90000,
       capture: true,
     });
