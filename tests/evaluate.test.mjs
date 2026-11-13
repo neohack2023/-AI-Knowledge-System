@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evaluateScenario, runEvaluation } from "../scripts/evaluate.mjs";
@@ -49,4 +49,10 @@ test("receipt reports incomplete coverage without falsely awarding acceptance", 
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("GitHub CI executes the same behavioral profiles and preserves their independent receipt", async () => {
+  const ci = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.match(ci, /name: Run behavioral evaluation profiles\s+if: always\(\)\s+run: npm run evaluate -- --profile=both/);
+  assert.match(ci, /name: Upload behavioral evaluation receipt[\s\S]*?outputs\/evaluations\/latest\.json[\s\S]*?outputs\/evaluations\/runs\.jsonl/);
 });

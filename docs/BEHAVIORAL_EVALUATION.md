@@ -25,3 +25,4 @@ A meaningful AIOS evaluation must specify a real task, starting state, expected 
 ## Changelog
 
 - 2026-11-12 — Initial canonical execution runner with two bounded profiles, environment-vs-functional failure classification, compact receipt history, and positive/negative/timeout regression controls.
+- 2026-11-12 — GitHub CI now invokes the same profiles as an independent post-build step and uploads its own receipts even when the legacy build-and-test bundle fails. Existing governance gates remain unchanged.
