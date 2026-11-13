@@ -47,6 +47,20 @@ jobs:
         id: build_test
         run: npm test
 
+      - name: Run behavioral evaluation profiles
+        if: always()
+        run: npm run evaluate -- --profile=both
+
+      - name: Upload behavioral evaluation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: behavioral-evaluation-${{ github.run_id }}
+          path: |
+            outputs/evaluations/latest.json
+            outputs/evaluations/runs.jsonl
+          if-no-files-found: warn
+
       - name: Emit verifier-owned CodingHarness receipt
         if: always()
         env:

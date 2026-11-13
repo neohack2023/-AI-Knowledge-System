@@ -64,7 +64,7 @@ Skills package repeatable **how**. They do not widen role, verifier, merge, rele
 
 ## Organization audit
 
-The repository mechanically audits its own agent operating structure through `npm run check:agent-system` and `.github/workflows/agent-system-audit.yml`.
+The repository can audit its agent operating structure on demand via `npm run check:agent-system`. The governance-only GitHub Actions workflow was retired; execution, behavioral tests and the public-release boundary remain in CI.
 
 A green organization audit is obligation-local. It does not imply application correctness, clean advisory review, merge eligibility, merge authorization, deployment authorization, or release authority.
 
