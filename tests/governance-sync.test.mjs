@@ -84,3 +84,61 @@ test('checkout newline styles produce the same canonical receipt digest', () => 
   const lf = '{\n  "schema_name": "GovernanceSyncReceipt"\n}\n';
   assert.equal(receiptDigest(lf), receiptDigest(lf.replace(/\n/g, '\r\n')));
 });
+
+const multiSource = () => {
+  const receipt = baseReceipt('NO_MATERIAL_DELTA');
+  receipt.upstream_snapshot_identity_kind = 'GOVERNED_MULTI_SOURCE_V1';
+  receipt.upstream_sources = [{
+    source_id: source.source_id,
+    source_kind: 'DRIVE',
+    object_id: '1VzlBRsQMaDOrQhsWbbwkXO8mLuBB0RaWpK5YyAqKQe4',
+    observed_modified_at: '2026-08-30T17:16:43.868Z',
+    content_digest: 'sha256:' + 'a'.repeat(64),
+    authority_state: 'drive_verified_mirror',
+    verification_state: 'VERIFIED',
+  }];
+  return receipt;
+};
+
+test('governed multi-source schema admits a verified Drive snapshot, retaining legacy support', () => {
+  assert.deepEqual(validateGovernanceSyncReceipt(multiSource(), { requiredSources: [source.source_id] }), []);
+  assert.deepEqual(validateGovernanceSyncReceipt(baseReceipt(), { requiredSources: [source.source_id] }), []);
+});
+
+test('governed multi-source schema rejects a Drive shadow passed off as verified authority', () => {
+  const receipt = multiSource();
+  receipt.upstream_sources[0].authority_state = 'drive_shadow';
+  assert.ok(validateGovernanceSyncReceipt(receipt, { requiredSources: [source.source_id] })
+    .some(x => x.code === 'GOVERNANCE_SYNC_SOURCE_UNVERIFIED'));
+});
+
+test('governed multi-source schema fails on missing digest, partial sources and duplicate identities', () => {
+  const receipt = multiSource();
+  receipt.upstream_sources[0].content_digest = null;
+  const missing = validateGovernanceSyncReceipt(receipt, { requiredSources: [source.source_id, 'CODING-HARNESS-01'] });
+  assert.ok(missing.some(x => x.code === 'GOVERNANCE_SYNC_SOURCE_UNVERIFIED'));
+  assert.ok(missing.some(x => x.code === 'GOVERNANCE_SYNC_SOURCE_SET_MISMATCH'));
+  const duplicate = multiSource();
+  duplicate.upstream_sources.push({...duplicate.upstream_sources[0]});
+  assert.ok(validateGovernanceSyncReceipt(duplicate, { requiredSources: [source.source_id] })
+    .some(x => x.code === 'GOVERNANCE_SYNC_SOURCE_DUPLICATE'));
+});
+
+test('governed multi-source schema can bind a live GitHub implementation identity but cannot substitute an arbitrary repository', () => {
+  const receipt = multiSource();
+  receipt.upstream_sources[0] = {
+    source_id: source.source_id,
+    source_kind: 'GITHUB',
+    repository: 'neohack2023/-AI-Knowledge-System',
+    path: 'server/coding-harness/index.ts',
+    commit_sha: '4a47885dfa00f7f9a9554bf3e6a3ef6500b781e4',
+    observed_modified_at: '2026-11-13T00:00:00Z',
+    content_digest: 'sha256:' + 'b'.repeat(64),
+    authority_state: 'github_authoritative',
+    verification_state: 'VERIFIED',
+  };
+  assert.deepEqual(validateGovernanceSyncReceipt(receipt, { requiredSources: [source.source_id] }), []);
+  receipt.upstream_sources[0].path = '../private-secret';
+  assert.ok(validateGovernanceSyncReceipt(receipt, { requiredSources: [source.source_id] })
+    .some(x => x.code === 'GOVERNANCE_SYNC_SOURCE_UNVERIFIED'));
+});

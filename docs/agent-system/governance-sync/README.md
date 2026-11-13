@@ -70,3 +70,13 @@ Recurring upstream sources should be stable cross-repository/global governance c
 ## Authority boundary
 
 A successful sync means only that the declared upstream sources were compared and the bounded repository governance snapshot was reconciled for the stated freshness interval. It does not authorize merge, release, deployment, capability widening, verifier changes, or global authority cutover.
+
+## Drive-first snapshot migration (2026-11-12 investigation)
+
+The legacy `NOTION_PAGE_ID_PLUS_LAST_EDITED_AT` receipt format remains readable for historical evidence. The governance-sync validator also supports `GOVERNED_MULTI_SOURCE_V1`, which can bind approved Drive-authoritative/verified-mirror snapshots and live GitHub implementation identities using opaque IDs, observed modification times and SHA-256 content digests. Invalid, partial, duplicated, or unverified sources fail closed. Merely labeling a record `VERIFIED` does **not** independently establish that authority: the Knowledge Steward must independently read back each source, resolve registry state and classify changes before issuing a real renewal.
+
+**Current sync disposition: BLOCKED (source-mapping gap), NOT A FRESHNESS RENEWAL.** The existing public lock still expires 2026-10-20. The pinned source `AIOS_GITHUB_GOVERNED_EXECUTION_CONTRACT_v0.1` has a Drive shadow, and `VERIFIER_OWNED_ACCEPTANCE_01` has a Drive shadow; neither was proven to be a registered `drive_verified_mirror` or `drive_authoritative` successor. No verified Drive successor for `CODING-HARNESS-01` was located in scoped Drive searches. The original three historical Notion page IDs could not be read (`object_not_found`), so Notion fallback did not resolve the dependency. No synthetic receipt was committed, no upstream source was silently replaced, and the governance lock/date/hash were not changed.
+
+**Legal next operation:** resolve each pinned source's authority_state and successor binding from the current Drive registry/migration ledger; reconcile the missing CodingHarness governance source rather than substituting current GitHub implementation semantics without an explicit mapping; compare source content against this repository's GOVERNANCE_BUNDLE / CodingHarness rules; then create a genuine `NO_MATERIAL_DELTA` or `MATERIAL_DELTA_RECONCILED` receipt, bind its canonical digest and mechanically derived 30-day date, and run exact-head strict CI. Until then ordinary code-only work may use scoped governance warning mode, while modifications to governance/CI remain strictly gated.
+
+Changelog: 2026-11-12 — Added mixed-source snapshot validation and source-verification negative controls; preserved legacy receipt compatibility and denied expiry renewal without complete authority evidence.

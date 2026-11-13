@@ -79,15 +79,34 @@ export function validateGovernanceSyncReceipt(receipt, {
   if (expectedPerformedOn && receipt.performed_on !== expectedPerformedOn) problems.push(issue('GOVERNANCE_SYNC_DATE_MISMATCH', file, 'Receipt performed_on does not match last_upstream_sync.'));
   if (!SHA40.test(receipt.repository_base_sha || '')) problems.push(issue('GOVERNANCE_SYNC_RECEIPT_INVALID', file, 'repository_base_sha must be an exact 40-character commit SHA.'));
   if (receipt.sync_role !== 'KNOWLEDGE_STEWARD') problems.push(issue('GOVERNANCE_SYNC_ROLE_INVALID', file, 'sync_role must be KNOWLEDGE_STEWARD.'));
-  if (receipt.upstream_snapshot_identity_kind !== 'NOTION_PAGE_ID_PLUS_LAST_EDITED_AT') problems.push(issue('GOVERNANCE_SYNC_SNAPSHOT_INVALID', file, 'Unsupported upstream snapshot identity kind.'));
+  const snapshotKind = receipt.upstream_snapshot_identity_kind;
+  if (!['NOTION_PAGE_ID_PLUS_LAST_EDITED_AT', 'GOVERNED_MULTI_SOURCE_V1'].includes(snapshotKind)) problems.push(issue('GOVERNANCE_SYNC_SNAPSHOT_INVALID', file, 'Unsupported upstream snapshot identity kind.'));
 
   const actualSources = Array.isArray(receipt.upstream_sources) ? receipt.upstream_sources : [];
   const actualIds = actualSources.map((source) => source.source_id).sort();
   const requiredIds = [...requiredSources].sort();
   if (JSON.stringify(actualIds) !== JSON.stringify(requiredIds)) problems.push(issue('GOVERNANCE_SYNC_SOURCE_SET_MISMATCH', file, `Receipt sources ${actualIds.join(', ')} do not match lock sources ${requiredIds.join(', ')}.`));
+  if (new Set(actualIds).size !== actualIds.length) problems.push(issue('GOVERNANCE_SYNC_SOURCE_DUPLICATE', file, 'Repeated upstream source IDs are not independent evidence.'));
   for (const source of actualSources) {
-    if (!source.source_id || !PAGE_ID.test(source.page_id || '') || Number.isNaN(Date.parse(source.observed_last_edited_at || ''))) {
-      problems.push(issue('GOVERNANCE_SYNC_SNAPSHOT_INVALID', file, `Source ${source.source_id || '<missing>'} lacks a valid opaque page ID or observed last-edited timestamp.`));
+    if (snapshotKind === 'NOTION_PAGE_ID_PLUS_LAST_EDITED_AT') {
+      if (!source.source_id || !PAGE_ID.test(source.page_id || '') || Number.isNaN(Date.parse(source.observed_last_edited_at || ''))) {
+        problems.push(issue('GOVERNANCE_SYNC_SNAPSHOT_INVALID', file, `Source ${source.source_id || '<missing>'} lacks a valid opaque page ID or observed last-edited timestamp.`));
+      }
+      continue;
+    }
+    if (snapshotKind === 'GOVERNED_MULTI_SOURCE_V1') {
+      const kind = source.source_kind;
+      const digest = /^sha256:[0-9a-f]{64}$/i.test(source.content_digest || '');
+      const observedAt = typeof source.observed_modified_at === 'string' && source.observed_modified_at.includes('T') && !Number.isNaN(Date.parse(source.observed_modified_at));
+      const drive = kind === 'DRIVE' && /^[A-Za-z0-9_-]{20,}$/.test(source.object_id || '') &&
+        ['drive_authoritative', 'drive_verified_mirror'].includes(source.authority_state);
+      const github = kind === 'GITHUB' && source.authority_state === 'github_authoritative' &&
+        /^[a-f0-9]{40}$/i.test(source.commit_sha || '') &&
+        (source.repository || '').split('/').length === 2 && (source.repository || '').split('/').every(part => /^[A-Za-z0-9_.-]+$/.test(part)) &&
+        typeof source.path === 'string' && source.path.length > 0 && !source.path.startsWith('/') && !source.path.includes('..');
+      if (source.verification_state !== 'VERIFIED' || !source.source_id || !digest || !observedAt || !(drive || github)) {
+        problems.push(issue('GOVERNANCE_SYNC_SOURCE_UNVERIFIED', file, `Source ${source.source_id || '<missing>'} lacks a verified, authority-eligible Drive/GitHub snapshot.`));
+      }
     }
   }
 
