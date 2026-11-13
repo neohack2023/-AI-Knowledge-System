@@ -68,3 +68,16 @@ test("diagnostic output from a failed executable scenario is bounded", async () 
   assert.equal(outcome.exit_code, 7);
   assert.equal(outcome.captured?.length, 12000);
 });
+
+test("HTTP evaluation checks the compiled Worker and local D1 prerequisites before execution", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "aios-http-missing-"));
+  try {
+    const receipt = await runEvaluation({ profile: "http", cwd, writeReceipt: false });
+    assert.equal(receipt.status, "BLOCKED");
+    assert.deepEqual(receipt.coverage, { executed: 0, requested: 1, complete: false });
+    assert.deepEqual(receipt.results[0].missing, [
+      "node_modules/miniflare/package.json", "dist/server/index.js",
+      "drizzle/0000_execution_history.sql", "tests/http-runtime.integration.ts",
+    ]);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
