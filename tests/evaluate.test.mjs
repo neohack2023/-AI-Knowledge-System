@@ -81,3 +81,16 @@ test("HTTP evaluation checks the compiled Worker and local D1 prerequisites befo
     ]);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
+
+test("optional real-browser profile stays outside ordinary four-profile CI and fails cleanly on missing environment", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "aios-browser-missing-"));
+  try {
+    const receipt = await runEvaluation({ profile: "browser", cwd, writeReceipt: false });
+    assert.equal(receipt.status, "BLOCKED");
+    assert.deepEqual(receipt.coverage, { executed: 0, requested: 1, complete: false });
+    assert.ok(receipt.results[0].missing.includes("tests/workbench-browser.integration.mjs"));
+    assert.equal(receipt.authorization_effect, "NONE");
+    const source = await readFile(new URL("../scripts/evaluate.mjs", import.meta.url), "utf8");
+    assert.match(source, /profile === "all" \? \["learning", "runtime", "d1", "http"\]/);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
