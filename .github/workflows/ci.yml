@@ -49,6 +49,10 @@ jobs:
         id: build_test
         run: npm test
 
+      - name: Audit governance scope independently
+        if: always()
+        run: npm run check:agent-system:ci
+
       - name: Run behavioral evaluation profiles
         if: always()
         run: npm run evaluate -- --profile=both

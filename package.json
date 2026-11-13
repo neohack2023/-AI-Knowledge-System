@@ -10,7 +10,7 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
     "build": "bash scripts/build-verified.sh",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --experimental-transform-types --test tests/*.test.mjs tests/*.test.ts && npm run test:agent-system && npm run test:governance-sync && npm run check:agent-system:ci && npm run check:governance-sync && npm run test:spatial-compiler && npm run check:public-release",
+    "test": "npm run build && node --experimental-transform-types --test tests/*.test.mjs tests/*.test.ts && npm run test:agent-system && npm run test:governance-sync && npm run check:governance-sync && npm run test:spatial-compiler && npm run check:public-release",
     "test:agent-system": "node --test tests/agent-system-audit.test.mjs",
     "check:agent-system": "node scripts/agent-system/audit.mjs --report outputs/agent-system-audit.json",
     "check:agent-system:ci": "node scripts/agent-system/audit.mjs --ci-scoped --report outputs/agent-system-audit.json",

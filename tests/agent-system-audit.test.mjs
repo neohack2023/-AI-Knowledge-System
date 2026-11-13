@@ -91,3 +91,14 @@ test('skill frontmatter accepts CRLF on Windows without weakening name validatio
   assert.deepEqual(validateSkillFrontmatter(lf.replace(/\n/g, '\r\n'), 'verify-head'), []);
   assert.ok(validateSkillFrontmatter(lf.replace(/\n/g, '\r\n'), 'other-skill').some(i => i.code === 'SKILL_NAME_MISMATCH'));
 });
+
+test('governance freshness cannot abort functional tests before spatial and release checks', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const ci = await readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  assert.ok(pkg.scripts.test.includes('npm run test:spatial-compiler'));
+  assert.ok(pkg.scripts.test.includes('npm run check:public-release'));
+  assert.ok(!pkg.scripts.test.includes('npm run check:agent-system:ci'));
+  assert.match(ci, /name: Audit governance scope independently\s+if: always\(\)\s+run: npm run check:agent-system:ci/);
+  assert.ok(ci.indexOf('name: Build and test') < ci.indexOf('name: Audit governance scope independently'));
+});

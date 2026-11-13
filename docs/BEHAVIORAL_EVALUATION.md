@@ -40,3 +40,5 @@ The public repository's existing governance lock remains expired (`valid_through
 ### Changelog
 
 - 2026-11-12 — Split scoped code CI from strict governance freshness; preserve warnings, exact-head scope proofs, and fail-closed sensitive-path enforcement. Repaired CRLF parsing and governance receipt hashing for Host 02 Windows parity.
+
+- 2026-11-12 — Removed the governance freshness audit from the `npm test` chain and put it in its own always-run GitHub Actions step. This preserves execution of the spatial compiler, release check and the complete build-and-test verdict even when governance is blocked. The governance step itself still fails under strict scope, so no merge authorization is implied.
