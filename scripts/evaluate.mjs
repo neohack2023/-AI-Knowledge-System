@@ -18,6 +18,7 @@ const profiles = {
     "tests/workflow-kernel.test.mjs",
     "tests/aios-bridge-live-read.test.mjs",
   ],
+  d1: ["tests/d1-runtime.integration.ts"],
 };
 const exists = async (path) => access(path, constants.F_OK).then(() => true).catch(() => false);
 
@@ -50,7 +51,7 @@ export async function evaluateScenario({ name, command, args = [], cwd = root, r
       child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: process.env });
       for (const stream of [child.stdout, child.stderr]) {
         stream?.on("data", (chunk) => {
-          if (capture && output.length < 512) output += chunk.toString("utf8").slice(0, 512 - output.length);
+          if (capture) output = (output + chunk.toString("utf8")).slice(-12000);
         });
       }
       child.on("error", (err) => complete({ status: "BLOCKED", reason_code: err.code === "ENOENT" ? "COMMAND_NOT_FOUND" : "PROCESS_START_FAILED", exit_code: null }));
@@ -62,18 +63,30 @@ export async function evaluateScenario({ name, command, args = [], cwd = root, r
 }
 
 export async function runEvaluation({ profile = "learning", cwd = root, outputDir = join(root, "outputs", "evaluations"), writeReceipt = true } = {}) {
-  if (!["learning", "runtime", "both"].includes(profile)) throw new Error("Profile must be learning, runtime, or both.");
+  if (!["learning", "runtime", "d1", "both", "all"].includes(profile)) throw new Error("Profile must be learning, runtime, d1, both, or all.");
   const startedAt = new Date().toISOString();
-  const scenarios = profile === "both" ? ["learning", "runtime"] : [profile];
+  const scenarios = profile === "all" ? ["learning", "runtime", "d1"]
+    : profile === "both" ? ["learning", "runtime"] : [profile];
   const results = [];
   for (const name of scenarios) {
     const tests = profiles[name];
-    results.push(await evaluateScenario({
+    const outcome = await evaluateScenario({
       name, command: process.execPath,
       args: ["--experimental-transform-types", "--test", ...tests],
-      cwd, requiredPaths: name === "runtime" ? ["dist/server/index.js", ...tests] : tests,
+      cwd, requiredPaths: name === "runtime" ? ["dist/server/index.js", ...tests]
+        : name === "d1" ? ["node_modules/miniflare/package.json", ...tests] : tests,
       timeoutMs: name === "runtime" ? 180000 : 90000,
-    }));
+      capture: true,
+    });
+    const { captured, ...receiptResult } = outcome;
+    if (outcome.status === "FAIL" && captured) {
+      // Diagnostics go to CI terminal only, not to durable receipts or knowledge.
+      const scrubbed = captured.replace(/Bearer\s+[^\s]+/gi, "Bearer [REDACTED]")
+        .replace(/sk-(?:proj-)?[a-zA-Z0-9_-]{12,}/g, "[REDACTED_KEY]")
+        .replace(/-----BEGIN [\s\S]*?-----END [A-Z ]+-----/g, "[REDACTED_PEM]");
+      process.stderr.write(`Evaluation ${name} failed; bounded test output follows:\n${scrubbed}\n`);
+    }
+    results.push(receiptResult);
   }
   const status = results.every(r => r.status === "PASS") ? "PASS"
     : results.some(r => r.status === "FAIL") ? "FAIL"

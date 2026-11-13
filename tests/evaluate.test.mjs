@@ -53,6 +53,18 @@ test("receipt reports incomplete coverage without falsely awarding acceptance", 
 
 test("GitHub CI executes the same behavioral profiles and preserves their independent receipt", async () => {
   const ci = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-  assert.match(ci, /name: Run behavioral evaluation profiles\s+if: always\(\)\s+run: npm run evaluate -- --profile=both/);
+  assert.match(ci, /name: Run behavioral evaluation profiles\s+if: always\(\)\s+run: npm run evaluate -- --profile=all/);
   assert.match(ci, /name: Upload behavioral evaluation receipt[\s\S]*?outputs\/evaluations\/latest\.json[\s\S]*?outputs\/evaluations\/runs\.jsonl/);
+});
+
+test("diagnostic output from a failed executable scenario is bounded", async () => {
+  const outcome = await evaluateScenario({
+    name: "bounded-failure",
+    command: process.execPath,
+    args: ["-e", "process.stderr.write('X'.repeat(15000));process.exit(7)"],
+    capture: true,
+  });
+  assert.equal(outcome.status, "FAIL");
+  assert.equal(outcome.exit_code, 7);
+  assert.equal(outcome.captured?.length, 12000);
 });
