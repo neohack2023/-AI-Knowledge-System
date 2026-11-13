@@ -10,7 +10,7 @@ native_adapter_state: ACTIVE
 native_skill_state: ACTIVE
 organization_audit_state: ACTIVE
 organization_audit_command: npm run check:agent-system
-organization_audit_workflow: .github/workflows/agent-system-audit.yml
+organization_audit_workflow: manual_only
 audit_fail_closed: true
 upstream_sync_state: ACTIVE
 sync_skill: sync-governance
